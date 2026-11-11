@@ -812,13 +812,42 @@
     else if (thr < 0) { if (v.speed > 0.5) v.speed -= 15 * dt; else v.speed = Math.max(-8, v.speed - 4 * dt); }
     else v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), (1.2 + Math.abs(v.speed) * 0.04) * dt);
     if (v.speed > vmax) v.speed -= (v.speed - vmax) * Math.min(1, 1.5 * dt);
-    if (hb) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), 20 * dt);
-    v.steer += (str * 0.6 - v.steer) * Math.min(1, dt * 6);
-    const eff = v.steer * L.clamp(1 - Math.abs(v.speed) / (t.vmax / 3.6 * 1.25), 0.12, 1) * (hb ? 1.6 : 1);
-    v.yaw += eff * v.speed / (t.len * 0.62) * dt;
-    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
-    const before = v.speed;
-    v.x += fx * v.speed * dt; v.z += fz * v.speed * dt;
+    // Handbremse bremst nur leicht – so kann man in die Kurve rutschen
+    if (hb) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), 5 * dt);
+    // Geschwindigkeit als Richtung in der Welt (vorwärts + seitlich rutschen)
+    const lat0 = v.lat || 0;
+    const f0x = Math.sin(v.yaw), f0z = Math.cos(v.yaw);
+    const Vx = f0x * v.speed - f0z * lat0, Vz = f0z * v.speed + f0x * lat0;
+    // Lenkung: dreht langsam ein, stellt sich von selbst zurück, bei hohem Tempo weniger stark
+    v.steer += (str - v.steer) * Math.min(1, dt * (str ? 3.5 : 6));
+    const spd = Math.abs(v.speed), top = t.vmax / 3.6;
+    const turn = (t.kind === 'bike' ? 1.7 : 1.35) * L.clamp(spd / 6, 0, 1) * L.lerp(1, 0.4, L.clamp(spd / top, 0, 1)) * (hb ? 1.5 : 1);
+    v.yaw += v.steer * turn * Math.sign(v.speed) * dt;
+    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw), rx = -fz, rz = fx;
+    // alte Bewegungsrichtung auf die neue Fahrzeugrichtung umrechnen
+    v.speed = Vx * fx + Vz * fz;
+    let lat = Vx * rx + Vz * rz;
+    // Haftung der Reifen: normal hoch, mit Handbremse sehr gering (= Drift)
+    const grip = hb ? 2.4 : (spd > 14 && Math.abs(v.steer) > 0.85 ? 4.5 : 8);
+    lat *= Math.exp(-grip * dt);
+    if (!hb && Math.abs(lat) > 0.5) v.speed += Math.sign(v.speed) * Math.abs(lat) * 0.15 * grip * dt * 0.3;
+    v.lat = lat;
+    const before = v.speed, latBefore = lat;
+    v.x += (fx * v.speed + rx * lat) * dt; v.z += (fz * v.speed + rz * lat) * dt;
+    // Driften: Reifenquietschen, Rauch, Lärm
+    if (Math.abs(lat) > 3 && spd > 5) {
+      v.driftT = (v.driftT || 0) - dt;
+      if (v.driftT <= 0) {
+        v.driftT = 0.12;
+        const bx = v.x - fx * t.len * 0.4, bz = v.z - fz * t.len * 0.4;
+        if (L.dist(P.x, P.z, v.x, v.z) < 150) {
+          L.fx('#cfcfcf', bx, 0.3, bz, 2, 0.6, { size: 0.35, life: 1.2, g: -0.1, grow: 1.1 });
+          L.snd.screech({ x: v.x, y: 0.5, z: v.z }, L.clamp(Math.abs(lat) / 12, 0.05, 0.3));
+          if (Math.random() < 0.3) L.decal(bx, bz, 0.35, '#141414');
+        }
+        if (isPlayer) L.makeNoise(v.x, v.z, 35, P);
+      }
+    }
     // Zusammenstöße
     let impact = 0;
     const circles = vehCircles(v);
@@ -826,7 +855,7 @@
       L.collide(c[0], c[1], c[2], 0.2, RES);
       if (RES.hit) {
         v.x += RES.x - c[0]; v.z += RES.z - c[1];
-        const into = -(fx * RES.nx + fz * RES.nz) * before;
+        const into = -((fx * before + rx * latBefore) * RES.nx + (fz * before + rz * latBefore) * RES.nz);
         if (into > impact) impact = into;
       }
     }
@@ -837,14 +866,14 @@
         if (d < min && d > 0.001) {
           const nx = (a[0] - b[0]) / d, nz = (a[1] - b[1]) / d;
           v.x += nx * (min - d); v.z += nz * (min - d);
-          const into = -(fx * nx + fz * nz) * before;
+          const into = -((fx * before + rx * latBefore) * nx + (fz * before + rz * latBefore) * nz);
           if (into > impact) impact = into;
           o.speed += before * 0.3;
         }
       }
     }
-    if (impact > 2.5) { v.speed = -before * 0.15; crash(v, impact, isPlayer); }
-    else if (impact > 0) v.speed *= 0.8;
+    if (impact > 2.5) { v.speed = -before * 0.15; v.lat = -latBefore * 0.2; crash(v, impact, isPlayer); }
+    else if (impact > 0) { v.speed *= 0.8; v.lat *= 0.5; }
     // Monster und Menschen überfahren
     if (Math.abs(v.speed) > 3) for (const e of allTargets()) {
       if (e.kind === 'walker' || e.kind === 'boss') continue;
@@ -858,8 +887,8 @@
     // Optik
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
-    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.7;
-    v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 25, -0.6, 0.6) : 0;
+    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
+    v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
     v.rig.root.position.set(v.x, 0, v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
@@ -871,8 +900,8 @@
     v.speed = p.speed || 0; v.steer = p.steer || 0; if (p.hp !== undefined) v.hp = p.hp;
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
-    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.7;
-    v.lean = v.t.kind === 'bike' ? L.clamp(v.steer * v.speed / 25, -0.6, 0.6) : 0;
+    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
+    v.lean = v.t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
     v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
     if (v.t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < 300;

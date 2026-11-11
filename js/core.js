@@ -220,6 +220,7 @@
     glass(pos, i) { for (let k = 0; k < 6; k++) L.tn({ f: 2000 + Math.random() * 3500, dur: 0.15 + Math.random() * 0.25, type: 'triangle', vol: 0.03 + 0.05 * i, pos, delay: Math.random() * 0.18 }); },
     belt(on) { L.nz({ dur: 0.05, f: 2600, type: 'highpass', vol: 0.25 }); L.tn({ f: on ? 1250 : 850, dur: 0.05, type: 'square', vol: 0.05, delay: 0.07 }); },
     beltWarn() { L.tn({ f: 1450, dur: 0.12, vol: 0.1 }); L.tn({ f: 1450, dur: 0.12, vol: 0.1, delay: 0.25 }); },
+    screech(pos, vol) { L.nz({ dur: 0.16, f: 1900 + Math.random() * 500, type: 'bandpass', q: 6, vol, pos }); },
     hupe(pos) { L.tn({ f: 405, dur: 0.6, type: 'square', vol: 0.12, pos }); L.tn({ f: 508, dur: 0.6, type: 'square', vol: 0.1, pos }); },
     key() { L.tn({ f: 1200, dur: 0.06, type: 'square', vol: 0.07 }); },
     codeOk() { [800, 1000, 1300].forEach((f, i) => L.tn({ f, dur: 0.15, type: 'square', vol: 0.07, delay: i * 0.12 })); },
