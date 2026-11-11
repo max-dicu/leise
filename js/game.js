@@ -1,0 +1,1576 @@
+'use strict';
+// Spiellogik: Spieler, Inventar, Waffen, Fahrzeuge, Monster, Stelzer, Koloss, NPCs, Fluchtwege
+(function () {
+  const L = window.L, T = THREE;
+
+  L.ITEMS = {
+    hammer: { name: 'Hammer', slot: 'hammer', icon: '🔨' },
+    minipistole: { name: 'Mini-Pistole', slot: 'waffe', icon: '🔫', dmg: 22, rate: 0.22, noise: 65, range: 70, ammo: '9mm', mag: 10, spread: 0.014 },
+    pistole: { name: 'Pistole', slot: 'waffe', icon: '🔫', dmg: 34, rate: 0.32, noise: 110, range: 100, ammo: '9mm', mag: 15, spread: 0.01 },
+    schrotflinte: { name: 'Schrotflinte', slot: 'waffe', icon: '💥', dmg: 15, pellets: 9, rate: 0.9, noise: 150, range: 40, ammo: 'schrot', mag: 6, spread: 0.07 },
+    gewehr: { name: 'Sturmgewehr', slot: 'waffe', icon: '🎯', dmg: 28, rate: 0.11, auto: true, noise: 150, range: 160, ammo: 'gewehrmuni', mag: 30, spread: 0.016 },
+    granate: { name: 'Granate', slot: 'granate', icon: '💣', stack: 10 },
+    konserve: { name: 'Konserve', slot: 'essen', icon: '🥫', food: 35, stack: 8 },
+    brot: { name: 'Brot', slot: 'essen', icon: '🍞', food: 25, stack: 8 },
+    apfel: { name: 'Apfel', slot: 'essen', icon: '🍎', food: 12, water: 6, stack: 8 },
+    riegel: { name: 'Energieriegel', slot: 'essen', icon: '🍫', food: 15, stam: 40, stack: 8 },
+    wasser: { name: 'Wasser', slot: 'trinken', icon: '💧', water: 40, stack: 8 },
+    cola: { name: 'Cola', slot: 'trinken', icon: '🥤', water: 25, stam: 30, stack: 8 },
+    saft: { name: 'Saft', slot: 'trinken', icon: '🧃', water: 30, food: 5, stack: 8 },
+    verband: { name: 'Verband', slot: 'bag', icon: '🩹', heal: 35, stack: 6 },
+    medkit: { name: 'Medikit', slot: 'bag', icon: '💊', heal: 80, stack: 3 },
+    '9mm': { name: '9mm-Munition', slot: 'bag', icon: '🟡', stack: 120, amount: 15 },
+    schrot: { name: 'Schrotpatronen', slot: 'bag', icon: '🔴', stack: 48, amount: 8 },
+    gewehrmuni: { name: 'Gewehrmunition', slot: 'bag', icon: '🟤', stack: 150, amount: 30 },
+    sicherung: { name: 'Sicherung', slot: 'bag', icon: '🔌', stack: 3 },
+    gold: { name: 'Goldbarren', slot: 'bag', icon: '🪙', stack: 10 },
+    uhr: { name: 'Taschenuhr', slot: 'bag', icon: '⌚', stack: 5 },
+    artefakt: { name: 'Alien-Artefakt', slot: 'bag', icon: '🔮', stack: 3 }
+  };
+  const ITEMS = L.ITEMS;
+  L.HOT = ['hammer', 'waffe', 'granate', 'essen', 'trinken'];
+  const MDIFF = { leicht: { hear: 0.7, speed: 0.85, count: 0.6, dmg: 0.7 }, normal: { hear: 1, speed: 1, count: 1, dmg: 1 }, schwer: { hear: 1.25, speed: 1.12, count: 1.35, dmg: 1.25 }, albtraum: { hear: 1.5, speed: 1.25, count: 1.8, dmg: 1.6 } };
+  const NDIFF = { leicht: { acc: 0.45, dmg: 0.6 }, normal: { acc: 0.75, dmg: 0.85 }, schwer: { acc: 1, dmg: 1 }, albtraum: { acc: 1.25, dmg: 1.3 } };
+  L.md = MDIFF.normal; L.nd = NDIFF.normal;
+  L.ents = { monsters: [], walkers: [], npcs: [], vehicles: [], items: [], grenades: [] };
+  L.boss = null;
+  const E = L.ents, P = L.player = {};
+  // ---------- Mehrspieler-Grundlagen ----------
+  let NID = 1;
+  L.byId = new Map();
+  const NET = () => (L.net ? L.net.role : 'solo');
+  const isClient = () => NET() === 'client', isHost = () => NET() === 'host';
+  const RP = () => (isHost() && L.remote && L.remote.inRound && L.remote.alive ? L.remote : null);
+  function players() { const a = []; if (P.alive && !P.gone) a.push(P); if (RP()) a.push(RP()); return a; }
+  function nearestPlayer(x, z) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
+  function hurtRemote(dmg, cause, kx, kz, ky, sneak) { L.mp.send({ t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
+  function hurtAny(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (t === L.remote) hurtRemote(dmg, cause); }
+  let remoteAcc = 0;
+  function dps(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (t === L.remote) { remoteAcc += dmg; if (remoteAcc >= 8) { hurtRemote(remoteAcc, cause); remoteAcc = 0; } } }
+  function nearDist(x, z, dP) { const rp = RP(); return rp ? Math.min(dP, L.dist(rp.x, rp.z, x, z)) : dP; }
+  const RES = {}, V1 = new T.Vector3(), V2 = new T.Vector3(), V3 = new T.Vector3();
+  L.shake = 0;
+
+  // ---------- Effekte ----------
+  const FX = { pool: [], decals: [], di: 0, tracers: [], ti: 0 };
+  let glowTex = null;
+  L.initFx = function () {
+    for (let i = 0; i < 380; i++) {
+      const m = new T.Mesh(L.GEO.box, L.mat('#8a0a0a')); m.visible = false; L.scene.add(m);
+      FX.pool.push({ m, life: 0, vx: 0, vy: 0, vz: 0, g: 1, grow: 0 });
+    }
+    const dg = new T.CircleGeometry(1, 12); dg.rotateX(-Math.PI / 2);
+    for (let i = 0; i < 80; i++) {
+      const m = new T.Mesh(dg, new T.MeshLambertMaterial({ color: '#4a0606', transparent: true, opacity: 0.85, depthWrite: false }));
+      m.visible = false; L.scene.add(m); FX.decals.push(m);
+    }
+    for (let i = 0; i < 16; i++) {
+      const m = new T.Mesh(L.GEO.cyl, new T.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.8, blending: T.AdditiveBlending, depthWrite: false }));
+      m.visible = false; L.scene.add(m); FX.tracers.push({ m, life: 0 });
+    }
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,180,0.9)'); gr.addColorStop(1, 'rgba(255,240,180,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    glowTex = new T.CanvasTexture(c);
+    L.flashBall = new T.Mesh(new T.SphereGeometry(1, 16, 12), new T.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false }));
+    L.scene.add(L.flashBall);
+  };
+  L.fx = function (color, x, y, z, n, spd, o) {
+    o = o || {};
+    for (let k = 0; k < n; k++) {
+      const p = FX.pool.find((q) => q.life <= 0);
+      if (!p) return;
+      p.m.material = L.mat(color, o.basic ? { basic: true } : undefined);
+      const s = (o.size || 0.08) * (0.6 + Math.random() * 0.8);
+      p.m.scale.set(s, s, s); p.m.position.set(x, y, z); p.m.visible = true;
+      p.vx = (Math.random() - 0.5) * spd * 2 + (o.vx || 0); p.vz = (Math.random() - 0.5) * spd * 2 + (o.vz || 0);
+      p.vy = Math.random() * spd + (o.up || 1); p.g = o.g === undefined ? 1 : o.g;
+      p.life = (o.life || 1.2) * (0.6 + Math.random() * 0.6); p.grow = o.grow || 0;
+    }
+  };
+  L.decal = function (x, z, r, color) {
+    const m = FX.decals[FX.di++ % FX.decals.length];
+    m.position.set(x, 0.04 + Math.random() * 0.01, z); m.scale.set(r, 1, r * (0.7 + Math.random() * 0.5)); m.rotation.y = Math.random() * 3;
+    m.material.color.set(color || '#4a0606'); m.visible = true;
+  };
+  L.blood = function (x, y, z, n, big) {
+    L.fx('#8a0a0a', x, y, z, n || 14, big ? 5 : 3, { size: big ? 0.12 : 0.07, life: 1.4 });
+    L.fx('#5a0404', x, y, z, Math.ceil((n || 14) / 2), 2, { size: 0.1 });
+    L.decal(x + (Math.random() - 0.5), z + (Math.random() - 0.5), big ? 1.6 : 0.6 + Math.random() * 0.6);
+  };
+  L.tracer = function (a, b) {
+    const t = FX.tracers[FX.ti++ % FX.tracers.length];
+    L.seg(t.m, a, b); t.m.scale.x = t.m.scale.z = 0.025; t.m.visible = true; t.life = 0.06;
+  };
+  L.makeGlow = function () {
+    const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0.6 }));
+    s.scale.set(0.9, 0.9, 0.9);
+    return s;
+  };
+  function updateFx(dt) {
+    for (const p of FX.pool) {
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      p.vy -= 9.8 * p.g * dt;
+      p.m.position.x += p.vx * dt; p.m.position.y += p.vy * dt; p.m.position.z += p.vz * dt;
+      if (p.m.position.y < 0.03 && p.g > 0) { p.m.position.y = 0.03; p.vx *= 0.3; p.vz *= 0.3; p.vy = 0; }
+      if (p.grow) p.m.scale.multiplyScalar(1 + p.grow * dt);
+      if (p.life <= 0) p.m.visible = false;
+    }
+    for (const t of FX.tracers) if (t.life > 0) { t.life -= dt; if (t.life <= 0) t.m.visible = false; }
+    const fb = L.flashBall;
+    if (fb.material.opacity > 0) { fb.material.opacity = Math.max(0, fb.material.opacity - dt * 2.5); fb.scale.multiplyScalar(1 + dt * 2); }
+    L.env.muzzle.intensity = Math.max(0, L.env.muzzle.intensity - dt * 60);
+    L.env.boom.intensity = Math.max(0, L.env.boom.intensity - dt * 8);
+  }
+
+  // ---------- Geräusche ----------
+  L.makeNoise = function (x, z, rad, src) {
+    if (rad <= 0) return;
+    const hm = L.env.hearMul * L.md.hear;
+    if (src === P) P.noiseShow = Math.max(P.noiseShow, rad);
+    if (isClient()) { if (rad >= 4) L.mp.send({ t: 'nz', x, z, r: rad }); return; }
+    for (const m of E.monsters) {
+      if (m.dead) continue;
+      const d = L.dist(x, z, m.x, m.z), R = rad * hm;
+      if (d < R) monsterHear(m, x, z, 1 - d / R, d, src);
+    }
+    if (rad >= 40) for (const w of E.walkers) { if (!w.dead && L.dist(x, z, w.x, w.z) < rad * 2.4 * hm) walkerHear(w, x, z); }
+    if (L.boss && !L.boss.dead && rad >= 6 && L.dist(x, z, L.boss.x, L.boss.z) < rad * 3.5 * hm) { L.boss.tx = x; L.boss.tz = z; }
+    if (rad >= 60) for (const n of E.npcs) if (!n.dead && L.dist(x, z, n.x, n.z) < rad) { n.alertX = x; n.alertZ = z; n.alertT = 6; }
+  };
+
+  // ---------- Treffer-Kugeln für Schüsse ----------
+  function spheres(e) {
+    const out = [];
+    if (e.kind === 'viktor') {
+      const s = e.rig.s;
+      if (e.anim === 'crawl') { out.push([e.x + Math.sin(e.yaw) * 0.6, 0.9 * s, e.z + Math.cos(e.yaw) * 0.6, 0.55 * s, 1], [e.x + Math.sin(e.yaw) * 1.3 * s, 1.2 * s, e.z + Math.cos(e.yaw) * 1.3 * s, 0.25 * s, 2]); }
+      else out.push([e.x, 1.3 * s, e.z, 0.35 * s, 1], [e.x, 2.1 * s, e.z, 0.35 * s, 1], [e.x, 2.8 * s, e.z, 0.24 * s, 2]);
+    } else if (e.kind === 'daniel') out.push([e.x, 1.0, e.z, 0.65, 1], [e.x, 1.9, e.z, 0.8, 1], [e.x, 2.5, e.z, 0.25, 2]);
+    else if (e.kind === 'npc') {
+      const lowY = e.mode === 'crouch' ? 0.6 : 1;
+      out.push([e.x, 0.9 * lowY, e.z, 0.42, 1], [e.x, 1.4 * lowY, e.z, 0.35, 1], [e.x, 1.75 * lowY, e.z, 0.17, 2]);
+    } else if (e.kind === 'remote') {
+      const low = e.stance === 'crawl' ? 0.3 : e.stance === 'crouch' ? 0.65 : 1;
+      out.push([e.x, e.y + 0.9 * low, e.z, 0.42, 1], [e.x, e.y + 1.4 * low, e.z, 0.35, 1], [e.x, e.y + 1.75 * low, e.z, 0.17, 2]);
+    } else if (e.kind === 'walker') {
+      out.push([e.x, e.hy, e.z, 6.5, 1], [e.x + Math.sin(e.yaw) * 7, e.hy - 0.3, e.z + Math.cos(e.yaw) * 7, 1.3, 3]);
+    } else if (e.kind === 'boss') {
+      out.push([e.x, e.hy, e.z, 6, 1], [e.x, e.hy + 8, e.z, 7, 1], [e.x, e.hy + 20, e.z, 2.6, 2]);
+    }
+    return out;
+  }
+  function allTargets() {
+    const a = [];
+    for (const m of E.monsters) if (!m.dead) a.push(m);
+    for (const n of E.npcs) if (!n.dead) a.push(n);
+    for (const w of E.walkers) if (!w.dead) a.push(w);
+    if (L.boss && !L.boss.dead) a.push(L.boss);
+    if (L.remote && L.remote.inRound && L.remote.alive && !L.remote.inVeh) a.push(L.remote);
+    return a;
+  }
+  L.rayHit = function (o, d, maxD, minT) {
+    let best = null, bt = maxD;
+    for (const e of allTargets()) {
+      if (L.dist(o.x, o.z, e.x, e.z) > maxD + 30) continue;
+      for (const s of spheres(e)) {
+        const cx = s[0] - o.x, cy = s[1] - o.y, cz = s[2] - o.z;
+        const t = cx * d.x + cy * d.y + cz * d.z;
+        if (t < minT) continue;
+        const d2 = cx * cx + cy * cy + cz * cz - t * t;
+        if (d2 > s[3] * s[3]) continue;
+        const th = t - Math.sqrt(s[3] * s[3] - d2);
+        if (th < bt) { bt = th; best = { ent: e, mult: s[4], t: th }; }
+      }
+    }
+    // Gebäude oder Boden davor?
+    let groundT = d.y < 0 ? -o.y / d.y : 1e9;
+    for (let t = minT; t < Math.min(bt, groundT); t += 1.2) {
+      const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+      if (L.blockedAt(x, y, z)) return { ent: null, t, wall: true };
+    }
+    if (groundT < bt) return { ent: null, t: groundT, wall: true };
+    return best || { ent: null, t: maxD };
+  };
+
+  // ---------- Schaden ----------
+  L.hurtPlayer = function (dmg, cause, fx, fz) {
+    if (!P.alive || dmg <= 0) return;
+    P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
+    L.snd.hurt(); L.shake = Math.min(1.2, L.shake + dmg / 60);
+    if (dmg > 8) L.blood(P.x, P.y + 1.2, P.z, Math.min(30, dmg / 2), dmg > 40);
+    if (P.hp <= 0) { P.hp = 0; killPlayer(cause); }
+  };
+  function killPlayer(cause) {
+    P.alive = false; P.deathT = 0; P.cause = cause;
+    if (P.vehicle) leaveVehicle(true);
+    L.blood(P.x, 1, P.z, 40, true); L.decal(P.x, P.z, 2.4); L.snd.splat({ x: P.x, y: 1, z: P.z });
+    L.music.set('night');
+  }
+  L.damageEnt = function (e, dmg, fromX, fromZ, src) {
+    if (e.dead) return;
+    if (e.kind === 'remote') { if (src === P) { L.mp.send({ t: 'pvp', dmg, by: (L.save.char || {}).name || 'Freund' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
+    if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
+    e.hp -= dmg;
+    const hy = e.kind === 'walker' ? e.hy : e.kind === 'boss' ? e.hy + 8 : 1.5;
+    if (e.kind === 'walker' || e.kind === 'boss') L.fx('#ffb040', e.x, hy, e.z, 6, 4, { basic: true, size: 0.15, life: 0.5 });
+    else L.blood(e.x, hy, e.z, 10);
+    const byPlayer = src && (src === P || src === L.remote);
+    if ((e.kind === 'viktor' || e.kind === 'daniel') && byPlayer) { e.state = 'chase'; e.tx = src.x; e.tz = src.z; e.prey = src; }
+    if (e.kind === 'npc' && byPlayer) { e.hostile = true; e.alertT = 10; }
+    if (e.kind === 'walker' && byPlayer) walkerHear(e, src.x, src.z);
+    if (e.hp <= 0) killEnt(e, src);
+  };
+  function killEnt(e, src) {
+    e.dead = true; e.deadT = 0;
+    if (src === P) P.kills++;
+    if (e.kind === 'viktor' || e.kind === 'daniel') { L.blood(e.x, 1.2, e.z, 30, true); L.decal(e.x, e.z, 2); L.snd.splat({ x: e.x, y: 1, z: e.z }); }
+    if (e.kind === 'npc') { L.blood(e.x, 1, e.z, 25, true); L.decal(e.x, e.z, 1.8); dropNpcLoot(e); }
+    if (e.kind === 'walker') { L.explode(e.x, e.hy, e.z, 12, 0, null, true); L.msg('💥 Ein Stelzer ist zerstört!'); for (let i = 0; i < 2; i++) L.spawnItem('artefakt', e.x + L.rand(-6, 6), e.z + L.rand(-6, 6), 1); }
+    if (e.kind === 'boss') { L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('DER KOLOSS IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
+  }
+
+  // ---------- Inventar ----------
+  L.giveItem = function (type, count, mag) {
+    const d = ITEMS[type]; count = count || 1;
+    if (!d) return count;
+    if (['waffe', 'granate', 'essen', 'trinken'].includes(d.slot)) {
+      const h = P.hot[d.slot];
+      if (!h) {
+        if (d.slot === 'waffe') { P.hot.waffe = { type, count: 1, mag: mag !== undefined ? mag : Math.floor(d.mag * 0.6) }; count--; }
+        else { const add = Math.min(d.stack || 1, count); P.hot[d.slot] = { type, count: add }; count -= add; }
+        if (count <= 0) return 0;
+      } else if (h.type === type && d.stack) {
+        const add = Math.min(d.stack - h.count, count); h.count += add; count -= add;
+        if (count <= 0) return 0;
+      }
+    }
+    if (d.stack) for (const it of P.bag) if (it && it.type === type && it.count < d.stack) {
+      const add = Math.min(d.stack - it.count, count); it.count += add; count -= add;
+      if (count <= 0) return 0;
+    }
+    while (count > 0) {
+      const i = P.bag.findIndex((x) => !x);
+      if (i < 0) return count;
+      const add = d.stack ? Math.min(d.stack, count) : 1;
+      P.bag[i] = { type, count: add, mag: d.slot === 'waffe' ? (mag !== undefined ? mag : Math.floor(d.mag * 0.6)) : undefined };
+      count -= add;
+    }
+    return 0;
+  };
+  L.countBag = (type) => P.bag.reduce((s, it) => s + (it && it.type === type ? it.count : 0), 0);
+  function takeBag(type, n) {
+    for (let i = 0; i < P.bag.length && n > 0; i++) {
+      const it = P.bag[i];
+      if (!it || it.type !== type) continue;
+      const k = Math.min(it.count, n); it.count -= k; n -= k;
+      if (it.count <= 0) P.bag[i] = null;
+    }
+  }
+  L.allPlayerItems = function () {
+    const out = [];
+    for (const s of ['waffe', 'granate', 'essen', 'trinken']) if (P.hot[s]) out.push(Object.assign({}, P.hot[s]));
+    for (const it of P.bag) if (it) out.push(Object.assign({}, it));
+    return out;
+  };
+  L.useConsumable = function (it) {
+    const d = ITEMS[it.type];
+    if (d.food) P.food = Math.min(100, P.food + d.food);
+    if (d.water) P.water = Math.min(100, P.water + d.water);
+    if (d.stam) P.stam = Math.min(100, P.stam + d.stam);
+    if (d.heal) { P.hp = Math.min(100, P.hp + d.heal); L.snd.heal(); }
+    else if (d.slot === 'trinken') L.snd.drink(); else L.snd.eat();
+    it.count--;
+  };
+  L.dropItem = function (it) {
+    const x = P.x + Math.sin(P.yaw) * 1.2, z = P.z + Math.cos(P.yaw) * 1.2;
+    if (isClient()) L.mp.send({ t: 'drop', type: it.type, count: it.count, mag: it.mag, x, z });
+    else L.spawnItem(it.type, x, z, it.count, it.mag);
+  };
+
+  // ---------- Gegenstände in der Welt ----------
+  L.spawnItem = function (type, x, z, count, mag, note, id) {
+    const g = new T.Group(), m = L.buildItem(note !== undefined ? 'note' : type);
+    m.scale.setScalar(1.7); g.add(m);
+    const glow = L.makeGlow(); glow.position.y = 0.1; g.add(glow);
+    g.position.set(x, 0.35, z); L.scene.add(g);
+    const it = { type, x, z, count: count || (ITEMS[type] && ITEMS[type].amount) || 1, mag, mesh: g, inner: m, note, ph: Math.random() * 6 };
+    it.id = id || NID++; L.byId.set('i' + it.id, it);
+    E.items.push(it);
+    if (isHost() && !L._bulk) L.mp.send({ t: 'iadd', it: [it.id, type, x, z, it.count, mag === undefined ? null : mag, note === undefined ? null : note] });
+    return it;
+  };
+  function removeItem(it) {
+    L.scene.remove(it.mesh); const i = E.items.indexOf(it); if (i >= 0) E.items.splice(i, 1);
+    L.byId.delete('i' + it.id);
+    if (isHost()) L.mp.send({ t: 'irem', id: it.id });
+  }
+  function updateItems(dt, t) {
+    for (const it of E.items) {
+      const d = L.dist(P.x, P.z, it.x, it.z), vis = d < 70;
+      it.mesh.visible = vis;
+      if (vis) { it.inner.rotation.y = t * 1.2 + it.ph; it.mesh.position.y = 0.35 + Math.sin(t * 2 + it.ph) * 0.08; }
+    }
+  }
+  const LT = {
+    stadt: 'konserve:3 brot:2 apfel:2 riegel:2 wasser:3 cola:2 saft:2 verband:2 9mm:2 minipistole:1 granate:0.5 uhr:1 gold:0.4',
+    krankenhaus: 'verband:5 medkit:3 wasser:2 saft:1',
+    polizei: 'pistole:3 9mm:4 schrotflinte:1.5 schrot:2 granate:1.5 verband:1',
+    supermarkt: 'konserve:4 brot:3 apfel:3 riegel:3 wasser:4 cola:3 saft:3',
+    militaer: 'gewehr:2.5 gewehrmuni:4 granate:3 pistole:1.5 9mm:2 medkit:1.5 verband:1 riegel:1',
+    hof: 'schrotflinte:2 schrot:3 apfel:3 brot:2 wasser:2 saft:1',
+    tanke1: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
+    tanke2: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
+    dorf: 'konserve:2 brot:2 apfel:2 wasser:2 saft:1 schrotflinte:0.6 schrot:1 minipistole:0.8 9mm:1 verband:1 uhr:1 gold:0.3',
+    camping: 'konserve:2 riegel:2 wasser:3 cola:1 minipistole:0.7 9mm:1 verband:1',
+    krater: 'artefakt:2 granate:1 gewehrmuni:1',
+    funk: 'verband:1 wasser:1 riegel:1 9mm:1',
+    windpark: 'wasser:1 riegel:1 verband:1 9mm:1',
+    sperre: 'gewehrmuni:1 granate:1 verband:1',
+    bunker: 'konserve:1 wasser:1',
+    wald: 'apfel:2 wasser:1 9mm:0.5 verband:0.5',
+    land: 'apfel:2 wasser:2 brot:1 konserve:1 9mm:0.6 schrot:0.5 minipistole:0.3 uhr:0.3'
+  };
+  const LTP = {};
+  for (const k in LT) LTP[k] = LT[k].split(' ').map((s) => { const [t, w] = s.split(':'); return [t, +w]; });
+  function rollLoot(poi) {
+    const tab = LTP[poi] || LTP.land;
+    let sum = 0; for (const e of tab) sum += e[1];
+    let r = Math.random() * sum;
+    for (const e of tab) { r -= e[1]; if (r <= 0) return e[0]; }
+    return tab[0][0];
+  }
+
+  // ---------- Spieler ----------
+  function resetPlayer() {
+    Object.assign(P, {
+      x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, camYaw: 0, camPitch: 0.25, hp: 100, food: 100, water: 100, stam: 100,
+      stance: 'stand', mode: 'idle', alive: true, vehicle: null, belted: false, sel: 0, hot: {}, bag: new Array(15).fill(null),
+      safe: L.save.safe ? Object.assign({}, L.save.safe) : null, fireCd: 0, swing: -1, throwT: -1, eatT: -1, reloadT: -1,
+      phase: 0, stepAcc: 0, noiseShow: 0, knockT: 0, air: false, tumble: 0, hurtFlash: 0, exhausted: false, flash: false,
+      aiming: false, kills: 0, deathT: 0, cause: '', beltWarnT: 0, camDist: 4, freeLookT: 0, starve: 0, gone: false, animSt: { mode: 'walk' }
+    });
+    if (P.rig) L.scene.remove(P.rig.root);
+    P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
+    L.scene.add(P.rig.root);
+  }
+  function selType() {
+    const s = L.HOT[P.sel];
+    if (s === 'hammer') return 'hammer';
+    return P.hot[s] ? P.hot[s].type : null;
+  }
+  const SPEED = { crawl: 1.1, crouch: 2.1, walk: 4.0, run: 7.3, idle: 0 };
+  const STEP = { crawl: [0.5, 0, 0.015], crouch: [0.6, 0, 0.03], walk: [0.75, 7, 0.1], run: [1.1, 24, 0.22] };
+  function updatePlayer(dt) {
+    if (!P.alive) {
+      P.deathT += dt;
+      P.animSt = { mode: 'dead' };
+      L.animHuman(P.rig, P.animSt);
+      if (P.deathT > 3.5 && !L.round.over) L.endRound('death', P.cause);
+      return;
+    }
+    // Hunger, Durst, Ausdauer
+    P.food -= dt * 100 / 1500;
+    P.water -= dt * 100 / 1100 * (P.mode === 'run' ? 2 : 1);
+    if (P.food <= 0 || P.water <= 0) { P.food = Math.max(0, P.food); P.water = Math.max(0, P.water); P.hp -= 0.6 * dt; if (P.hp <= 0) { P.hp = 0; killPlayer(P.food <= 0 ? 'Verhungert' : 'Verdurstet'); return; } }
+    else if (P.food > 60 && P.water > 60 && P.hp < 100) P.hp = Math.min(100, P.hp + 0.25 * dt);
+    P.noiseShow = Math.max(0, P.noiseShow - dt * 30);
+    P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
+    P.fireCd -= dt;
+    if (L.hit('KeyL')) { P.flash = !P.flash; L.snd.key(); }
+    if (P.vehicle) { updateDriving(dt); return; }
+    const S = L.S(), sens = 0.0022 * S.sens;
+    P.camYaw -= L.mouse.dx * sens;
+    P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.6, 1.2);
+    const block = L.uiBlock;
+    if (!block) {
+      if (L.hit('KeyC')) P.stance = P.stance === 'crouch' ? 'stand' : 'crouch';
+      if (L.hit('KeyX')) P.stance = P.stance === 'crawl' ? 'crouch' : 'crawl';
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+      if (L.mouse.wheel) P.sel = (P.sel + (L.mouse.wheel > 0 ? 1 : 4)) % 5;
+    }
+    const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
+    const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
+    const moving = (fIn || rIn) && P.knockT <= 0 && P.eatT < 0;
+    P.aiming = !block && L.mouse.right && (selType() && ITEMS[selType()].slot === 'waffe');
+    let sprint = !block && (L.keys.ShiftLeft || L.keys.ShiftRight);
+    if (sprint && moving && P.stance !== 'stand') P.stance = 'stand';
+    if (P.stam <= 1) P.exhausted = true;
+    if (P.stam > 25) P.exhausted = false;
+    sprint = sprint && moving && !P.exhausted && !P.aiming;
+    P.mode = !moving ? (P.stance === 'stand' ? 'idle' : P.stance) : P.stance === 'crawl' ? 'crawl' : P.stance === 'crouch' ? 'crouch' : sprint ? 'run' : 'walk';
+    let spd = SPEED[P.mode] || 0;
+    if (P.aiming && P.mode === 'walk') spd = 2.6;
+    const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
+    let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn;
+    const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    if (!P.air && P.knockT <= 0) {
+      const k = Math.min(1, dt * 14);
+      P.vx += (mx * spd - P.vx) * k; P.vz += (mz * spd - P.vz) * k;
+    } else if (!P.air) { P.vx *= 1 - Math.min(1, dt * 5); P.vz *= 1 - Math.min(1, dt * 5); }
+    P.knockT -= dt;
+    if (sprint) P.stam = Math.max(0, P.stam - 16 * dt); else P.stam = Math.min(100, P.stam + (P.stance === 'stand' ? 11 : 15) * dt);
+    if (!block && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2; P.air = true; P.stam -= 8; P.stance = 'stand'; }
+    // Schwerkraft
+    if (P.air || P.y > 0) {
+      P.vy -= 20 * dt; P.y += P.vy * dt;
+      if (P.y <= 0) {
+        const hs = Math.hypot(P.vx, P.vz), impact = -P.vy;
+        P.y = 0; P.vy = 0; P.air = false;
+        L.snd.land({ x: P.x, y: 0, z: P.z });
+        L.makeNoise(P.x, P.z, P.tumble > 0 ? 20 : 9, P);
+        if (P.tumble > 0) {
+          const dmg = Math.max(0, (hs - 5) * 1.6) + Math.max(0, (impact - 8) * 2);
+          if (dmg > 0) L.hurtPlayer(dmg, P.ejected ? 'Durch die Windschutzscheibe geflogen' : 'Hart aufgeschlagen');
+          P.knockT = 0.9; P.tumble = 0; P.ejected = false;
+        } else if (impact > 13) L.hurtPlayer((impact - 13) * 4, 'Gestürzt');
+      }
+    }
+    P.tumble = P.tumble > 0 ? P.tumble + dt * 9 : 0;
+    // Bewegung mit Kollision
+    L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38, P.y, RES);
+    P.x = RES.x; P.z = RES.z;
+    for (const v of E.vehicles) {
+      const d = L.dist(P.x, P.z, v.x, v.z);
+      if (d > 5) continue;
+      for (const c of vehCircles(v)) {
+        const dd = L.dist(P.x, P.z, c[0], c[1]), min = c[2] + 0.38;
+        if (dd < min && dd > 0.001) { P.x = c[0] + (P.x - c[0]) / dd * min; P.z = c[1] + (P.z - c[1]) / dd * min; }
+      }
+    }
+    L.clampWorld(P);
+    // Richtung der Figur
+    const hsp = Math.hypot(P.vx, P.vz);
+    if (P.aiming || P.swing >= 0 || P.throwT >= 0) P.yaw += L.angDiff(P.yaw, P.camYaw) * Math.min(1, dt * 15);
+    else if (hsp > 0.4 && P.knockT <= 0) P.yaw += L.angDiff(P.yaw, Math.atan2(P.vx, P.vz)) * Math.min(1, dt * 10);
+    // Schritte und Lautstärke
+    if (!P.air && hsp > 0.3 && STEP[P.mode]) {
+      P.stepAcc += hsp * dt;
+      const st = STEP[P.mode];
+      if (P.stepAcc > st[0]) {
+        P.stepAcc = 0;
+        L.snd.step({ x: P.x, y: 0, z: P.z }, st[2], L.onRoad(P.x, P.z));
+        L.makeNoise(P.x, P.z, st[1], P);
+      }
+    }
+    P.phase += dt * (P.mode === 'run' ? 11 : P.mode === 'walk' ? 7.5 : P.mode === 'crouch' ? 5.5 : 4) * (hsp > 0.3 ? 1 : 0.15);
+    // Aktionen
+    if (!block) playerActions(dt);
+    updateActions(dt);
+    // Animation
+    const r = P.rig;
+    r.root.position.set(P.x, P.y, P.z); r.root.rotation.y = P.yaw;
+    const st = selType();
+    L.setHeld(r, P.eatT >= 0 ? P.eatType : st);
+    P.animSt = {
+      mode: P.tumble > 0 ? 'tumble' : P.air ? 'jump' : P.mode === 'idle' ? 'walk' : P.mode, tumble: P.tumble,
+      phase: P.phase, speed: L.clamp(hsp / 4, 0, 1), aim: P.aiming || (P.fireCd > 0 && st && ITEMS[st] && ITEMS[st].slot === 'waffe'),
+      pitch: -P.camPitch * 0.6, swing: P.swing, throwT: P.throwT, eat: P.eatT >= 0
+    };
+    L.animHuman(r, P.animSt);
+  }
+  function playerActions() {
+    const st = selType();
+    // Interaktion
+    if (L.hit('KeyE')) interact();
+    if (L.hit('KeyF')) { const v = nearestVehicle(); if (v) enterVehicle(v); }
+    if (L.hit('KeyQ')) useHealing();
+    if (L.hit('KeyG')) throwGrenade();
+    if (L.hit('KeyR')) reload();
+    if (!st) { if (L.mouse.click) L.msg('Dieser Platz ist leer.'); return; }
+    const d = ITEMS[st];
+    if (st === 'hammer') { if (L.mouse.click && P.swing < 0) { P.swing = 0; P.hammerHit = false; L.snd.swing(); } return; }
+    if (d.slot === 'waffe') {
+      if (P.reloadT >= 0) return;
+      if ((d.auto ? L.mouse.left : L.mouse.click) && P.fireCd <= 0) fire();
+      return;
+    }
+    if (d.slot === 'granate') { if (L.mouse.click) throwGrenade(); return; }
+    if (d.slot === 'essen' || d.slot === 'trinken') {
+      if (L.mouse.click && P.eatT < 0) { P.eatT = 0; P.eatType = st; P.eatSlot = d.slot; }
+    }
+  }
+  function updateActions(dt) {
+    if (P.swing >= 0) {
+      P.swing += dt / 0.65;
+      if (P.swing > 0.42 && !P.hammerHit) { P.hammerHit = true; meleeHit(); }
+      if (P.swing >= 1) P.swing = -1;
+    }
+    if (P.throwT >= 0) { P.throwT += dt / 0.6; if (P.throwT >= 1) P.throwT = -1; }
+    if (P.eatT >= 0) {
+      P.eatT += dt;
+      if (P.eatT > 1.3) {
+        const h = P.hot[P.eatSlot];
+        if (h) { L.useConsumable(h); if (h.count <= 0) P.hot[P.eatSlot] = null; }
+        P.eatT = -1;
+      }
+    }
+    if (P.reloadT >= 0) {
+      P.reloadT += dt;
+      if (P.reloadT > 1.4) {
+        P.reloadT = -1;
+        const w = P.hot.waffe;
+        if (w) { const d = ITEMS[w.type], need = d.mag - w.mag, have = L.countBag(d.ammo), n = Math.min(need, have); takeBag(d.ammo, n); w.mag += n; }
+      }
+    }
+  }
+  function useHealing() {
+    const idx = P.bag.findIndex((it) => it && (it.type === 'medkit' || it.type === 'verband') && (P.hp < 60 || it.type === 'verband'));
+    const i2 = idx >= 0 ? idx : P.bag.findIndex((it) => it && (it.type === 'verband' || it.type === 'medkit'));
+    if (i2 < 0) { L.msg('Kein Verband oder Medikit im Rucksack.'); return; }
+    if (P.hp >= 100) { L.msg('Du bist nicht verletzt.'); return; }
+    L.useConsumable(P.bag[i2]); if (P.bag[i2].count <= 0) P.bag[i2] = null;
+    L.msg('🩹 Verarztet');
+  }
+  function reload() {
+    const w = P.hot.waffe;
+    if (!w || P.reloadT >= 0) return;
+    const d = ITEMS[w.type];
+    if (w.mag >= d.mag) return;
+    if (L.countBag(d.ammo) <= 0) { L.msg('Keine ' + ITEMS[d.ammo].name + ' im Rucksack!'); return; }
+    P.reloadT = 0; L.snd.reload();
+  }
+  function meleeHit() {
+    const fx = Math.sin(P.camYaw), fz = Math.cos(P.camYaw);
+    let hit = false;
+    for (const e of allTargets()) {
+      if (e.kind === 'walker' || e.kind === 'boss') continue;
+      const dx = e.x - P.x, dz = e.z - P.z, d = Math.hypot(dx, dz);
+      if (d > 2.6 || (dx * fx + dz * fz) / (d || 1) < 0.3) continue;
+      const sneak = (P.stance !== 'stand') && (e.state === 'wander' || e.state === 'search' || e.state === 'idle');
+      const dmg = sneak ? 90 : 34;
+      if (sneak) L.msg('🔨 Schleich-Angriff! (x2,6 Schaden)');
+      L.damageEnt(e, dmg, P.x, P.z, P); hit = true;
+    }
+    if (hit) { L.snd.hammerHit({ x: P.x, y: 1, z: P.z }); L.makeNoise(P.x, P.z, 12, P); }
+  }
+  function fire() {
+    const w = P.hot.waffe, d = ITEMS[w.type];
+    if (w.mag <= 0) { L.snd.empty(); P.fireCd = 0.3; if (L.countBag(d.ammo) > 0) reload(); else L.msg('Keine Munition!'); return; }
+    w.mag--; P.fireCd = d.rate;
+    const cam = L.camera, o = cam.position, dir = V1;
+    cam.getWorldDirection(dir);
+    const hand = V2; P.rig.hand.getWorldPosition(hand);
+    let lastEnd = null;
+    for (let p = 0; p < (d.pellets || 1); p++) {
+      const dd = V3.copy(dir);
+      const sp = d.spread * (P.aiming ? 0.5 : 1.3) * (P.mode === 'run' ? 2 : 1);
+      dd.x += (Math.random() - 0.5) * sp * 2; dd.y += (Math.random() - 0.5) * sp * 2; dd.z += (Math.random() - 0.5) * sp * 2; dd.normalize();
+      const h = L.rayHit(o, dd, d.range + P.camDist, P.camDist + 0.3);
+      const end = new T.Vector3().copy(o).addScaledVector(dd, h.t);
+      if (h.ent) L.damageEnt(h.ent, d.dmg * h.mult * (L.dist(P.x, P.z, h.ent.x, h.ent.z) > d.range * 0.7 ? 0.7 : 1), P.x, P.z, P);
+      else if (h.wall) L.fx('#c8b890', end.x, end.y, end.z, 3, 1.5, { size: 0.05, life: 0.4 });
+      L.tracer(hand, end); lastEnd = end;
+    }
+    if (NET() !== 'solo' && lastEnd) L.mp.send({ t: 'shot', a: [hand.x, hand.y, hand.z], b: [lastEnd.x, lastEnd.y, lastEnd.z], w: w.type });
+    L.snd.gun(w.type, { x: P.x, y: 1.5, z: P.z });
+    L.makeNoise(P.x, P.z, d.noise, P);
+    L.env.muzzle.position.copy(hand); L.env.muzzle.intensity = 4;
+    P.camPitch -= d.pellets ? 0.05 : 0.012; L.shake = Math.max(L.shake, d.pellets ? 0.25 : 0.06);
+  }
+  function throwGrenade() {
+    const g = P.hot.granate;
+    if (!g || g.count <= 0) { L.msg('Keine Granate ausgerüstet.'); return; }
+    if (P.throwT >= 0) return;
+    g.count--; if (g.count <= 0) P.hot.granate = null;
+    P.throwT = 0;
+    const dir = V1; L.camera.getWorldDirection(dir);
+    const m = L.buildItem('granate'); m.scale.setScalar(1.4);
+    m.position.set(P.x + Math.sin(P.yaw) * 0.5, P.y + 1.7, P.z + Math.cos(P.yaw) * 0.5); L.scene.add(m);
+    E.grenades.push({ m, vx: dir.x * 17 + P.vx, vy: dir.y * 17 + 4, vz: dir.z * 17 + P.vz, fuse: 2.8 });
+    L.snd.swing();
+  }
+  function updateGrenades(dt) {
+    for (let i = E.grenades.length - 1; i >= 0; i--) {
+      const g = E.grenades[i], p = g.m.position;
+      g.vy -= 9.8 * dt; p.x += g.vx * dt; p.y += g.vy * dt; p.z += g.vz * dt;
+      if (p.y < 0.1) { p.y = 0.1; if (g.vy < -2) L.makeNoise(p.x, p.z, 6, null); g.vy = -g.vy * 0.35; g.vx *= 0.6; g.vz *= 0.6; }
+      L.collide(p.x, p.z, 0.12, p.y, RES);
+      if (RES.hit) { p.x = RES.x; p.z = RES.z; const dn = g.vx * RES.nx + g.vz * RES.nz; g.vx -= 1.6 * dn * RES.nx; g.vz -= 1.6 * dn * RES.nz; }
+      g.m.rotation.x += dt * 8;
+      g.fuse -= dt;
+      if (g.fuse <= 0) { L.scene.remove(g.m); E.grenades.splice(i, 1); L.explode(p.x, p.y, p.z, 9, 160, P); }
+    }
+  }
+  L.explode = function (x, y, z, rad, dmg, src, big, fromNet) {
+    L.snd.explosion({ x, y, z });
+    if (!isClient()) L.makeNoise(x, z, big ? 400 : 260, src);
+    L.env.boom.position.set(x, y + 2, z); L.env.boom.intensity = 6;
+    const fb = L.flashBall; fb.position.set(x, y + 1, z); fb.scale.setScalar(rad * 0.35); fb.material.opacity = 0.9;
+    L.fx('#ffb040', x, y + 0.5, z, 24, 9, { basic: true, size: 0.2, life: 0.7 });
+    L.fx('#3a3a3a', x, y + 1, z, 20, 3, { size: 0.6, life: 2.2, g: -0.15, grow: 0.8 });
+    L.fx('#2a2018', x, y + 0.5, z, 16, 7, { size: 0.15, life: 1.6 });
+    L.decal(x, z, rad * 0.4, '#151210');
+    const pd = Math.hypot(P.x - x, P.y + 1 - y, P.z - z);
+    L.shake = Math.max(L.shake, L.clamp(1.4 - pd / 60, 0, 1.4));
+    if (dmg && pd < rad && P.alive && !P.gone) {
+      L.hurtPlayer(dmg * (1 - pd / rad) * (P.vehicle ? 0.6 : 1), 'Von einer Explosion zerrissen');
+      if (!P.vehicle) { const k = 12 * (1 - pd / rad); P.vx = (P.x - x) / (pd || 1) * k; P.vz = (P.z - z) / (pd || 1) * k; P.vy = 5 * (1 - pd / rad); P.air = true; P.tumble = 0.01; P.knockT = 1; }
+    }
+    // Mehrspieler: wer die Explosion nicht selbst ausgelöst hat, bekommt sie geschickt
+    if (isClient()) { if (!fromNet) L.mp.send({ t: 'boom', x, y, z, rad, dmg, big: !!big }); return; }
+    if (isHost() && !fromNet) L.mp.send({ t: 'boom', x, y, z, rad, dmg, big: !!big });
+    if (!dmg) return;
+    for (const e of allTargets()) {
+      if (e.kind === 'remote') continue;
+      const d = L.dist(e.x, e.z, x, z);
+      if (d < rad + (e.kind === 'walker' ? 6 : e.kind === 'boss' ? 6 : 0)) L.damageEnt(e, dmg * (1 - Math.min(d, rad) / (rad + 6)) * (e.kind === 'walker' || e.kind === 'boss' ? 2.5 : 1), x, z, src);
+    }
+    for (const v of E.vehicles) { const d = L.dist(v.x, v.z, x, z); if (d < rad) v.hp -= dmg * (1 - d / rad); }
+  };
+
+  // ---------- Interaktion ----------
+  function nearestItem() {
+    let best = null, bd = 2.3;
+    for (const it of E.items) { const d = L.dist(P.x, P.z, it.x, it.z); if (d < bd) { bd = d; best = it; } }
+    return best;
+  }
+  function nearestVehicle() {
+    let best = null, bd = 3.8;
+    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z); if (d < bd && v.hp > 0 && !v.occupied) { bd = d; best = v; } }
+    return best;
+  }
+  L.interactHint = function () {
+    if (!P.alive) return '';
+    if (P.vehicle) {
+      const t = P.vehicle.t;
+      return t.kind === 'car' ? `F aussteigen · B ${P.belted ? 'Gurt lösen' : 'anschnallen'} · H Hupe · Leertaste Handbremse` : 'F absteigen · H Hupe';
+    }
+    const it = nearestItem();
+    if (it) return it.note !== undefined ? 'E: Zettel lesen' : `E: ${ITEMS[it.type].name}${it.count > 1 ? ' ×' + it.count : ''} aufheben`;
+    const v = nearestVehicle();
+    if (v) return `F oder E: ${v.t.kind === 'car' ? 'einsteigen' : 'aufsteigen'} (${v.t.name}, max. ${v.t.vmax} km/h, Zustand ${Math.round(v.hp / v.t.hp * 100)}%)`;
+    const I = L.interact, R = L.round;
+    if (L.dist(P.x, P.z, I.bunker.x, I.bunker.z) < 3) return R.bunkerOpen ? 'Bunker offen – geh hinein!' : 'E: Code am Bunker eingeben';
+    if (L.dist(P.x, P.z, I.radio.x, I.radio.z) < 3) {
+      if (R.radio === 'idle') return L.countBag('sicherung') > 0 ? 'E: Sicherung einsetzen und Hubschrauber rufen' : 'Funkgerät ohne Strom – eine Sicherung fehlt';
+      return 'Der Hubschrauber ist unterwegs!';
+    }
+    if (L.heli && L.heli.state === 'landed' && L.dist(P.x, P.z, L.heli.x, L.heli.z) < 7) return 'E: In den Hubschrauber steigen';
+    if (L.dist(P.x, P.z, I.gate.x, I.gate.z) < 3) return R.gate === 'closed' ? 'E: Schranke öffnen (löst Alarm aus!)' : R.gate === 'opening' ? 'Schranke öffnet sich ...' : 'Schranke offen – raus hier!';
+    return '';
+  };
+  function interact() {
+    const it = nearestItem();
+    if (it) {
+      if (isClient()) { L.mp.send({ t: 'pick', id: it.id }); removeItem(it); return; }
+      if (it.note !== undefined) {
+        L.round.found[it.note] = true;
+        L.snd.pickup(); removeItem(it);
+        L.ui.showNote(`„Wer das liest: Die ${it.note + 1}. Ziffer für Bunker 7 ist ${L.round.code[it.note]}. Der Bunker liegt im Dunkelforst. Viel Glück.“`);
+        return;
+      }
+      const left = L.giveItem(it.type, it.count, it.mag);
+      if (left === it.count) { L.msg('🎒 Rucksack voll!'); return; }
+      L.snd.pickup();
+      L.msg(`+ ${ITEMS[it.type].icon} ${ITEMS[it.type].name}${it.count - left > 1 ? ' ×' + (it.count - left) : ''}`);
+      if (left > 0) { it.count = left; L.msg('🎒 Rucksack voll – Rest liegt noch da.'); } else removeItem(it);
+      return;
+    }
+    const veh = nearestVehicle();
+    if (veh) { enterVehicle(veh); return; }
+    const I = L.interact, R = L.round;
+    if (L.dist(P.x, P.z, I.bunker.x, I.bunker.z) < 3 && !R.bunkerOpen) { L.ui.openKeypad(); return; }
+    if (L.dist(P.x, P.z, I.radio.x, I.radio.z) < 3 && R.radio === 'idle') {
+      if (L.countBag('sicherung') <= 0) { L.msg('🔌 Ohne Sicherung kein Strom. Such in der Militärbasis!'); return; }
+      takeBag('sicherung', 1); R.radio = 'calling'; R.radioT = 90; R.radioPing = 0;
+      if (isClient()) L.mp.send({ t: 'radio' });
+      L.banner('HUBSCHRAUBER GERUFEN', 'Überlebe 90 Sekunden. Das Funkgerät ist laut ...');
+      return;
+    }
+    if (L.heli && L.heli.state === 'landed' && L.dist(P.x, P.z, L.heli.x, L.heli.z) < 7) { L.endRound('escape', 'Hubschrauber'); return; }
+    if (L.dist(P.x, P.z, I.gate.x, I.gate.z) < 3 && R.gate === 'closed') {
+      R.gate = 'opening'; R.gateT = 30; R.alarmT = 0;
+      if (isClient()) L.mp.send({ t: 'gate' });
+      L.banner('SCHRANKE ÖFFNET SICH', '30 Sekunden Alarm – alles in der Nähe hört dich!');
+    }
+  }
+  L.tryCode = function (code) {
+    const R = L.round;
+    if (code === R.code.join('')) {
+      R.bunkerOpen = true; R.doorT = 0; L.snd.codeOk(); L.snd.door();
+      if (isClient()) L.mp.send({ t: 'bunker' });
+      L.interact.bunker.led.material = L.mat('#20ff40', { basic: true });
+      L.msg('🔓 Code richtig! Die Bunkertür öffnet sich.');
+      return true;
+    }
+    L.snd.codeBad(); L.makeNoise(P.x, P.z, 35, P);
+    return false;
+  };
+
+  // ---------- Fahrzeuge ----------
+  function vehCircles(v) {
+    const t = v.t, fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    if (t.kind === 'bike') return [[v.x, v.z, 0.6]];
+    const o = t.len * 0.3, r = t.wid * 0.55;
+    return [[v.x + fx * o, v.z + fz * o, r], [v.x - fx * o, v.z - fz * o, r]];
+  }
+  function spawnVehicle(sp) {
+    const t = L.VTYPES[sp.type]; if (!t) return;
+    const rig = L.buildVehicle(sp.type); L.scene.add(rig.root);
+    const hp = sp.hp !== undefined ? sp.hp : sp.worn ? Math.round(t.hp * L.rand(0.45, 1)) : t.hp;
+    const v = { type: sp.type, t, rig, x: sp.x, z: sp.z, yaw: sp.yaw, speed: 0, steer: 0, hp, wheel: 0, lean: 0 };
+    v.id = sp.id || NID++; v.key = 'v' + v.id; L.byId.set(v.key, v);
+    E.vehicles.push(v);
+    rig.root.position.set(sp.x, 0, sp.z); rig.root.rotation.y = sp.yaw;
+  }
+  function enterVehicle(v) {
+    P.vehicle = v; P.belted = false; P.stance = 'stand'; P.vx = P.vz = 0; P.beltWarnT = 2;
+    P.freeLookT = 0; P.camYaw = v.yaw;
+    if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id });
+    L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
+    L.snd.key();
+  }
+  function leaveVehicle(silent) {
+    const v = P.vehicle; if (!v) return;
+    const kmh = Math.abs(v.speed) * 3.6;
+    const rx = -Math.cos(v.yaw), rz = Math.sin(v.yaw), side = v.t.kind === 'car' ? v.t.wid / 2 + 0.9 : 1.1;
+    P.x = v.x - rx * side; P.z = v.z - rz * side; P.y = 0;
+    L.collide(P.x, P.z, 0.4, 0, RES); P.x = RES.x; P.z = RES.z;
+    P.vehicle = null; P.belted = false;
+    L.engine.set(false, 0);
+    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
+    if (!silent && kmh > 20) {
+      P.vx = Math.sin(v.yaw) * v.speed * 0.6; P.vz = Math.cos(v.yaw) * v.speed * 0.6; P.vy = 2; P.air = true; P.tumble = 0.01;
+      L.hurtPlayer((kmh - 20) * 0.5, 'Aus dem fahrenden Fahrzeug gesprungen');
+    }
+  }
+  function eject(v, spd, kmh) {
+    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    P.vehicle = null; P.belted = false; L.engine.set(false, 0);
+    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
+    P.x = v.x + fx * (v.t.len * 0.55); P.z = v.z + fz * (v.t.len * 0.55); P.y = 1.3;
+    L.collide(P.x, P.z, 0.4, 0, RES); P.x = RES.x; P.z = RES.z;
+    P.vx = fx * spd * 0.62; P.vz = fz * spd * 0.62; P.vy = 4 + spd * 0.08;
+    P.air = true; P.tumble = 0.01; P.ejected = true; P.knockT = 2;
+    L.fx('#bfe0f0', P.x, 1.3, P.z, 26, 4, { size: 0.06, vx: fx * spd * 0.3, vz: fz * spd * 0.3, life: 1.2 });
+    L.snd.glass({ x: P.x, y: 1, z: P.z }, 1);
+    L.msg(v.t.kind === 'car' ? `💥 Nicht angeschnallt – bei ${Math.round(kmh)} km/h durch die Windschutzscheibe!` : `💥 Bei ${Math.round(kmh)} km/h vom ${v.t.name} geschleudert!`);
+  }
+  function crash(v, impact, isPlayer) {
+    const kmh = impact * 3.6;
+    v.hp -= kmh * (v.type === 'jeep' ? 0.3 : 0.55);
+    L.snd.crash(L.clamp(kmh / 120, 0.1, 1), { x: v.x, y: 1, z: v.z });
+    L.makeNoise(v.x, v.z, 60 + kmh * 0.8, isPlayer ? P : null);
+    L.fx('#9a9a9a', v.x, 1, v.z, Math.min(20, kmh / 5), 3, { size: 0.08 });
+    if (!isPlayer) return;
+    L.shake = Math.max(L.shake, L.clamp(kmh / 80, 0.2, 1.5));
+    if (kmh < 18) return;
+    const helm = (L.save.char || {}).hat === 'helm';
+    if (v.t.kind === 'car') {
+      if (P.belted) L.hurtPlayer((kmh - 18) * 0.28, `Unfall mit ${Math.round(kmh)} km/h (angeschnallt)`);
+      else {
+        L.hurtPlayer((kmh - 18) * 0.7 + (kmh > 45 ? 10 : 0), `Unfall mit ${Math.round(kmh)} km/h – nicht angeschnallt`);
+        if (kmh > 45 && P.alive) eject(v, impact, kmh);
+      }
+    } else {
+      L.hurtPlayer((kmh - 15) * 0.55 * (helm ? 0.6 : 1), `Motorradunfall mit ${Math.round(kmh)} km/h`);
+      if (kmh > 28 && P.alive) eject(v, impact, kmh);
+    }
+  }
+  function updateDriving(dt) {
+    const v = P.vehicle, t = v.t, block = L.uiBlock;
+    const S = L.S(), sens = 0.0022 * S.sens;
+    if (L.mouse.dx || L.mouse.dy) P.freeLookT = 1.5;
+    P.camYaw -= L.mouse.dx * sens; P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.3, 1.0);
+    P.freeLookT -= dt;
+    if (P.freeLookT <= 0) P.camYaw += L.angDiff(P.camYaw, v.yaw) * Math.min(1, dt * 3);
+    if (!block) {
+      if (L.hit('KeyF')) { leaveVehicle(false); return; }
+      if (L.hit('KeyB') && t.kind === 'car') { P.belted = !P.belted; L.snd.belt(P.belted); L.msg(P.belted ? '✅ Angeschnallt' : '⚠️ Gurt gelöst'); }
+      if (L.hit('KeyH')) { L.snd.hupe({ x: v.x, y: 1, z: v.z }); L.makeNoise(v.x, v.z, 150, P); }
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+    }
+    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
+    if (!P.vehicle) return;
+    P.x = v.x; P.z = v.z; P.y = 0;
+    // Gurtwarner
+    if (t.kind === 'car' && !P.belted && Math.abs(v.speed) > 4) { P.beltWarnT -= dt; if (P.beltWarnT <= 0) { P.beltWarnT = 4; L.snd.beltWarn(); } }
+    // Motorgeräusch und Lärm
+    const rpm = Math.abs(v.speed) / (t.vmax / 3.6);
+    L.engine.set(v.hp > 0, t.electric ? rpm : (rpm * 3) % 1 * 0.5 + rpm * 0.6, t.kind === 'bike', t.electric);
+    v.noiseAcc = (v.noiseAcc || 0) + dt;
+    // E-Roller sind fast lautlos
+    if (v.noiseAcc > 0.5) { v.noiseAcc = 0; L.makeNoise(v.x, v.z, v.hp > 0 ? (t.electric ? 3 + Math.abs(v.speed) * 0.35 : 16 + Math.abs(v.speed) * 1.1) : 0, P); }
+    // Figur auf dem Sitz
+    const r = P.rig, s = v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
+    r.root.rotation.set(0, v.yaw, 0);
+    if (t.kind === 'bike') r.root.rotation.z = 0;
+    r.root.rotateZ(-v.lean);
+    L.setHeld(r, null);
+    P.animSt = { mode: t.scooter ? 'scooter' : t.kind === 'bike' ? 'ride' : 'sit' };
+    L.animHuman(r, P.animSt);
+    if (v.hp <= 0 && Math.abs(v.speed) < 0.5 && !v.deadMsg) { v.deadMsg = true; L.msg('🔥 Das Fahrzeug ist kaputt. Steig aus!'); }
+  }
+  function driveVehicle(v, dt, thr, str, hb, isPlayer) {
+    const t = v.t, onR = L.onRoad(v.x, v.z), vmax = t.vmax / 3.6 * (onR ? 1 : t.off) * (v.hp > 0 ? 1 : 0);
+    if (v.hp <= 0) thr = 0;
+    if (thr > 0) { if (v.speed < -0.5) v.speed += 16 * dt; else if (v.speed < vmax) v.speed = Math.min(vmax, v.speed + t.acc * dt * (1 - Math.max(0, v.speed) / (vmax * 1.15 + 0.01))); }
+    else if (thr < 0) { if (v.speed > 0.5) v.speed -= 15 * dt; else v.speed = Math.max(-8, v.speed - 4 * dt); }
+    else v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), (1.2 + Math.abs(v.speed) * 0.04) * dt);
+    if (v.speed > vmax) v.speed -= (v.speed - vmax) * Math.min(1, 1.5 * dt);
+    if (hb) v.speed -= Math.sign(v.speed) * Math.min(Math.abs(v.speed), 20 * dt);
+    v.steer += (str * 0.6 - v.steer) * Math.min(1, dt * 6);
+    const eff = v.steer * L.clamp(1 - Math.abs(v.speed) / (t.vmax / 3.6 * 1.25), 0.12, 1) * (hb ? 1.6 : 1);
+    v.yaw += eff * v.speed / (t.len * 0.62) * dt;
+    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    const before = v.speed;
+    v.x += fx * v.speed * dt; v.z += fz * v.speed * dt;
+    // Zusammenstöße
+    let impact = 0;
+    const circles = vehCircles(v);
+    for (const c of circles) {
+      L.collide(c[0], c[1], c[2], 0.2, RES);
+      if (RES.hit) {
+        v.x += RES.x - c[0]; v.z += RES.z - c[1];
+        const into = -(fx * RES.nx + fz * RES.nz) * before;
+        if (into > impact) impact = into;
+      }
+    }
+    for (const o of E.vehicles) {
+      if (o === v || L.dist(o.x, o.z, v.x, v.z) > 7) continue;
+      for (const a of vehCircles(v)) for (const b of vehCircles(o)) {
+        const d = L.dist(a[0], a[1], b[0], b[1]), min = a[2] + b[2];
+        if (d < min && d > 0.001) {
+          const nx = (a[0] - b[0]) / d, nz = (a[1] - b[1]) / d;
+          v.x += nx * (min - d); v.z += nz * (min - d);
+          const into = -(fx * nx + fz * nz) * before;
+          if (into > impact) impact = into;
+          o.speed += before * 0.3;
+        }
+      }
+    }
+    if (impact > 2.5) { v.speed = -before * 0.15; crash(v, impact, isPlayer); }
+    else if (impact > 0) v.speed *= 0.8;
+    // Monster und Menschen überfahren
+    if (Math.abs(v.speed) > 3) for (const e of allTargets()) {
+      if (e.kind === 'walker' || e.kind === 'boss') continue;
+      if (L.dist(e.x, e.z, v.x + fx * t.len * 0.4, v.z + fz * t.len * 0.4) > (t.kind === 'bike' ? 1.2 : t.wid * 0.7 + 0.5)) continue;
+      const sp = Math.abs(v.speed);
+      if (e.kind === 'daniel') { L.damageEnt(e, sp * 5, v.x, v.z, isPlayer ? P : null); v.speed *= 0.1; crash(v, sp * 0.7, isPlayer); }
+      else { L.damageEnt(e, sp * 7, v.x, v.z, isPlayer ? P : null); v.speed *= 0.85; L.snd.splat({ x: e.x, y: 1, z: e.z }); }
+      e.x += fx * 3; e.z += fz * 3;
+    }
+    L.clampWorld(v);
+    // Optik
+    v.wheel += v.speed * dt / 0.35;
+    for (const w of v.rig.wheels) w.rotation.x = v.wheel;
+    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.7;
+    v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 25, -0.6, 0.6) : 0;
+    v.rig.root.position.set(v.x, 0, v.z);
+    v.rig.root.rotation.set(0, v.yaw, 0);
+    if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
+  }
+  // Fahrzeug, das gerade vom anderen Spieler gesteuert wird (Position kommt übers Netz)
+  function netVeh(v, dt) {
+    const p = v.netPose, k = Math.min(1, dt * 10);
+    v.x += (p.x - v.x) * k; v.z += (p.z - v.z) * k; v.yaw += L.angDiff(v.yaw, p.yaw) * k;
+    v.speed = p.speed || 0; v.steer = p.steer || 0; if (p.hp !== undefined) v.hp = p.hp;
+    v.wheel += v.speed * dt / 0.35;
+    for (const w of v.rig.wheels) w.rotation.x = v.wheel;
+    for (const s of v.rig.steer) s.rotation.y = v.steer * 0.7;
+    v.lean = v.t.kind === 'bike' ? L.clamp(v.steer * v.speed / 25, -0.6, 0.6) : 0;
+    v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
+    if (v.t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
+    v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < 300;
+    if (p.until && performance.now() > p.until) v.netPose = null;
+  }
+  function updateVehicles(dt) {
+    for (const v of E.vehicles) {
+      if (v === P.vehicle) continue;
+      if (v.netPose) { netVeh(v, dt); continue; }
+      if (Math.abs(v.speed) > 0.05 && !isClient()) driveVehicle(v, dt, 0, 0, false, false);
+      v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < (v.t.kind === 'bike' ? 200 : 300);
+      if (v.hp <= 0 && Math.random() < dt * 4 && v.rig.root.visible) L.fx('#2a2a2a', v.x, 1.5, v.z, 1, 0.4, { size: 0.5, life: 2, g: -0.2, grow: 0.6 });
+    }
+    const pv = P.vehicle, H = L.env.head;
+    if (pv && L.env.day < 0.6) {
+      const fx = Math.sin(pv.yaw), fz = Math.cos(pv.yaw);
+      H.position.set(pv.x + fx * pv.t.len * 0.5, 1, pv.z + fz * pv.t.len * 0.5);
+      H.target.position.set(pv.x + fx * 30, 0, pv.z + fz * 30); H.intensity = 2.2;
+    } else H.intensity = 0;
+  }
+
+  // ---------- Viktor und Daniel ----------
+  // [umherlaufen, Geräusch nachgehen, Jagd]
+  const MSPD = { viktor: [1.9, 6.5, 8.8], lange: [2.2, 7.2, 10], daniel: [1.6, 5.5, 7] };
+  function spawnMonster(kind, x, z, variant, id) {
+    const rig = kind === 'viktor' ? L.buildViktor(variant) : L.buildDaniel();
+    L.scene.add(rig.root);
+    const m = {
+      kind, variant, rig, x, z, yaw: Math.random() * 6.28, hp: kind === 'viktor' ? (variant === 'lange' ? 150 : 110) : 280,
+      state: 'wander', tx: x, tz: z, home: { x, z }, timer: Math.random() * 5, phase: Math.random() * 10, atk: 0, hitDone: false,
+      cd: 0, dead: false, deadT: 0, prey: null, anim: 'walk', stuckT: 0, detT: 0, lastX: x, lastZ: z, lod: 0, voice: 0
+    };
+    m.spd = (variant === 'lange' ? MSPD.lange : MSPD[kind]).map((s) => s * L.md.speed);
+    m.id = id || NID++; m.key = 'm' + m.id; L.byId.set(m.key, m);
+    E.monsters.push(m);
+    return m;
+  }
+  function monsterHear(m, x, z, inten, d, src) {
+    if (m.state === 'attack') return;
+    const was = m.state;
+    const off = d * 0.08;
+    m.tx = x + L.rand(-off, off); m.tz = z + L.rand(-off, off);
+    m.prey = src || null;
+    m.state = (inten > 0.45 && d < 35) || was === 'chase' ? 'chase' : 'investigate';
+    m.timer = 12;
+    if (was === 'wander' || was === 'search' || was === 'listen') m.alertT = 0.6;
+    if ((was === 'wander' || was === 'search' || was === 'listen') && m.voice <= 0) {
+      m.voice = 4;
+      if (L.dist(P.x, P.z, m.x, m.z) < 120) { if (m.kind === 'viktor') L.snd.viktor({ x: m.x, y: 2.5, z: m.z }); else L.snd.daniel({ x: m.x, y: 2, z: m.z }); }
+    }
+  }
+  function monsterVictims(m) {
+    const list = [];
+    if (P.alive && !P.gone) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
+    const rp = RP();
+    if (rp) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
+    for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
+    return list;
+  }
+  function moveToward(e, tx, tz, spd, dt, r) {
+    const want = Math.atan2(tx - e.x, tz - e.z);
+    let yaw = want;
+    if (e.stuckT > 0) { yaw = want + e.detour; e.stuckT -= dt; }
+    e.yaw += L.angDiff(e.yaw, yaw) * Math.min(1, dt * 5);
+    const nx = e.x + Math.sin(e.yaw) * spd * dt, nz = e.z + Math.cos(e.yaw) * spd * dt;
+    L.collide(nx, nz, r, 0, RES);
+    const moved = Math.hypot(RES.x - e.x, RES.z - e.z);
+    e.x = RES.x; e.z = RES.z;
+    L.clampWorld(e);
+    if (spd > 0.5 && moved < spd * dt * 0.3 && e.stuckT <= 0) { e.stuckT = 1.5; e.detour = (Math.random() < 0.5 ? -1 : 1) * L.rand(1, 1.8); }
+  }
+  function updateMonster(m, dt) {
+    const dP = L.dist(P.x, P.z, m.x, m.z), rig = m.rig, dN = nearDist(m.x, m.z, dP);
+    rig.root.visible = dP < (m.variant === 'lange' ? 300 : 260);
+    if (m.dead) {
+      m.deadT += dt;
+      if (m.kind === 'viktor') L.animViktor(rig, { mode: 'dead' }); else L.animDaniel(rig, { mode: 'dead' });
+      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+      return m.deadT < 45;
+    }
+    // weit weg: grob und selten rechnen
+    if (dN > 450) {
+      m.lod += dt; if (m.lod < 0.5) return true; dt = m.lod; m.lod = 0;
+    }
+    m.cd -= dt; m.voice -= dt; m.phase += dt * (m.state === 'chase' ? 9 : m.state === 'investigate' ? 6 : 3.2);
+    const r = m.kind === 'daniel' ? 0.8 : 0.45;
+    if (m.state === 'attack') {
+      m.atk += dt / (m.kind === 'daniel' ? 1.1 : 0.85);
+      const wind = m.kind === 'daniel' ? 0.55 : 0.4;
+      if (m.atk >= wind && !m.hitDone) {
+        m.hitDone = true;
+        const v = m.victim, reach = m.kind === 'daniel' ? 3.2 : 2.9;
+        if (v && L.dist(v.x, v.z, m.x, m.z) < reach) monsterStrike(m, v);
+      }
+      if (m.atk >= 1) { m.state = 'listen'; m.timer = 3.5; }
+    } else if (m.state === 'listen' || m.state === 'search') {
+      m.timer -= dt;
+      if (m.timer <= 0) { m.state = 'wander'; m.timer = 0; }
+    } else if (m.state === 'investigate' || m.state === 'chase') {
+      if (m.alertT > 0) {
+        // kurz zusammenzucken und zum Geräusch drehen, dann losrennen
+        m.alertT -= dt;
+        m.yaw += L.angDiff(m.yaw, Math.atan2(m.tx - m.x, m.tz - m.z)) * Math.min(1, dt * 8);
+      } else moveToward(m, m.tx, m.tz, m.state === 'chase' ? m.spd[2] : m.spd[1], dt, r);
+      m.timer -= dt;
+      if (L.dist(m.x, m.z, m.tx, m.tz) < 1.6 || m.timer <= 0) { m.state = 'search'; m.timer = L.rand(4, 7); }
+    } else {
+      m.timer -= dt;
+      if (m.timer <= 0 || L.dist(m.x, m.z, m.tx, m.tz) < 2) {
+        if (Math.random() < 0.3) { m.state = 'listen'; m.timer = L.rand(3, 6); }
+        else if (Math.random() < 0.3) {
+          // wandert zu einem anderen Ort auf der Karte
+          const p = L.pick(L.POIS);
+          m.tx = L.clamp(p.x + L.rand(-p.r, p.r) * 0.7, -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r) * 0.7, -1480, 1480);
+          m.home = { x: m.tx, z: m.tz }; m.timer = L.rand(60, 160);
+        } else { m.tx = L.clamp(m.x + L.rand(-150, 150), -1480, 1480); m.tz = L.clamp(m.z + L.rand(-150, 150), -1480, 1480); m.timer = L.rand(15, 35); }
+      }
+      if (m.state === 'wander') moveToward(m, m.tx, m.tz, m.spd[0], dt, r);
+    }
+    // Opfer ertasten
+    if (m.state !== 'attack' && m.cd <= 0 && dN < 30) {
+      for (const v of monsterVictims(m)) {
+        const d = L.dist(v.x, v.z, m.x, m.z);
+        const touch = v.sneaking ? 1.1 : 1.7;
+        const hunting = m.state === 'chase' || m.state === 'investigate';
+        // direkt angestoßen (unter 0,8 m) spürt er dich immer – auch wenn du still liegst
+        if ((d < touch && (v.moving || hunting)) || d < 0.8 || (hunting && d < (m.kind === 'daniel' ? 2.6 : 2.4) && L.dist(v.x, v.z, m.tx, m.tz) < 4)) {
+          m.state = 'attack'; m.atk = 0; m.hitDone = false; m.victim = v.e; m.cd = 2.5;
+          m.yaw = Math.atan2(v.x - m.x, v.z - m.z);
+          if (dP < 60) { if (m.kind === 'viktor') L.snd.viktor({ x: m.x, y: 2.5, z: m.z }); else L.snd.daniel({ x: m.x, y: 2, z: m.z }); }
+          break;
+        }
+      }
+    }
+    // Klick-Geräusche in der Nähe (damit man sie hört)
+    if (dP < 45 && Math.random() < dt * 0.35) { if (m.kind === 'viktor') L.snd.click({ x: m.x, y: 2.6, z: m.z }); else L.snd.heavy({ x: m.x, y: 0, z: m.z }, 0.2); }
+    if (!rig.root.visible) return true;
+    const anim = m.state === 'attack' ? 'attack' : m.alertT > 0 ? 'alert' : m.state === 'chase' ? (m.kind === 'viktor' ? 'crawl' : 'run') : m.state === 'investigate' ? 'run' : m.state === 'wander' ? 'walk' : 'search';
+    m.anim = anim;
+    if (m.kind === 'viktor') L.animViktor(rig, { mode: anim, phase: m.phase, atk: m.atk }); else L.animDaniel(rig, { mode: anim, phase: m.phase, atk: m.atk });
+    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+    return true;
+  }
+  function monsterStrike(m, v) {
+    const dmul = L.md.dmg;
+    const dx = (v === P ? P.x : v.x) - m.x, dz = (v === P ? P.z : v.z) - m.z, d = Math.hypot(dx, dz) || 1;
+    if (v === P) {
+      const sneaking = P.stance !== 'stand' && !P.vehicle;
+      let dmg = sneaking ? (m.kind === 'daniel' ? 45 : 35) * dmul : 999;
+      if (P.vehicle) dmg = (m.kind === 'daniel' ? 50 : 35) * dmul;
+      const k = m.kind === 'daniel' ? 15 : 10;
+      L.blood(P.x, 1.3, P.z, 25, true);
+      L.snd.splat({ x: P.x, y: 1, z: P.z });
+      L.hurtPlayer(dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : `Viktor (${({ grey: 'mit Hut', red: 'mit Schal', blue: 'mit schiefem Kopf', lange: 'der Lange' })[m.variant]}) hat dich erwischt`);
+      if (P.alive && !P.vehicle) {
+        P.vx = dx / d * k; P.vz = dz / d * k; P.vy = m.kind === 'daniel' ? 6 : 4.5; P.air = true; P.tumble = 0.01; P.knockT = 1.2;
+        L.msg('😱 Getroffen und weggeschleudert! Bleib leise ...');
+      }
+    } else if (v === L.remote) {
+      const sneaking = v.stance !== 'stand' && !v.inVeh;
+      let dmg = sneaking ? (m.kind === 'daniel' ? 45 : 35) * dmul : 999;
+      if (v.inVeh) dmg = (m.kind === 'daniel' ? 50 : 35) * dmul;
+      const k = m.kind === 'daniel' ? 15 : 10;
+      hurtRemote(dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : 'Viktor hat dich erwischt', dx / d * k, dz / d * k, m.kind === 'daniel' ? 6 : 4.5, sneaking);
+      L.blood(v.x, 1.3, v.z, 20, true); L.snd.splat({ x: v.x, y: 1, z: v.z });
+    } else {
+      L.damageEnt(v, 120, m.x, m.z, m);
+      L.snd.scream({ x: v.x, y: 1.5, z: v.z });
+    }
+  }
+
+  // ---------- Stelzer ----------
+  function spawnWalker(x, z, id) {
+    const rig = L.buildWalker(); L.scene.add(rig.root);
+    const w = { kind: 'walker', rig, x, z, yaw: Math.random() * 6.28, hy: 22, hp: 1600, state: 'patrol', tx: x, tz: z, t: Math.random() * 10, sweep: 0, fireT: 0, chargeT: 0, cool: 0, hornT: L.rand(20, 60), dead: false, deadT: 0, aimX: x, aimZ: z };
+    initGait(w, rig);
+    w.id = id || NID++; w.key = 'w' + w.id; L.byId.set(w.key, w);
+    E.walkers.push(w);
+    return w;
+  }
+  function initGait(w, rig) {
+    for (const lg of rig.legs) {
+      const a = w.yaw + lg.angle;
+      lg.footPos.set(w.x + Math.sin(a) * rig.footR, 0, w.z + Math.cos(a) * rig.footR); lg.t = 1;
+    }
+  }
+  const OUT = new T.Vector3();
+  function gait(w, rig, dt, speed, stride, stepDur, lift, onStep) {
+    const stepping = rig.legs.filter((l) => l.t < 1).length, maxStep = speed > 4 ? 2 : 1;
+    for (const lg of rig.legs) {
+      const a = w.yaw + lg.angle;
+      lg.hip.set(w.x + Math.sin(a) * rig.hipR, w.hy - 1, w.z + Math.cos(a) * rig.hipR);
+      const lead = speed * stepDur * 1.2;
+      const hx = w.x + Math.sin(a) * rig.footR + Math.sin(w.yaw) * lead, hz = w.z + Math.cos(a) * rig.footR + Math.cos(w.yaw) * lead;
+      if (lg.t >= 1 && stepping < maxStep && Math.hypot(lg.footPos.x - hx, lg.footPos.z - hz) > stride) { lg.from.copy(lg.footPos); lg.to.set(hx, 0, hz); lg.t = 0; }
+      if (lg.t < 1) {
+        lg.t = Math.min(1, lg.t + dt / stepDur);
+        lg.footPos.lerpVectors(lg.from, lg.to, lg.t); lg.footPos.y = Math.sin(lg.t * Math.PI) * lift;
+        if (lg.t >= 1 && onStep) onStep(lg.footPos);
+      }
+      OUT.set(Math.sin(a), 0, Math.cos(a));
+      L.ik(lg.hip, lg.footPos, rig.legA, rig.legB, lg.kneePos, OUT);
+      L.seg(lg.up, lg.hip, lg.kneePos); L.seg(lg.low, lg.kneePos, lg.footPos);
+      lg.knee.position.copy(lg.kneePos); lg.foot.position.copy(lg.footPos); lg.glow.position.copy(lg.hip);
+    }
+  }
+  function walkerHear(w, x, z) { if (w.state === 'patrol') { w.state = 'hunt'; w.tx = x; w.tz = z; } else if (w.state === 'hunt') { w.tx = x; w.tz = z; } }
+  function canSee(fromX, fromY, fromZ, maxD, t) {
+    t = t || P;
+    if (!t.alive || t.gone) return false;
+    const d = L.dist(fromX, fromZ, t.x, t.z);
+    if (d > maxD) return false;
+    return L.los(fromX, fromY, fromZ, t.x, (t.y || 0) + 1.2, t.z);
+  }
+  function updateWalker(w, dt) {
+    const rig = w.rig, dP = L.dist(P.x, P.z, w.x, w.z);
+    if (w.dead) {
+      w.deadT += dt;
+      w.hy = Math.max(3, w.hy - dt * 12);
+      rig.hull.position.set(w.x, w.hy, w.z); rig.hull.rotation.set(Math.min(0.5, w.deadT * 0.4), w.yaw, 0.3);
+      rig.cone.visible = rig.spot.visible = rig.beam.g.visible = false;
+      return true;
+    }
+    w.t += dt; w.cool -= dt; w.hornT -= dt;
+    if (w.hornT <= 0) { w.hornT = L.rand(35, 80); L.snd.horn({ x: w.x, y: 22, z: w.z }); }
+    const far = nearDist(w.x, w.z, dP) > 700;
+    let speed = 0;
+    if (w.state === 'patrol' || w.state === 'hunt') {
+      if (w.state === 'patrol' && (L.dist(w.x, w.z, w.tx, w.tz) < 20)) {
+        const p = Math.random() < 0.6 ? L.pick(L.POIS) : { x: L.rand(-1300, 1300), z: L.rand(-1300, 1300) };
+        w.tx = p.x + L.rand(-80, 80); w.tz = p.z + L.rand(-80, 80);
+      }
+      if (w.state === 'hunt' && L.dist(w.x, w.z, w.tx, w.tz) < 15) { w.state = 'patrol'; }
+      speed = w.state === 'hunt' ? 6 : 3.2;
+      const want = Math.atan2(w.tx - w.x, w.tz - w.z);
+      w.yaw += L.clamp(L.angDiff(w.yaw, want), -0.5 * dt, 0.5 * dt);
+      w.x += Math.sin(w.yaw) * speed * dt; w.z += Math.cos(w.yaw) * speed * dt;
+      L.clampWorld(w);
+    }
+    // Suchscheinwerfer
+    w.sweep = Math.sin(w.t * 0.45) * 0.9;
+    const la = w.yaw + w.sweep, ld = 38;
+    const gx = w.x + Math.sin(la) * ld, gz = w.z + Math.cos(la) * ld;
+    const night = 1 - L.env.day;
+    if (!far) {
+      const top = V1.set(w.x + Math.sin(w.yaw) * 6.8, w.hy - 0.3, w.z + Math.cos(w.yaw) * 6.8);
+      const len = Math.hypot(gx - top.x, -top.y, gz - top.z);
+      rig.cone.position.copy(top); rig.cone.scale.set(9, len, 9);
+      rig.cone.quaternion.setFromUnitVectors(V2.set(0, -1, 0), V3.set(gx - top.x, -top.y, gz - top.z).normalize());
+      rig.cone.material.opacity = 0.03 + night * 0.08;
+      rig.spot.position.set(gx, 0.12, gz); rig.spot.scale.setScalar(9); rig.spot.material.opacity = 0.12 + night * 0.35;
+    }
+    rig.cone.visible = rig.spot.visible = !far;
+    // Entdecken
+    if (w.state !== 'fire' && w.cool <= 0) {
+      for (const t of players()) {
+        const dT = L.dist(t.x, t.z, w.x, w.z), mv = t === P ? Math.hypot(P.vx, P.vz) : (t.moving ? 1 : 0);
+        const inSpot = L.dist(t.x, t.z, gx, gz) < 9 && !(t.stance === 'crawl' && mv < 0.3);
+        const close = dT < 22 && t.stance === 'stand' && mv > 0.5;
+        const flash = t.flash && night > 0.4 && dT < 120 && Math.abs(L.angDiff(w.yaw, Math.atan2(t.x - w.x, t.z - w.z))) < 1.2;
+        if ((inSpot || close || flash) && canSee(w.x, w.hy - 2, w.z, 160, t)) {
+          w.state = 'fire'; w.chargeT = 1.3; w.fireT = 3; w.aimX = t.x; w.aimZ = t.z; w.target = t;
+          L.snd.charge({ x: w.x, y: w.hy, z: w.z });
+          const txt = '⚠️ Ein Stelzer hat dich entdeckt! Versteck dich hinter Gebäuden!';
+          if (t === P) L.msg(txt); else L.mp.send({ t: 'msg', text: txt });
+          break;
+        }
+      }
+    }
+    if (w.state === 'fire') {
+      const T = w.target && (w.target === P || w.target === RP()) ? w.target : P;
+      const see = canSee(w.x, w.hy - 2, w.z, 170, T);
+      w.yaw += L.clamp(L.angDiff(w.yaw, Math.atan2(T.x - w.x, T.z - w.z)), -1.2 * dt, 1.2 * dt);
+      if (see) { const k = Math.min(1, dt * 1.6); w.aimX += (T.x - w.aimX) * k; w.aimZ += (T.z - w.aimZ) * k; }
+      if (w.chargeT > 0) { w.chargeT -= dt; rig.eye.scale.setScalar(1.05 + (1.3 - w.chargeT) * 0.6); }
+      else {
+        w.fireT -= dt;
+        const a = V1.set(w.x + Math.sin(w.yaw) * 7, w.hy - 0.3, w.z + Math.cos(w.yaw) * 7), b = V2.set(w.aimX, 0.5, w.aimZ);
+        rig.beam.g.visible = true; L.setBeam(rig.beam, a, b, 0.7 + Math.random() * 0.25);
+        if (Math.random() < dt * 8) { L.fx('#ff8030', w.aimX, 0.3, w.aimZ, 3, 3, { basic: true, size: 0.15, life: 0.5 }); L.decal(w.aimX, w.aimZ, 1.2, '#1a1008'); }
+        if (Math.random() < dt * 3) L.snd.ray({ x: w.aimX, y: 1, z: w.aimZ });
+        if (T.alive && L.dist(T.x, T.z, w.aimX, w.aimZ) < 2.6 && see) dps(T, 45 * dt * L.md.dmg, 'Vom Hitzestrahl eines Stelzers verbrannt');
+        for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, w.aimX, w.aimZ) < 2.5) L.damageEnt(n, 60 * dt, w.x, w.z, w);
+        if (w.fireT <= 0) { w.state = see ? 'fire' : 'hunt'; if (!see) { w.tx = T.x; w.tz = T.z; } w.chargeT = see ? 1 : 0; w.fireT = 3; w.cool = see ? 0 : 5; if (!see) rig.beam.g.visible = false; }
+      }
+    } else { rig.beam.g.visible = false; rig.eye.scale.set(1.05, 1.05, 0.55); }
+    // Körper und Beine
+    w.hy = 22 + Math.sin(w.t * 1.7) * 0.4;
+    if (far) { rig.root.visible = dP < L.S().view + 200; if (!rig.root.visible) return true; }
+    rig.root.visible = true;
+    rig.hull.position.set(w.x, w.hy, w.z); rig.hull.rotation.set(Math.sin(w.t) * 0.03, w.yaw, Math.sin(w.t * 0.8) * 0.03);
+    for (let i = 0; i < rig.cables.length; i++) rig.cables[i].rotation.set(Math.sin(w.t * 1.3 + i) * 0.25, 0, Math.cos(w.t + i * 2) * 0.25);
+    gait(w, rig, dt, speed, 7, speed > 4 ? 0.55 : 0.75, 3.5, (fp) => {
+      const d = L.dist(P.x, P.z, fp.x, fp.z);
+      if (d < 200) L.snd.heavy({ x: fp.x, y: 0, z: fp.z }, 0.6);
+      if (d < 60) L.shake = Math.max(L.shake, (60 - d) / 150);
+    });
+    return true;
+  }
+
+  // ---------- Der Koloss ----------
+  function spawnBoss() {
+    const rig = L.buildKoloss(); L.scene.add(rig.root);
+    const side = Math.floor(Math.random() * 4), e = 1400, o = L.rand(-1200, 1200);
+    const pos = [[o, -e], [e, o], [o, e], [-e, o]][side];
+    const b = { kind: 'boss', rig, x: pos[0], z: pos[1], yaw: 0, hy: 30, hp: 8000, t: 0, life: 150, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: false, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3 };
+    b.yaw = Math.atan2(b.tx - b.x, b.tz - b.z);
+    initGait(b, rig);
+    L.boss = b;
+    if (isHost()) L.mp.send({ t: 'boss', x: b.x, z: b.z, yaw: b.yaw });
+    L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
+    L.banner('DER KOLOSS IST ERWACHT', 'Daniel, Viktor und etwas Fremdes – verschmolzen zu einem Riesen. Versteck dich!');
+  }
+  function updateBoss(dt) {
+    const b = L.boss, rig = b.rig, dP = L.dist(P.x, P.z, b.x, b.z);
+    if (b.dead) {
+      b.deadT += dt; b.hy = Math.max(6, b.hy - dt * 10);
+      rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(Math.min(1.2, b.deadT * 0.5), b.yaw, 0);
+      rig.beam.g.visible = false;
+      if (b.deadT > 60) { L.scene.remove(rig.root); L.boss = null; if (isHost()) L.mp.send({ t: 'bossGone' }); }
+      return;
+    }
+    b.t += dt; b.life -= dt; b.stompCd -= dt; b.beamCd -= dt; b.roarT -= dt;
+    if (b.roarT <= 0) { b.roarT = L.rand(15, 30); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
+    if (b.life <= 0 && !b.leaving) { b.leaving = true; const a = Math.atan2(b.x, b.z); b.tx = Math.sin(a) * 1700; b.tz = Math.cos(a) * 1700; L.msg('Der Koloss zieht sich zurück ...'); }
+    if (b.leaving && (Math.abs(b.x) > 1480 || Math.abs(b.z) > 1480)) { L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); return; }
+    // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
+    if (!b.leaving) for (const t of players()) {
+      const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
+      if (loud && L.dist(t.x, t.z, b.x, b.z) < 140) { b.tx = t.x; b.tz = t.z; break; }
+    }
+    const [nearP, dNear] = nearestPlayer(b.x, b.z);
+    const dT = L.dist(b.x, b.z, b.tx, b.tz);
+    let speed = 0;
+    if (b.stompT <= 0 && dT > 12) {
+      speed = b.leaving ? 9 : 7.5;
+      const want = Math.atan2(b.tx - b.x, b.tz - b.z);
+      b.yaw += L.clamp(L.angDiff(b.yaw, want), -0.45 * dt, 0.45 * dt);
+      b.x += Math.sin(b.yaw) * speed * dt; b.z += Math.cos(b.yaw) * speed * dt;
+      if (!b.leaving) L.clampWorld(b);
+    } else if (!b.leaving && dT <= 12 && b.stompT <= 0) { b.tx = P.x + L.rand(-200, 200); b.tz = P.z + L.rand(-200, 200); }
+    // Stampfen
+    if (!b.leaving && nearP && dNear < 24 && b.stompCd <= 0 && b.stompT <= 0) { b.stompT = 1.4; }
+    if (b.stompT > 0) {
+      b.stompT -= dt;
+      if (b.stompT <= 0) {
+        b.stompCd = 6;
+        L.snd.stomp({ x: b.x, y: 0, z: b.z }); L.shake = 1.6;
+        L.fx('#6a5a40', b.x, 0.5, b.z, 30, 12, { size: 0.4, life: 1.5 });
+        L.makeNoise(b.x, b.z, 200, null);
+        const d = L.dist(P.x, P.z, b.x, b.z);
+        if (d < 26 && P.alive) {
+          const sneaking = P.stance !== 'stand' && !P.vehicle;
+          L.hurtPlayer((sneaking ? 40 : 85) * L.md.dmg * (1 - d / 40), 'Vom Koloss zertrampelt');
+          if (P.alive && !P.vehicle) { const k = 16; P.vx = (P.x - b.x) / (d || 1) * k; P.vz = (P.z - b.z) / (d || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
+        }
+        for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, b.x, b.z) < 26) L.damageEnt(n, 200, b.x, b.z, b);
+        const rp = RP();
+        if (rp) {
+          const d2 = L.dist(rp.x, rp.z, b.x, b.z);
+          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote((sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Vom Koloss zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
+        }
+        if (isHost()) L.mp.send({ t: 'stomp', x: b.x, z: b.z });
+      }
+    }
+    // Brust-Strahl
+    const chest = V1.set(b.x + Math.sin(b.yaw) * 3, b.hy + 9, b.z + Math.cos(b.yaw) * 3);
+    if (!b.leaving && b.beamT <= 0 && b.beamCd <= 0) for (const t of players()) {
+      const dT = L.dist(t.x, t.z, b.x, b.z), standing = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
+      if (dT > 25 && dT < 110 && standing && canSee(chest.x, chest.y, chest.z, 110, t)) {
+        b.beamT = 3.5; b.target = t; b.aimX = t.x + L.rand(-8, 8); b.aimZ = t.z + L.rand(-8, 8); L.snd.charge({ x: b.x, y: b.hy, z: b.z });
+        break;
+      }
+    }
+    if (b.beamT > 0) {
+      b.beamT -= dt;
+      const T = b.target && (b.target === P || b.target === RP()) ? b.target : P;
+      const see = canSee(chest.x, chest.y, chest.z, 130, T);
+      if (see) { const k = Math.min(1, dt * 1.3); b.aimX += (T.x - b.aimX) * k; b.aimZ += (T.z - b.aimZ) * k; }
+      if (b.beamT < 2.8) {
+        rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(b.aimX, 0.5, b.aimZ), 1.3);
+        if (Math.random() < dt * 8) L.decal(b.aimX, b.aimZ, 1.6, '#1a1008');
+        if (Math.random() < dt * 3) L.snd.ray({ x: b.aimX, y: 1, z: b.aimZ });
+        if (T.alive && see && L.dist(T.x, T.z, b.aimX, b.aimZ) < 3.2) dps(T, 60 * dt * L.md.dmg, 'Vom Strahl des Koloss verbrannt');
+      }
+      if (b.beamT <= 0) { rig.beam.g.visible = false; b.beamCd = 7; }
+    } else rig.beam.g.visible = false;
+    // Optik
+    b.hy = 30 + Math.sin(b.t * 1.2) * 0.6 - (b.stompT > 0 ? Math.sin((1.4 - b.stompT) / 1.4 * Math.PI) * -3 : 0);
+    rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(0, b.yaw, Math.sin(b.t * 0.9) * 0.04);
+    const sw = Math.sin(b.t * 1.4);
+    rig.arms[0].arm.rotation.set(-sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, -0.3);
+    rig.thin[0].arm.rotation.set(-1.2 + Math.sin(b.t * 2.1) * 0.4, 0, 0.6); rig.thin[1].arm.rotation.set(-1.2 + Math.cos(b.t * 1.9) * 0.4, 0, -0.6);
+    rig.thin[0].elbow.rotation.x = -0.8 + Math.sin(b.t * 2.6) * 0.3; rig.thin[1].elbow.rotation.x = -0.8 + Math.cos(b.t * 2.3) * 0.3;
+    rig.neck.rotation.set(0.15, Math.sin(b.t * 0.5) * 0.5, Math.sin(b.t * 0.7) * 0.25);
+    rig.mouth.scale.y = 0.3 + (b.roarT > 12 ? 0.4 : 0);
+    rig.core.scale.setScalar(1.5 + Math.sin(b.t * 6) * 0.2);
+    gait(b, rig, dt, speed, 10, 0.85, 5, (fp) => {
+      const d = L.dist(P.x, P.z, fp.x, fp.z);
+      L.snd.stomp({ x: fp.x, y: 0, z: fp.z });
+      L.shake = Math.max(L.shake, L.clamp((200 - d) / 200, 0, 0.9));
+      L.makeNoise(fp.x, fp.z, 0, null);
+    });
+  }
+
+  // ---------- NPCs (andere Überlebende) ----------
+  function spawnNpc(x, z, hostile, id, app, wpn) {
+    const appearance = app || L.randomAppearance();
+    const rig = L.buildHuman(appearance); L.scene.add(rig.root);
+    const r = Math.random(), weapon = wpn || (r < 0.6 ? 'pistole' : r < 0.78 ? 'schrotflinte' : r < 0.9 ? 'gewehr' : 'hammer');
+    const n = { kind: 'npc', rig, x, z, yaw: Math.random() * 6.28, hp: 100, hostile, weapon, mag: 99, state: 'wander', tx: x, tz: z, phase: 0, shootCd: 1, dead: false, deadT: 0, moving: false, mode: 'walk', alertT: 0, stepAcc: 0, stuckT: 0, lod: 0 };
+    L.setHeld(rig, weapon);
+    n.app = appearance; n.id = id || NID++; n.key = 'n' + n.id; L.byId.set(n.key, n);
+    E.npcs.push(n);
+    return n;
+  }
+  function dropNpcLoot(n) {
+    if (n.weapon !== 'hammer') L.spawnItem(n.weapon, n.x + 0.5, n.z, 1, Math.floor(ITEMS[n.weapon].mag * 0.5));
+    L.spawnItem(L.pick(['konserve', 'wasser', 'riegel', 'cola', 'verband', '9mm', 'schrot']), n.x - 0.5, n.z + 0.4);
+    if (Math.random() < 0.3) L.spawnItem(L.pick(['gold', 'uhr', 'granate']), n.x, n.z - 0.6);
+  }
+  function updateNpc(n, dt) {
+    const dP = L.dist(P.x, P.z, n.x, n.z), rig = n.rig;
+    rig.root.visible = dP < 220;
+    if (n.dead) { n.deadT += dt; L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw; return n.deadT < 60; }
+    if (nearDist(n.x, n.z, dP) > 400) { n.lod += dt; if (n.lod < 0.5) return true; dt = n.lod; n.lod = 0; }
+    n.shootCd -= dt; n.alertT -= dt;
+    // Bedrohung durch Monster
+    let threat = null, td = 26;
+    for (const m of E.monsters) { if (m.dead) continue; const d = L.dist(m.x, m.z, n.x, n.z); if (d < td && (m.state === 'chase' || m.state === 'investigate' || d < 10)) { td = d; threat = m; } }
+    const [tgt, dT] = nearestPlayer(n.x, n.z);
+    const seesPlayer = n.hostile && tgt && dT < 40 && L.los(n.x, 1.6, n.z, tgt.x, 1.2, tgt.z) && (Math.abs(L.angDiff(n.yaw, Math.atan2(tgt.x - n.x, tgt.z - n.z))) < 1.3 || dT < 8 || n.alertT > 0);
+    let spd = 0;
+    if (threat) {
+      n.state = 'flee';
+      if (n.weapon !== 'hammer' && td < 18 && n.shootCd <= 0) { npcShoot(n, threat); }
+      const ax = n.x - threat.x, az = n.z - threat.z, al = Math.hypot(ax, az) || 1;
+      n.tx = n.x + ax / al * 30; n.tz = n.z + az / al * 30; spd = 6.3; n.mode = 'run';
+    } else if (seesPlayer) {
+      n.state = 'fight'; n.alertT = 5;
+      n.yaw += L.angDiff(n.yaw, Math.atan2(tgt.x - n.x, tgt.z - n.z)) * Math.min(1, dt * 6);
+      if (n.weapon === 'hammer') { n.tx = tgt.x; n.tz = tgt.z; spd = dT > 1.8 ? 5.5 : 0; n.mode = 'run'; if (dT < 2 && n.shootCd <= 0) { n.shootCd = 1.2; hurtAny(tgt, 12 * L.nd.dmg, 'Von einem Überlebenden erschlagen'); L.snd.hammerHit({ x: tgt.x, y: 1, z: tgt.z }); } }
+      else { if (n.shootCd <= 0) npcShoot(n, tgt); spd = dT < 10 ? -2 : dT > 28 ? 3 : 0; n.tx = tgt.x; n.tz = tgt.z; n.mode = 'walk'; }
+    } else {
+      if (n.state !== 'wander' || L.dist(n.x, n.z, n.tx, n.tz) < 3) {
+        n.state = 'wander';
+        const p = Math.random() < 0.7 ? L.pick(L.POIS) : { x: n.x + L.rand(-200, 200), z: n.z + L.rand(-200, 200), r: 20 };
+        n.tx = L.clamp(p.x + L.rand(-(p.r || 40), p.r || 40) * 0.6, -1450, 1450); n.tz = L.clamp(p.z + L.rand(-(p.r || 40), p.r || 40) * 0.6, -1450, 1450);
+      }
+      spd = 3.2; n.mode = 'walk';
+    }
+    if (spd !== 0) {
+      if (spd > 0) moveToward(n, n.tx, n.tz, spd, dt, 0.4);
+      else { const a = Math.atan2(n.x - (tgt || P).x, n.z - (tgt || P).z); L.collide(n.x + Math.sin(a) * 2 * dt, n.z + Math.cos(a) * 2 * dt, 0.4, 0, RES); n.x = RES.x; n.z = RES.z; }
+      n.moving = true;
+      n.stepAcc += Math.abs(spd) * dt;
+      if (n.stepAcc > 0.8) { n.stepAcc = 0; L.makeNoise(n.x, n.z, spd > 5 ? 24 : 8, n); }
+    } else n.moving = false;
+    n.phase += dt * (spd > 5 ? 11 : 7.5) * (n.moving ? 1 : 0.1);
+    if (!rig.root.visible) return true;
+    L.animHuman(rig, { mode: n.mode === 'run' && n.moving ? 'run' : 'walk', phase: n.phase, speed: n.moving ? 1 : 0, aim: n.state === 'fight' && n.weapon !== 'hammer' });
+    rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw;
+    return true;
+  }
+  function npcShoot(n, target) {
+    const d = ITEMS[n.weapon];
+    n.shootCd = d.rate * 4 + L.rand(0.6, 1.4);
+    const tx = target === P ? P.x : target.x, tz = target === P ? P.z : target.z, dist = L.dist(n.x, n.z, tx, tz);
+    n.yaw = Math.atan2(tx - n.x, tz - n.z);
+    L.snd.gun(n.weapon, { x: n.x, y: 1.5, z: n.z });
+    L.makeNoise(n.x, n.z, d.noise, n);
+    const a = V1.set(n.x, 1.4, n.z), b = V2.set(tx + L.rand(-1, 1), 1.2, tz + L.rand(-1, 1));
+    L.tracer(a, b);
+    if (isHost()) L.mp.send({ t: 'shot', a: [a.x, a.y, a.z], b: [b.x, b.y, b.z], w: n.weapon });
+    const hitP = L.clamp(0.75 - dist / 80, 0.08, 0.75) * L.nd.acc * (target === P && P.stance !== 'stand' ? 0.6 : 1);
+    if (Math.random() < hitP) {
+      if (target === P || target === L.remote) hurtAny(target, d.dmg * (d.pellets ? 3 : 1) * 0.6 * L.nd.dmg, 'Von einem anderen Überlebenden erschossen');
+      else L.damageEnt(target, d.dmg * (d.pellets ? 3 : 1), n.x, n.z, n);
+    }
+  }
+
+  // ---------- Hubschrauber ----------
+  function updateHeli(dt) {
+    const R = L.round, H = L.heli;
+    if (R.radio === 'calling') {
+      R.radioT -= dt; R.radioPing -= dt;
+      if (R.radioPing <= 0) { R.radioPing = 8; L.snd.radio({ x: L.interact.radio.x, y: 2, z: L.interact.radio.z }); L.makeNoise(L.interact.radio.x, L.interact.radio.z, 140, null); }
+      if (R.radioT <= 0) {
+        R.radio = 'arriving';
+        const rig = L.buildHeli('#2a3a4a'); L.scene.add(rig.root);
+        L.heli = { rig, x: 1078 + 900, y: 80, z: 528 - 300, state: 'arriving', t: 0 };
+        L.banner('HUBSCHRAUBER IM ANFLUG', 'Lauf zum Landeplatz an der Funkstation!');
+      }
+    }
+    if (!H) return;
+    H.t += dt;
+    const pad = L.interact.radio.pad;
+    if (H.state === 'arriving') {
+      const dx = pad.x - H.x, dz = pad.z - H.z, d = Math.hypot(dx, dz);
+      const sp = Math.min(40, d * 0.4 + 5);
+      if (d > 1) { H.x += dx / d * sp * dt; H.z += dz / d * sp * dt; }
+      H.y = Math.max(0, L.lerp(H.y, d < 60 ? 0 : 60, dt * 0.5));
+      if (d < 2 && H.y < 0.5) { H.state = 'landed'; H.y = 0; H.t = 0; L.banner('HUBSCHRAUBER GELANDET', 'Steig ein (E) – er wartet nur 40 Sekunden!'); }
+    } else if (H.state === 'landed') {
+      if (H.t > 40) { H.state = 'leaving'; H.t = 0; L.msg('Der Hubschrauber startet ohne dich ...'); R.radio = 'idle'; }
+    } else if (H.state === 'leaving') {
+      H.y += dt * 8; H.x += dt * 25;
+      if (H.y > 150) { L.scene.remove(H.rig.root); L.heli = null; return; }
+    }
+    H.rig.root.position.set(H.x, H.y, H.z); H.rig.root.rotation.y = -Math.PI / 2;
+    H.rig.rotor.rotation.y += dt * 30;
+    H.noiseT = (H.noiseT || 0) - dt;
+    if (H.noiseT <= 0) { H.noiseT = 0.09; L.snd.rotor({ x: H.x, y: H.y + 3, z: H.z }); }
+    H.bigNoise = (H.bigNoise || 0) - dt;
+    if (H.bigNoise <= 0) { H.bigNoise = 3; L.makeNoise(H.x, H.z, 180, null); }
+  }
+
+  // ---------- Runde ----------
+  L.respawnQueue = [];
+  function clearAll() {
+    for (const m of E.monsters) L.scene.remove(m.rig.root);
+    for (const w of E.walkers) L.scene.remove(w.rig.root);
+    for (const n of E.npcs) L.scene.remove(n.rig.root);
+    for (const v of E.vehicles) L.scene.remove(v.rig.root);
+    for (const it of E.items) L.scene.remove(it.mesh);
+    for (const g of E.grenades) L.scene.remove(g.m);
+    if (L.boss) L.scene.remove(L.boss.rig.root);
+    if (L.heli) L.scene.remove(L.heli.rig.root);
+    E.monsters = []; E.walkers = []; E.npcs = []; E.vehicles = []; E.items = []; E.grenades = [];
+    L.boss = null; L.heli = null; L.respawnQueue = []; L.byId.clear();
+  }
+  function farSpot(minD) {
+    for (let i = 0; i < 60; i++) {
+      const x = L.rand(-1450, 1450), z = L.rand(-1450, 1450);
+      if (L.dist(x, z, P.x, P.z) < minD) continue;
+      if (L.queryBoxes(x, z, 1.5).length) continue;
+      return [x, z];
+    }
+    return [P.x + minD, P.z];
+  }
+  function randVariant() { const r = Math.random(); return r < 0.28 ? 'grey' : r < 0.56 ? 'red' : r < 0.84 ? 'blue' : 'lange'; }
+  L.startRound = function (loadout) {
+    const S = L.S();
+    L.md = MDIFF[S.monsterDiff] || MDIFF.normal; L.nd = NDIFF[S.npcDiff] || NDIFF.normal;
+    clearAll();
+    resetPlayer();
+    for (const it of loadout || []) {
+      const left = L.giveItem(it.type, it.count, it.mag);
+      if (left > 0) L.save.stash.push(Object.assign({}, it, { count: left }));
+    }
+    const sp = L.pick(L.spawnSpots); P.x = sp[0]; P.z = sp[1]; P.yaw = P.camYaw = Math.random() * 6.28;
+    L.round = {
+      over: false, time: 0, code: [0, 1, 2, 3].map(() => L.randi(0, 9)), found: [false, false, false, false],
+      bunkerOpen: false, doorT: 0, radio: 'idle', radioT: 0, gate: 'closed', gateT: 0, alarmT: 0, bossT: S.bossMin * 60, warned: false
+    };
+    // Tür und Schranke zurücksetzen
+    const I = L.interact;
+    I.bunker.door.position.y = 0; I.bunker.led.material = L.mat('#ff2020', { basic: true });
+    I.gate.gate.position.x = 0; I.gate.gbox.on = true; L.gateOpen = false;
+    // Gegenstände
+    // Mehrspieler: als Host in der Nähe des Freundes starten lassen (der Freund bekommt einen Punkt ganz in der Nähe)
+    L._bulk = true;
+    const spots = L.lootSpots.slice().sort(() => Math.random() - 0.5);
+    let n = 0;
+    for (const s of spots) {
+      if (Math.random() > 0.45) continue;
+      L.spawnItem(rollLoot(s.poi), s.x, s.z);
+      n++;
+    }
+    const mil = spots.filter((s) => s.poi === 'militaer');
+    for (let i = 0; i < 2 && i < mil.length; i++) L.spawnItem('sicherung', mil[i].x + 0.6, mil[i].z, 1);
+    const extra = spots.filter((s) => s.poi === 'dorf' || s.poi === 'windpark');
+    if (extra.length) L.spawnItem('sicherung', extra[0].x + 0.6, extra[0].z, 1);
+    const notePois = ['stadt', 'dorf', 'hof', 'tanke1', 'tanke2', 'camping', 'funk', 'windpark', 'militaer', 'krankenhaus', 'polizei', 'supermarkt'].sort(() => Math.random() - 0.5);
+    let ni = 0;
+    for (const poi of notePois) {
+      if (ni >= 4) break;
+      const s = spots.find((q) => q.poi === poi);
+      if (!s) continue;
+      L.spawnItem('note', s.x - 0.6, s.z + 0.3, 1, undefined, ni); ni++;
+    }
+    for (const v of L.vehSpots) spawnVehicle(v);
+    // Monster
+    // Alle Monster sind von Anfang an auf der Karte verteilt (es kommen keine neuen dazu)
+    const cm = Math.min(L.md.count, 1.2);
+    const place = (kind, n) => {
+      let made = 0, tries = 0;
+      while (made < n && tries++ < n * 6) {
+        let x, z;
+        if (Math.random() < 0.6) { const p = L.pick(L.POIS); x = p.x + L.rand(-p.r, p.r) * 0.85; z = p.z + L.rand(-p.r, p.r) * 0.85; }
+        else { x = L.rand(-1450, 1450); z = L.rand(-1450, 1450); }
+        if (L.dist(x, z, P.x, P.z) < 120 || L.queryBoxes(x, z, 1.2).length) continue;
+        spawnMonster(kind, x, z, kind === 'viktor' ? randVariant() : undefined);
+        made++;
+      }
+    };
+    place('viktor', Math.round(135 * cm));
+    place('daniel', Math.round(45 * cm));
+    for (let i = 0; i < Math.max(3, Math.round(8 * L.md.count)); i++) { const [x, z] = farSpot(400); spawnWalker(x, z); }
+    for (let i = 0; i < S.npcCount; i++) {
+      const [x, z] = farSpot(80);
+      const hostile = S.npcMode === 'feindlich' ? true : S.npcMode === 'friedlich' ? false : Math.random() < 0.4;
+      spawnNpc(x, z, hostile);
+    }
+    L.env.time = L.rand(6.5, 10); L.randomWeather();
+    L.state = 'game'; L.paused = false;
+    L.music.set('calm');
+    L._bulk = false;
+    L.msg('Finde einen Weg hinaus: Bunker-Code, Funkstation oder Autobahnsperre. Sei leise.', 7000);
+    if (isHost()) L.mp.sendStart();
+  };
+  L.endRound = function (result, why) {
+    const R = L.round;
+    if (R.over) return;
+    R.over = true;
+    L.engine.set(false, 0);
+    if (P.vehicle) { if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: P.vehicle.id, x: P.vehicle.x, z: P.vehicle.z, yaw: P.vehicle.yaw, hp: P.vehicle.hp }); P.vehicle = null; }
+    P.gone = true;
+    if (P.rig && result === 'escape') P.rig.root.visible = false;
+    if (NET() !== 'solo') L.mp.send({ t: 'done', result, why });
+    const items = L.allPlayerItems();
+    if (result === 'escape') L.save.stats.escapes++; else L.save.stats.deaths++;
+    L.save.safe = P.safe ? Object.assign({}, P.safe) : null;
+    L.persist();
+    L.ui.showEnd(result, why, items);
+  };
+
+  // ---------- Fluchtwege prüfen ----------
+  function updateEscapes(dt) {
+    const R = L.round, I = L.interact;
+    if (R.bunkerOpen) {
+      R.doorT = Math.min(1, R.doorT + dt / 3); I.bunker.door.position.y = R.doorT * 3;
+      if (R.doorT > 0.8 && P.alive && L.dist(P.x, P.z, I.bunker.x, I.bunker.z - 1.5) < 2.6) L.endRound('escape', 'Bunker 7');
+    }
+    if (R.gate === 'opening' && !isClient()) {
+      R.gateT -= dt; R.alarmT -= dt;
+      if (R.alarmT <= 0) { R.alarmT = 1.2; L.snd.alarm({ x: 0, y: 3, z: -1490 }); L.makeNoise(0, -1490, 320, null); }
+      I.gate.gate.position.x = (1 - R.gateT / 30) * 15;
+      if (R.gateT <= 0) { R.gate = 'open'; I.gate.gbox.on = false; L.gateOpen = true; L.banner('SCHRANKE OFFEN', 'Raus aus der Sperrzone – nach Norden!'); }
+    }
+    if (R.gate === 'open' && P.alive && P.z < -1500) L.endRound('escape', 'Autobahnsperre');
+  }
+
+  // ---------- Hauptupdate ----------
+  L.updateGame = function (dt, t) {
+    const R = L.round;
+    R.time += dt;
+    // Boss-Timer
+    if (!L.boss && !isClient()) {
+      R.bossT -= dt;
+      if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt der Koloss.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
+      if (R.bossT <= 0) { R.warned = false; spawnBoss(); }
+    }
+    if (!P.gone) updatePlayer(dt);
+    if (isClient()) L.mp.puppets(dt);
+    else {
+      for (let i = E.monsters.length - 1; i >= 0; i--) if (!updateMonster(E.monsters[i], dt)) { L.byId.delete(E.monsters[i].key); L.scene.remove(E.monsters[i].rig.root); E.monsters.splice(i, 1); }
+      for (const w of E.walkers) updateWalker(w, dt);
+      if (L.boss) updateBoss(dt);
+      for (let i = E.npcs.length - 1; i >= 0; i--) if (!updateNpc(E.npcs[i], dt)) { L.byId.delete(E.npcs[i].key); L.scene.remove(E.npcs[i].rig.root); E.npcs.splice(i, 1); }
+    }
+    if (NET() !== 'solo') L.mp.update(dt);
+    updateVehicles(dt);
+    updateGrenades(dt);
+    updateItems(dt, t);
+    if (!isClient()) updateHeli(dt);
+    updateEscapes(dt);
+    updateFx(dt);
+    // Musik je nach Lage
+    let danger = 0;
+    for (const m of E.monsters) {
+      if (m.dead) continue;
+      const d = L.dist(P.x, P.z, m.x, m.z);
+      if (d < 40 && (m.state === 'chase' || m.state === 'attack') && m.prey === P) danger = Math.max(danger, 3);
+      else if (d < 35) danger = Math.max(danger, 2);
+      else if (d < 70 && m.state !== 'wander') danger = Math.max(danger, 1);
+    }
+    for (const w of E.walkers) if (!w.dead && w.state === 'fire' && L.dist(P.x, P.z, w.x, w.z) < 200) danger = 3;
+    P.danger = danger;
+    if (!P.alive) L.music.set('night');
+    else if (L.boss && !L.boss.dead && L.dist(P.x, P.z, L.boss.x, L.boss.z) < 900) L.music.set('boss');
+    else if (danger >= 3) L.music.set('chase');
+    else if (danger >= 1) L.music.set('tension');
+    else L.music.set(L.env.day < 0.4 ? 'night' : 'calm');
+    // Herzschlag bei Nähe
+    if (danger >= 2 && P.alive) { P.heartT = (P.heartT || 0) - dt; if (P.heartT <= 0) { P.heartT = danger >= 3 ? 0.55 : 0.85; L.snd.heart(0.25); } }
+    // Natur
+    if (Math.random() < dt * 0.25) { if (L.env.day > 0.5 && L.env.rain < 0.2) L.snd.bird(); else if (L.env.day < 0.3) L.snd.cricket(); }
+    // Taschenlampe
+    const F = L.env.flash;
+    if (P.flash && P.alive) {
+      F.intensity = 2.4;
+      const dir = V1; L.camera.getWorldDirection(dir);
+      F.position.set(P.x, P.y + (P.stance === 'crawl' ? 0.5 : 1.5), P.z);
+      F.target.position.set(P.x + dir.x * 20, P.y + dir.y * 20 + 1, P.z + dir.z * 20);
+    } else F.intensity = 0;
+  };
+  L.updateMenuFx = updateFx;
+  // interne Funktionen für den Mehrspieler-Teil (mp.js)
+  L._g = { spawnMonster, spawnWalker, spawnNpc, spawnVehicle, clearAll, resetPlayer, removeItem, initGait, gait, MDIFF, NDIFF, players, farSpot };
+})();

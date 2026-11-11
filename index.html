@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEISE – Die Nacht der Stelzer</title>
+  <meta name="description" content="3D-Schleich-Horror im Browser: Sei leise, flieh vor Viktor, Daniel, den Stelzern und dem Koloss.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;500;700&family=Special+Elite&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" hidden>
+    <div id="tl">
+      <div id="clock">08:00</div>
+      <div id="weather"></div>
+      <div id="bossTimer"></div>
+      <div id="codes"></div>
+      <div id="objective"></div>
+      <div id="friendInfo"></div>
+    </div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="bars">
+      <div class="bar"><span>❤️</span><div><i id="bHp"></i></div></div>
+      <div class="bar"><span>🍖</span><div><i id="bFood"></i></div></div>
+      <div class="bar"><span>💧</span><div><i id="bWater"></i></div></div>
+      <div class="bar"><span>⚡</span><div><i id="bStam"></i></div></div>
+    </div>
+    <div id="noiseBox">
+      <div id="moveMode">🚶 Gehen</div>
+      <div class="nbar"><i id="noiseFill"></i></div>
+      <div id="noiseTxt">leise</div>
+    </div>
+    <div id="hotbar"></div>
+    <div id="ammo"></div>
+    <div id="vehHud" hidden>
+      <div id="kmh">0</div><small>km/h</small>
+      <div id="belt"></div>
+      <div id="vehHp"></div>
+    </div>
+    <div id="hint"></div>
+    <div id="msgs"></div>
+    <div id="cross"></div>
+    <div id="dmgVig"></div>
+    <div id="banner"><h2 id="bannerT"></h2><p id="bannerS"></p></div>
+    <div id="extract"></div>
+  </div>
+
+  <!-- Inventar -->
+  <div id="inv" class="overlay" hidden>
+    <div class="panel wide">
+      <h2>Inventar <small>Tab schließen</small></h2>
+      <div class="invcols">
+        <div>
+          <h3>Ausrüstung</h3>
+          <div id="invHot" class="slots"></div>
+          <h3>🔒 Tresor-Platz <small>bleibt auch, wenn du stirbst</small></h3>
+          <div id="invSafe" class="slots"></div>
+        </div>
+        <div>
+          <h3>🎒 Rucksack</h3>
+          <div id="invBag" class="slots grid"></div>
+        </div>
+      </div>
+      <div id="invActions"></div>
+    </div>
+  </div>
+
+  <!-- Große Karte -->
+  <div id="mapPanel" class="overlay" hidden>
+    <div class="panel map">
+      <h2>Karte <small>M schließen</small></h2>
+      <canvas id="bigmap" width="760" height="760"></canvas>
+    </div>
+  </div>
+
+  <!-- Bunker-Tastenfeld -->
+  <div id="keypad" class="overlay" hidden>
+    <div class="panel small">
+      <h2>Bunker 7</h2>
+      <div id="kpDisplay">____</div>
+      <div id="kpKeys"></div>
+      <p id="kpInfo"></p>
+    </div>
+  </div>
+
+  <!-- Zettel -->
+  <div id="noteView" class="overlay" hidden>
+    <div class="paper"><p id="noteText"></p><button class="btn" id="noteClose">Weiter (E)</button></div>
+  </div>
+
+  <!-- Hauptmenü -->
+  <section id="menu" class="screen">
+    <div class="menuBox">
+      <p class="eyebrow">Ein Schleich-Horrorspiel</p>
+      <h1>LEISE</h1>
+      <p class="tag">Die Nacht der Stelzer</p>
+      <p class="lead">Viktor und Daniel hören jedes Geräusch. Über ihnen staksen die Stelzer. Und alle paar Minuten erwacht der Koloss.</p>
+      <div class="mbtns">
+        <button class="btn primary" id="btnPlay">Spielen</button>
+        <button class="btn" id="btnChar">Charakter</button>
+        <button class="btn" id="btnStash">Versteck</button>
+        <button class="btn" id="btnSettings">Einstellungen</button>
+        <button class="btn" id="btnMp">Mit Freund spielen</button>
+        <button class="btn" id="btnHelp">Anleitung</button>
+      </div>
+      <p class="stats" id="menuStats"></p>
+    </div>
+  </section>
+
+  <!-- Charakter -->
+  <section id="charScreen" class="screen" hidden>
+    <div class="panel wide charPanel">
+      <h2>Dein Charakter</h2>
+      <div class="charCols">
+        <canvas id="charPreview" width="360" height="460"></canvas>
+        <div id="charOpts"></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="charRandom">🎲 Zufällig</button>
+        <button class="btn primary" id="charSave">Speichern</button>
+        <button class="btn" id="charBack">Zurück</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Versteck / Ausrüstung wählen -->
+  <section id="stashScreen" class="screen" hidden>
+    <div class="panel wide">
+      <h2 id="stashTitle">Dein Versteck</h2>
+      <p id="stashInfo"></p>
+      <div id="stashList" class="slots grid big"></div>
+      <h3>🔒 Tresor-Platz</h3>
+      <div id="stashSafe" class="slots"></div>
+      <div class="row">
+        <button class="btn primary" id="stashGo" hidden>Losgehen</button>
+        <button class="btn" id="stashBack">Zurück</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Einstellungen -->
+  <section id="settingsScreen" class="screen" hidden>
+    <div class="panel wide">
+      <h2>Einstellungen</h2>
+      <div id="setForm" class="form"></div>
+      <div class="row"><button class="btn primary" id="setBack">Fertig</button></div>
+    </div>
+  </section>
+
+  <!-- Mehrspieler -->
+  <section id="mpScreen" class="screen" hidden>
+    <div class="panel">
+      <h2>Mit Freund spielen</h2>
+      <p class="small">Beide brauchen Internet. Einer erstellt einen Raum, der andere tritt mit dem Code bei. Ihr spielt dann in derselben Welt: Chat mit <b>Enter</b>, dein Freund ist auf der Karte blau.</p>
+      <div id="mpIdle">
+        <div class="row"><button class="btn primary" id="mpHost">Raum erstellen</button></div>
+        <p class="small center">– oder –</p>
+        <div class="row"><input id="mpCode" type="text" maxlength="8" placeholder="Code, z. B. WOLF-42" autocomplete="off"><button class="btn" id="mpJoin">Beitreten</button></div>
+      </div>
+      <div id="mpStatus"></div>
+      <div class="row">
+        <button class="btn primary" id="mpStart" hidden>Runde starten</button>
+        <button class="btn danger" id="mpLeave" hidden>Verbindung trennen</button>
+        <button class="btn" id="mpBack">Zurück</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Anleitung -->
+  <section id="helpScreen" class="screen" hidden>
+    <div class="panel wide help">
+      <h2>Anleitung</h2>
+      <div class="helpCols">
+        <div>
+          <h3>Steuerung</h3>
+          <p><b>WASD</b> laufen · <b>Maus</b> umsehen · <b>Shift</b> rennen<br>
+          <b>C</b> schleichen · <b>X</b> kriechen · <b>Leertaste</b> springen<br>
+          <b>Linksklick</b> benutzen (Hammer, Schießen, Werfen, Essen)<br>
+          <b>Rechtsklick</b> zielen · <b>R</b> nachladen · <b>G</b> Granate werfen<br>
+          <b>1–5</b> / Mausrad: Ausrüstung wählen · <b>Q</b> Verband benutzen<br>
+          <b>E</b> aufheben / benutzen / einsteigen · <b>F</b> ein- und aussteigen<br>
+          <b>B</b> anschnallen · <b>H</b> hupen · <b>L</b> Taschenlampe<br>
+          <b>Tab</b> Inventar · <b>M</b> Karte · <b>Enter</b> Chat (zu zweit) · <b>Esc</b> Pause</p>
+        </div>
+        <div>
+          <h3>Leise sein</h3>
+          <p>Viktor und Daniel sind blind, hören aber gut. <b>Kriechen und Schleichen hören sie nicht.</b> Normales Gehen hören sie nur aus der Nähe. Rennen, Schüsse, Hupen, Unfälle und Explosionen hört man weit.</p>
+          <p>Wenn dich ein Monster beim Schleichen erwischt, überlebst du knapp und wirst weggeschleudert. Stehst oder rennst du, bist du sofort tot.</p>
+          <p>Die <b>Stelzer</b> sehen mit ihrem Scheinwerfer. Geh ihnen aus dem Lichtkegel und versteck dich hinter Häusern.</p>
+        </div>
+        <div>
+          <h3>Fliehen</h3>
+          <p><b>🔒 Bunker 7:</b> 4 Zettel mit den Code-Ziffern finden.<br>
+          <b>📡 Funkstation:</b> Sicherung finden (Militärbasis), Hubschrauber rufen, 90 Sekunden überleben.<br>
+          <b>🚧 Autobahnsperre:</b> Schranke öffnen (30 Sekunden Alarm), dann nach Norden raus.</p>
+          <p>Wenn du entkommst, legst du deine Sachen ins Versteck. Wenn du stirbst, ist alles weg, nur nicht der Gegenstand im <b>Tresor-Platz</b>.</p>
+        </div>
+      </div>
+      <div class="row"><button class="btn" id="helpBack">Zurück</button></div>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <section id="pauseScreen" class="screen dim" hidden>
+    <div class="panel small">
+      <h2>Pause</h2>
+      <div class="col">
+        <button class="btn primary" id="pResume">Weiter</button>
+        <button class="btn" id="pSettings">Einstellungen</button>
+        <button class="btn" id="pHelp">Anleitung</button>
+        <button class="btn danger" id="pQuit">Runde aufgeben</button>
+      </div>
+      <p class="small">Aufgeben zählt wie Sterben: Deine Sachen sind weg, nur der Tresor-Platz bleibt.</p>
+    </div>
+  </section>
+
+  <!-- Rundenende -->
+  <section id="endScreen" class="screen dim" hidden>
+    <div class="panel wide">
+      <h2 id="endTitle"></h2>
+      <p id="endText"></p>
+      <div id="endList" class="slots grid big"></div>
+      <p id="endInfo" class="small"></p>
+      <div class="row"><button class="btn primary" id="endOk">Weiter</button></div>
+    </div>
+  </section>
+
+  <div id="chat" hidden>
+    <div id="chatLog"></div>
+    <input id="chatIn" type="text" maxlength="160" placeholder="Nachricht … (Enter senden, Esc abbrechen)" autocomplete="off" hidden>
+  </div>
+
+  <div id="loading" class="screen"><div class="menuBox"><h1>LEISE</h1><p class="lead" id="loadText">Die Welt wird gebaut ...</p></div></div>
+  <div id="bloodScreen"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/mp.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
