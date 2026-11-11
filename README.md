@@ -6,7 +6,7 @@
 - **Viktor** (4 Varianten: mit Hut, mit Schal, mit schiefem Kopf, der Lange): blind, hört aber alles und krabbelt auf allen Vieren hinter dir her.
 - **Daniel**: langsam, riesig und stark.
 - **Stelzer**: dreibeinige Alien-Maschinen mit Suchscheinwerfer und Hitzestrahl.
-- **Der Koloss**: kommt alle 10 Minuten (einstellbar). Er ist eine Fusion aus Daniel, Viktor und einem Stelzer.
+- **MAMA IVA**: der Riesen-Boss – eine Fusion aus Daniel, Viktor und einem Stelzer. Nach 10 Minuten erscheint sie (mal bricht sie aus dem Boden, mal erhebt sie sich hinter einem Berg), bleibt 10 Minuten, versinkt wieder im Boden, und nach 10 Minuten Pause geht es von vorne los (einstellbar).
 - **Andere Überlebende** (NPCs): friedlich, gemischt oder feindlich, einstellbar.
 
 ## Orte

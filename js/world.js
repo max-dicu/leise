@@ -477,6 +477,43 @@
     mesh(L.GEO.boxB, '#555', 0.3, 4, 0.3, -8, 0, -1490); mesh(L.GEO.boxB, '#555', 0.3, 4, 0.3, 8, 0, -1490);
     L.interact.gate = { x: 12, z: -1486, gate, gbox, btn };
   }
+  // ---------- Bergkette am Kartenrand (hinter diesen Bergen kann MAMA IVA auftauchen) ----------
+  L.mountains = [];
+  function buildMountains() {
+    for (const [x, z, r, h] of [[-1360, 600, 95, 58], [1370, -470, 100, 62], [600, -1370, 95, 55], [-850, 1390, 90, 52], [1385, 200, 85, 50]]) {
+      const geo = new T.ConeGeometry(r, h, 28, 7);
+      geo.translate(0, h / 2, 0);
+      const pos = geo.attributes.position, cols = [];
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i), vy = pos.getY(i), vz = pos.getZ(i);
+        // zerklüftete Felsen: Seiten etwas verbeulen (Spitze und Fuß bleiben)
+        if (vy > 1 && vy < h - 1) {
+          const n = (L.noise2(vx * 0.08 + x, vz * 0.08 + z) - 0.5) * 18;
+          const f = 1 + n / Math.max(10, Math.hypot(vx, vz));
+          pos.setX(i, vx * f); pos.setZ(i, vz * f); pos.setY(i, vy + n * 0.3);
+        }
+        const yy = pos.getY(i), snow = yy > h * 0.72;
+        const g = 0.38 + L.noise2(vx * 0.2, vz * 0.2) * 0.12;
+        if (snow) cols.push(0.92, 0.94, 0.97); else cols.push(g * 1.05, g, g * 0.88);
+      }
+      geo.setAttribute('color', new T.Float32BufferAttribute(cols, 3));
+      geo.computeVertexNormals();
+      const m = new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      m.position.set(x, 0, z); m.castShadow = true; m.receiveShadow = true;
+      L.scene.add(m);
+      const c = r * 0.8;
+      L.addBox(x - c, z - c, x + c, z + c, h, 'building');
+      L.mapRects.push({ x, z, w: r * 1.7, d: r * 1.7, c: '#7a7468' });
+      L.mountains.push({ x, z, r, h });
+    }
+  }
+  // Höhe der Berge an einer Stelle (0 = flacher Boden)
+  L.mountainH = function (x, z) {
+    let best = 0;
+    for (const m of L.mountains) { const d = Math.hypot(x - m.x, z - m.z); if (d < m.r) best = Math.max(best, m.h * (1 - d / m.r)); }
+    return best;
+  };
+
   function scatteredHouses() {
     const country = L.roads.filter((r) => r.rx2 - r.rx1 > 300 || r.rz2 - r.rz1 > 300);
     let placed = 0, tries = 0;
@@ -735,7 +772,7 @@
     buildGround(); buildRoads();
     buildCity(); buildVillage(); buildFarm(); buildMilitary();
     buildGas(700, -35, true, 'tanke1'); buildGas(-35, 800, false, 'tanke2');
-    buildBunker(); buildRadio(); buildCrater(); buildCamping(); buildWindpark(); buildSperre();
+    buildBunker(); buildRadio(); buildCrater(); buildCamping(); buildWindpark(); buildSperre(); buildMountains();
     scatteredHouses(); perimeter(); wrecks(); trees(); extraBikes(); lootCountryside();
     flush(); buildMapCanvas();
     // Startpunkte für Spieler (auf Landstraßen)

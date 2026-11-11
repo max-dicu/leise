@@ -215,7 +215,7 @@
     const h = Math.floor(E.time), m = Math.floor((E.time - h) * 60);
     $('clock').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     $('weather').textContent = (E.day < 0.3 ? '🌙 Nacht · ' : '') + (E.label || '');
-    $('bossTimer').textContent = L.boss ? (L.boss.dead ? '' : '👹 Der Koloss ist unterwegs!') : `👹 Koloss in ${L.fmt(R.bossT)}`;
+    $('bossTimer').textContent = L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA ist da – noch ${L.fmt(L.boss.life)}` : '👹 MAMA IVA versinkt …') : `👹 MAMA IVA in ${L.fmt(R.bossT)}`;
     const nf = R.found.filter(Boolean).length;
     $('codes').textContent = nf ? '🔒 Bunker-Code: ' + R.code.map((c, i) => (R.found[i] ? c : '_')).join(' ') : '';
     let obj = '';
@@ -416,7 +416,7 @@
     ['npcDiff', 'NPC-Schwierigkeit (Treffsicherheit)', [['leicht', 'Leicht'], ['normal', 'Normal'], ['schwer', 'Schwer'], ['albtraum', 'Albtraum']]],
     ['npcMode', 'Andere Überlebende sind …', [['friedlich', 'friedlich'], ['gemischt', 'gemischt'], ['feindlich', 'feindlich']]],
     ['npcCount', 'Anzahl Überlebende (NPCs)', [[0, 'keine'], [8, '8'], [16, '16'], [24, '24'], [32, '32']]],
-    ['bossMin', 'Der Koloss kommt alle …', [[5, '5 Minuten'], [10, '10 Minuten'], [15, '15 Minuten'], [20, '20 Minuten']]],
+    ['bossMin', 'MAMA IVA: Pause und Aufenthalt je …', [[5, '5 Minuten'], [10, '10 Minuten'], [15, '15 Minuten'], [20, '20 Minuten']]],
     ['shadows', 'Schatten', [[true, 'An'], [false, 'Aus (schneller)']]],
     ['view', 'Sichtweite', [[400, 'Kurz (schneller)'], [700, 'Mittel'], [1000, 'Weit']]]
   ];

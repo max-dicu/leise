@@ -1,5 +1,5 @@
 'use strict';
-// Spiellogik: Spieler, Inventar, Waffen, Fahrzeuge, Monster, Stelzer, Koloss, NPCs, Fluchtwege
+// Spiellogik: Spieler, Inventar, Waffen, Fahrzeuge, Monster, Stelzer, MAMA IVA, NPCs, Fluchtwege
 (function () {
   const L = window.L, T = THREE;
 
@@ -239,7 +239,7 @@
     if (e.kind === 'viktor' || e.kind === 'daniel') { L.blood(e.x, 1.2, e.z, 30, true); L.decal(e.x, e.z, 2); L.snd.splat({ x: e.x, y: 1, z: e.z }); }
     if (e.kind === 'npc') { L.blood(e.x, 1, e.z, 25, true); L.decal(e.x, e.z, 1.8); dropNpcLoot(e); }
     if (e.kind === 'walker') { L.explode(e.x, e.hy, e.z, 12, 0, null, true); L.msg('💥 Ein Stelzer ist zerstört!'); for (let i = 0; i < 2; i++) L.spawnItem('artefakt', e.x + L.rand(-6, 6), e.z + L.rand(-6, 6), 1); }
-    if (e.kind === 'boss') { L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('DER KOLOSS IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
+    if (e.kind === 'boss') { L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('MAMA IVA IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
   }
 
   // ---------- Inventar ----------
@@ -1269,19 +1269,57 @@
     return true;
   }
 
-  // ---------- Der Koloss ----------
+  // ---------- MAMA IVA (der Riesen-Boss) ----------
+  // Sie erscheint entweder hinter einem Berg oder bricht aus dem Boden, bleibt eine Weile und versinkt dann wieder.
   function spawnBoss() {
     const rig = L.buildKoloss(); L.scene.add(rig.root);
-    const side = Math.floor(Math.random() * 4), e = 1400, o = L.rand(-1200, 1200);
-    const pos = [[o, -e], [e, o], [o, e], [-e, o]][side];
-    const b = { kind: 'boss', rig, x: pos[0], z: pos[1], yaw: 0, hy: 30, hp: 8000, t: 0, life: 150, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: false, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3 };
-    b.yaw = Math.atan2(b.tx - b.x, b.tz - b.z);
+    const stay = L.S().bossMin * 60;
+    const fromMountain = L.mountains && L.mountains.length && Math.random() < 0.5;
+    let x, z;
+    if (fromMountain) {
+      // hinter dem Berg, der dem Spieler am nächsten ist (vom Spieler aus gesehen dahinter)
+      const m = L.mountains.slice().sort((p, q) => L.dist(p.x, p.z, P.x, P.z) - L.dist(q.x, q.z, P.x, P.z))[0];
+      const a = Math.atan2(m.x - P.x, m.z - P.z);
+      // auf dem hinteren Hang: so ragen Kopf und Schultern beim Aufsteigen über den Gipfel
+      x = L.clamp(m.x + Math.sin(a) * m.r * 0.4, -1485, 1485); z = L.clamp(m.z + Math.cos(a) * m.r * 0.4, -1485, 1485);
+    } else {
+      // aus dem Boden, 220–350 m vom Spieler entfernt
+      x = P.x + 260; z = P.z;
+      for (let k = 0; k < 40; k++) {
+        const a = Math.random() * 6.28, d = L.rand(220, 350), tx = P.x + Math.sin(a) * d, tz = P.z + Math.cos(a) * d;
+        if (Math.abs(tx) < 1450 && Math.abs(tz) < 1450 && L.mountainH(tx, tz) === 0) { x = tx; z = tz; break; }
+      }
+    }
+    const how = fromMountain ? "berg" : "boden";
+    const b = { kind: "boss", rig, x, z, yaw: 0, hy: 30, hp: 8000, t: 0, life: stay, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: true, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3,
+      how, emerge: 0, emergeDur: fromMountain ? 9 : 8, rootY: fromMountain ? -50 : -62, startY: fromMountain ? -50 : -62, sinking: 0 };
+    b.yaw = Math.atan2(P.x - b.x, P.z - b.z);
     initGait(b, rig);
+    rig.root.position.y = b.rootY;
     L.boss = b;
-    if (isHost()) L.mp.send({ t: 'boss', x: b.x, z: b.z, yaw: b.yaw });
-    L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
-    L.banner('DER KOLOSS IST ERWACHT', 'Daniel, Viktor und etwas Fremdes – verschmolzen zu einem Riesen. Versteck dich!');
+    if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how });
+    L.bossAppear(b);
   }
+  // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
+  L.bossAppear = function (b) {
+    L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
+    if (b.how === "boden") {
+      L.decal(b.x, b.z, 30, "#1a120c");
+      L.fx("#5a4630", b.x, 1, b.z, 40, 14, { size: 0.9, life: 2.5 });
+      L.banner("MAMA IVA BRICHT AUS DEM BODEN", "Die Erde reißt auf … Versteck dich!");
+    } else L.banner("MAMA IVA ERSCHEINT", "Hinter dem Berg erhebt sich etwas Riesiges … Versteck dich!");
+  };
+  // Aufsteigen / Versinken: gemeinsame Optik für Host und Mitspieler
+  L.bossRise = function (b, dt) {
+    const d = L.dist(P.x, P.z, b.x, b.z);
+    if (Math.random() < dt * 12) {
+      if (b.how === "boden" || b.sinking) L.fx(Math.random() < 0.5 ? "#5a4630" : "#3a3a36", b.x + L.rand(-14, 14), 0.5, b.z + L.rand(-14, 14), 3, 9, { size: 0.7, life: 1.8 });
+      else L.fx("#6a6458", b.x + L.rand(-20, 20), L.mountainH(b.x, b.z) + 30, b.z + L.rand(-20, 20), 2, 6, { size: 0.6, life: 2 });
+    }
+    L.shake = Math.max(L.shake, L.clamp((420 - d) / 420, 0, 0.8));
+    b.rumbleT = (b.rumbleT || 0) - dt;
+    if (b.rumbleT <= 0) { b.rumbleT = 0.7; L.snd.stomp({ x: b.x, y: 0, z: b.z }); }
+  };
   function updateBoss(dt) {
     const b = L.boss, rig = b.rig, dP = L.dist(P.x, P.z, b.x, b.z);
     if (b.dead) {
@@ -1291,10 +1329,24 @@
       if (b.deadT > 60) { L.scene.remove(rig.root); L.boss = null; if (isHost()) L.mp.send({ t: 'bossGone' }); }
       return;
     }
-    b.t += dt; b.life -= dt; b.stompCd -= dt; b.beamCd -= dt; b.roarT -= dt;
+    b.t += dt; b.stompCd -= dt; b.beamCd -= dt; b.roarT -= dt;
     if (b.roarT <= 0) { b.roarT = L.rand(15, 30); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
-    if (b.life <= 0 && !b.leaving) { b.leaving = true; const a = Math.atan2(b.x, b.z); b.tx = Math.sin(a) * 1700; b.tz = Math.cos(a) * 1700; L.msg('Der Koloss zieht sich zurück ...'); }
-    if (b.leaving && (Math.abs(b.x) > 1480 || Math.abs(b.z) > 1480)) { L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); return; }
+    if (b.emerge < b.emergeDur) {
+      // langsam aus dem Boden / hinter dem Berg hervor
+      b.emerge += dt;
+      const k = Math.min(1, b.emerge / b.emergeDur), ease = 1 - Math.pow(1 - k, 3);
+      b.rootY = b.startY * (1 - ease);
+      L.bossRise(b, dt);
+      if (k >= 1) { b.rootY = 0; b.leaving = false; L.msg('👹 MAMA IVA ist da – ' + Math.round(b.life / 60) + ' Minuten lang!'); }
+    } else if (!b.sinking) {
+      b.life -= dt;
+      if (b.life <= 0) { b.sinking = 0.001; b.leaving = true; rig.beam.g.visible = false; L.msg('MAMA IVA versinkt im Boden … ' + L.S().bossMin + ' Minuten Pause.'); }
+    } else {
+      b.sinking += dt;
+      b.rootY = -65 * Math.min(1, b.sinking / 7);
+      L.bossRise(b, dt);
+      if (b.sinking >= 7) { L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); return; }
+    }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
     if (!b.leaving) for (const t of players()) {
       const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
@@ -1303,12 +1355,12 @@
     const [nearP, dNear] = nearestPlayer(b.x, b.z);
     const dT = L.dist(b.x, b.z, b.tx, b.tz);
     let speed = 0;
-    if (b.stompT <= 0 && dT > 12) {
-      speed = b.leaving ? 9 : 7.5;
+    if (!b.leaving && b.stompT <= 0 && dT > 12) {
+      speed = 7.5;
       const want = Math.atan2(b.tx - b.x, b.tz - b.z);
       b.yaw += L.clamp(L.angDiff(b.yaw, want), -0.45 * dt, 0.45 * dt);
       b.x += Math.sin(b.yaw) * speed * dt; b.z += Math.cos(b.yaw) * speed * dt;
-      if (!b.leaving) L.clampWorld(b);
+      L.clampWorld(b);
     } else if (!b.leaving && dT <= 12 && b.stompT <= 0) { b.tx = P.x + L.rand(-200, 200); b.tz = P.z + L.rand(-200, 200); }
     // Stampfen
     if (!b.leaving && nearP && dNear < 24 && b.stompCd <= 0 && b.stompT <= 0) { b.stompT = 1.4; }
@@ -1322,13 +1374,13 @@
         const d = L.dist(P.x, P.z, b.x, b.z);
         if (d < 26 && P.alive) {
           const sneaking = P.stance !== 'stand' && !P.vehicle;
-          L.hurtPlayer((sneaking ? 40 : 85) * L.md.dmg * (1 - d / 40), 'Vom Koloss zertrampelt');
+          L.hurtPlayer((sneaking ? 40 : 85) * L.md.dmg * (1 - d / 40), 'Von MAMA IVA zertrampelt');
           if (P.alive && !P.vehicle) { const k = 16; P.vx = (P.x - b.x) / (d || 1) * k; P.vz = (P.z - b.z) / (d || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
         }
         for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, b.x, b.z) < 26) L.damageEnt(n, 200, b.x, b.z, b);
         for (const rp of RPs()) {
           const d2 = L.dist(rp.x, rp.z, b.x, b.z);
-          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Vom Koloss zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
+          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Von MAMA IVA zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
         }
         if (isHost()) L.mp.send({ t: 'stomp', x: b.x, z: b.z });
       }
@@ -1351,13 +1403,14 @@
         rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(b.aimX, 0.5, b.aimZ), 1.3);
         if (Math.random() < dt * 8) L.decal(b.aimX, b.aimZ, 1.6, '#1a1008');
         if (Math.random() < dt * 3) L.snd.ray({ x: b.aimX, y: 1, z: b.aimZ });
-        if (T.alive && see && L.dist(T.x, T.z, b.aimX, b.aimZ) < 3.2) dps(T, 60 * dt * L.md.dmg, 'Vom Strahl des Koloss verbrannt');
+        if (T.alive && see && L.dist(T.x, T.z, b.aimX, b.aimZ) < 3.2) dps(T, 60 * dt * L.md.dmg, 'Vom Strahl von MAMA IVA verbrannt');
       }
       if (b.beamT <= 0) { rig.beam.g.visible = false; b.beamCd = 7; }
     } else rig.beam.g.visible = false;
     // Optik
     b.hy = 30 + Math.sin(b.t * 1.2) * 0.6 - (b.stompT > 0 ? Math.sin((1.4 - b.stompT) / 1.4 * Math.PI) * -3 : 0);
     rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(0, b.yaw, Math.sin(b.t * 0.9) * 0.04);
+    rig.root.position.y = b.rootY + L.mountainH(b.x, b.z);
     const sw = Math.sin(b.t * 1.4);
     rig.arms[0].arm.rotation.set(-sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, -0.3);
     rig.thin[0].arm.rotation.set(-1.2 + Math.sin(b.t * 2.1) * 0.4, 0, 0.6); rig.thin[1].arm.rotation.set(-1.2 + Math.cos(b.t * 1.9) * 0.4, 0, -0.6);
@@ -1618,7 +1671,7 @@
     // Boss-Timer
     if (!L.boss && !isClient()) {
       R.bossT -= dt;
-      if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt der Koloss.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
+      if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
       if (R.bossT <= 0) { R.warned = false; spawnBoss(); }
     }
     if (!P.gone) updatePlayer(dt);

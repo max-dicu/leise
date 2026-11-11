@@ -405,7 +405,7 @@
       if (hostDrives || (Math.abs(v.speed) > 0.05 && v !== P.vehicle)) V.push([v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), hostDrives ? 1 : 0]);
     }
     const b = L.boss;
-    const B = b ? [r1(b.x), r1(b.z), r2(b.yaw), r1(b.hy), b.rig.beam.g.visible ? 1 : 0, r1(b.aimX || 0), r1(b.aimZ || 0), r2(b.stompT || 0), b.dead ? 1 : 0] : null;
+    const B = b ? [r1(b.x), r1(b.z), r2(b.yaw), r1(b.hy), b.rig.beam.g.visible ? 1 : 0, r1(b.aimX || 0), r1(b.aimZ || 0), r2(b.stompT || 0), b.dead ? 1 : 0, r1(b.rootY || 0), Math.round(b.life || 0)] : null;
     mp.sendTo(R.pid, { t: 'snap', M, W, N: NN, V, B });
   }
   function sendRound() {
@@ -508,7 +508,7 @@
     for (const v of [...occ]) if (!seen.has(v)) { if (![...RM.values()].some((r) => r.inVeh && r.vehId === v.id && !(r.seat > 0))) v.occupied = false; occ.delete(v); }
     if (s.B && L.boss) {
       const b = L.boss, B = s.B;
-      b.nx = B[0]; b.nz = B[1]; b.nyaw = B[2]; b.hy = B[3]; b.beamOn = !!B[4]; b.aimX = B[5]; b.aimZ = B[6]; b.stompT = B[7];
+      b.nx = B[0]; b.nz = B[1]; b.nyaw = B[2]; b.hy = B[3]; b.beamOn = !!B[4]; b.aimX = B[5]; b.aimZ = B[6]; b.stompT = B[7]; b.rootY = B[9] || 0; b.life = B[10] || 0;
       if (B[8] && !b.dead) { b.dead = true; b.deadT = 0; }
     }
   }
@@ -516,7 +516,7 @@
   function applyRound(m) {
     if (N.role !== 'client' || !L.round || L.round.over || L.state !== 'game') return;
     const R = L.round, I = L.interact;
-    if (R.bossT > 30 && m.bossT <= 30 && !L.boss) L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt der Koloss.');
+    if (R.bossT > 30 && m.bossT <= 30 && !L.boss) L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.');
     R.bossT = m.bossT;
     if (m.radio === 'calling' && R.radio === 'idle') L.banner('HUBSCHRAUBER GERUFEN', 'Überlebt 90 Sekunden!');
     R.radio = m.radio; R.radioT = m.radioT;
@@ -544,11 +544,12 @@
   function bossPuppet(m) {
     if (L.boss) L.scene.remove(L.boss.rig.root);
     const rig = L.buildKoloss(); L.scene.add(rig.root);
-    const b = { kind: 'boss', key: 'boss', rig, x: m.x, z: m.z, nx: m.x, nz: m.z, yaw: m.yaw, nyaw: m.yaw, hy: 30, hp: 8000, t: 0, dead: false, deadT: 0, roarT: 3, beamOn: false, aimX: 0, aimZ: 0, stompT: 0 };
+    const how = m.how || 'boden', start = how === 'berg' ? -50 : -62;
+    const b = { kind: 'boss', key: 'boss', rig, x: m.x, z: m.z, nx: m.x, nz: m.z, yaw: m.yaw, nyaw: m.yaw, hy: 30, hp: 8000, t: 0, dead: false, deadT: 0, roarT: 3, beamOn: false, aimX: 0, aimZ: 0, stompT: 0, how, rootY: start, life: 0 };
     G().initGait(b, rig);
+    rig.root.position.y = start;
     L.boss = b;
-    L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
-    L.banner('DER KOLOSS IST ERWACHT', 'Daniel, Viktor und etwas Fremdes – verschmolzen zu einem Riesen. Versteck dich!');
+    L.bossAppear(b);
   }
 
   // ---------- Mitspieler-Gerät: Figuren bewegen und animieren ----------
@@ -650,6 +651,8 @@
     b.roarT -= dt;
     if (b.roarT <= 0) { b.roarT = L.rand(15, 30); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
     rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(0, b.yaw, Math.sin(b.t * 0.9) * 0.04);
+    rig.root.position.y = (b.rootY || 0) + L.mountainH(b.x, b.z);
+    if ((b.rootY || 0) < -0.5) { b.sinking = b.life <= 0 ? 1 : 0; L.bossRise(b, dt); }
     const sw = Math.sin(b.t * 1.4), st = b.stompT > 0 ? 1.5 : 0;
     rig.arms[0].arm.rotation.set(-sw * 0.3 - st, 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - st, 0, -0.3);
     rig.thin[0].arm.rotation.set(-1.2 + Math.sin(b.t * 2.1) * 0.4, 0, 0.6); rig.thin[1].arm.rotation.set(-1.2 + Math.cos(b.t * 1.9) * 0.4, 0, -0.6);
