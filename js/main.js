@@ -10,8 +10,9 @@
   const T = THREE, P = L.player;
   const canvas = L.$('c');
   L.canvas = canvas;
-  const renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  const renderer = new T.WebGLRenderer({ canvas, antialias: !L.isTouch, powerPreference: 'high-performance' });
+  // am Handy mit geringerer Auflösung rendern, damit es flüssig läuft
+  renderer.setPixelRatio(L.isTouch ? Math.min(window.devicePixelRatio || 1, 1) : Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.shadowMap.type = T.PCFSoftShadowMap;
   L.renderer = renderer;
   const scene = new T.Scene();

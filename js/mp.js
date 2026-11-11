@@ -579,7 +579,7 @@
   addEventListener('keydown', (e) => {
     const inp = $('chatIn');
     if (e.target === inp) {
-      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === 'Enter') {
         const t = inp.value.trim();
         if (t) { mp.send({ t: 'chat', text: t.slice(0, 160) }); addChat('Du', t); }
         closeChat(); e.preventDefault();

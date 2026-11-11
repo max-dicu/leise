@@ -41,6 +41,7 @@
     if (online()) { L.mpPause = true; L.uiBlock = true; show('pauseScreen'); return; }
     L.paused = true; L.engine.set(false, 0); show('pauseScreen');
   }
+  ui.pause = function () { if (L.state === 'game' && !L.paused && !L.mpPause) { ui.closeOverlays(); L.unlock(); pause(); } };
   function resume() {
     show(null);
     if (L.mpPause) { L.mpPause = false; L.uiBlock = false; L.lock(); return; }

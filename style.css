@@ -155,6 +155,53 @@ button { font: inherit; cursor: pointer; }
 #chatIn { pointer-events: auto; width: 100%; margin-top: 6px; font: inherit; font-size: 15px; padding: 7px 9px; background: rgba(10, 10, 14, .9); color: var(--text); border: 1px solid var(--amber); border-radius: 3px; }
 .slot.friend { border-color: #5ab0ff; background: rgba(60, 110, 170, .4); }
 
+/* Handy-Steuerung */
+body.touch { touch-action: none; -webkit-tap-highlight-color: transparent; }
+#touch { position: fixed; inset: 0; z-index: 6; }
+#tLook { position: absolute; inset: 0; }
+#tJoy { position: absolute; left: 70px; bottom: 36px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255, 255, 255, .07); border: 2px solid rgba(255, 255, 255, .22); pointer-events: none; }
+#tJoy.act { bottom: auto; background: rgba(255, 255, 255, .12); }
+#tKnob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, .38); }
+#touch button { position: relative; pointer-events: auto; width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .3); background: rgba(10, 10, 14, .55); color: #fff; font-size: 21px; padding: 0; line-height: 1; font-family: var(--display); }
+#touch button.on { background: rgba(226, 178, 90, .7); border-color: var(--amber); }
+#touch button.big { width: 78px; height: 78px; font-size: 34px; }
+#touch [hidden] { display: none !important; }
+.tgrp { position: absolute; display: grid; gap: 6px; }
+#tTop { top: 8px; right: 146px; grid-auto-flow: column; }
+#tFoot { left: 8px; top: 150px; grid-template-columns: 48px 48px; }
+#tAct button, #tCar button { position: absolute; }
+#tFire, #tBrake { right: 22px; bottom: 26px; }
+#tJump, #tBelt { right: 112px; bottom: 18px; }
+#tAim, #tHorn { right: 112px; bottom: 78px; }
+#tUse, #tExit { right: 26px; bottom: 116px; font-weight: 700; }
+#tVeh { right: 84px; bottom: 140px; }
+#rotateHint { display: none; position: fixed; inset: 0; z-index: 40; background: #050506; color: var(--text); font-size: 26px; text-align: center; align-items: center; justify-content: center; line-height: 1.6; }
+@media (orientation: portrait) { body.touch.ingame #rotateHint { display: flex; } }
+body.touch #tl { font-size: 12px; }
+body.touch #clock { font-size: 22px; }
+body.touch #weather, body.touch #bossTimer, body.touch #codes, body.touch #objective, body.touch #friendInfo { font-size: 12px; }
+body.touch #minimap { width: 130px; height: 130px; top: 8px; right: 8px; }
+body.touch #bars { top: 6px; bottom: auto; left: 50%; transform: translateX(-50%); width: 180px; gap: 2px; }
+body.touch .bar { font-size: 11px; }
+body.touch .bar div { height: 6px; }
+body.touch #noiseBox { top: 82px; bottom: auto; left: 50%; transform: translateX(-50%); width: 170px; text-align: center; }
+body.touch #moveMode { font-size: 13px; }
+body.touch #noiseTxt { font-size: 11px; }
+body.touch #hotbar { bottom: 8px; }
+body.touch #hotbar .slot { width: 46px; height: 46px; font-size: 20px; }
+body.touch #hotbar .slot.empty { font-size: 9px; }
+body.touch #hint { bottom: 62px; font-size: 13px; white-space: normal; max-width: 60vw; text-align: center; }
+body.touch #ammo { right: auto; left: 50%; transform: translateX(-50%); bottom: 58px; font-size: 16px; }
+body.touch #ammo small { display: none; }
+body.touch #vehHud { right: auto; left: 16px; top: 120px; bottom: auto; text-align: left; }
+body.touch #kmh { font-size: 40px; }
+body.touch #msgs { top: 110px; }
+body.touch #msgs div { font-size: 13px; }
+body.touch #banner h2 { font-size: 28px; }
+body.touch #banner p { font-size: 14px; }
+body.touch #chat { left: 120px; bottom: 70px; width: 300px; }
+body.touch #cross.aim { width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+
 @media (max-width: 860px) {
   .invcols, .charCols, .helpCols, .form { grid-template-columns: 1fr; }
   #charPreview { width: 100%; height: 320px; }
