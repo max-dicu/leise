@@ -591,7 +591,7 @@
       const rim = new T.Mesh(wheelGeo, L.mat('#9a9a9a')); rim.scale.set(w * 1.05, r * 0.5, r * 0.5); piv.add(rim);
       wheels.push(wm); return piv;
     };
-    let seat, glassZ = 0;
+    let seat, seats, glassZ = 0;
     if (t.kind === 'car') {
       const L2 = t.len, W = t.wid, low = type === 'sportwagen';
       part(box, color, W, low ? 0.55 : 0.7, L2, 0, low ? 0.55 : 0.7, 0, root);
@@ -623,6 +623,10 @@
         mkWheel(s * W * 0.46, r, -wz, r, 0.25);
       }
       seat = { x: W * 0.22, y: 0.25, z: -L2 * 0.03 };
+      // Fahrer, Beifahrer, zwei Rücksitze (Sportwagen nur zwei Sitze; beim Pickup sitzt man hinten auf der Ladefläche)
+      const back = type === 'pickup' ? { y: 0.6, z: -L2 * 0.32 } : { y: 0.25, z: -L2 * 0.27 };
+      seats = [seat, { x: -W * 0.22, y: 0.25, z: -L2 * 0.03 }];
+      if (type !== 'sportwagen') seats.push({ x: W * 0.22, y: back.y, z: back.z }, { x: -W * 0.22, y: back.y, z: back.z });
     } else if (t.scooter) {
       // E-Roller: Trittbrett, Lenkstange, kleine Räder, Schriftzug
       const t10 = type === 'joyort10';
@@ -643,6 +647,7 @@
       steer.push(mkWheel(0, wr, 0.55, wr, t10 ? 0.07 : 0.09));
       mkWheel(0, wr, -0.5, wr, t10 ? 0.07 : 0.09);
       seat = { x: 0, y: 0.27, z: -0.05 };
+      seats = [seat, { x: 0, y: 0.27, z: -0.42 }];
     } else {
       const cc = type === 'cross' ? '#e0a020' : type === 'roller' ? '#6ab0d0' : color;
       part(box, '#2a2a2a', 0.18, 0.25, t.len * 0.6, 0, 0.55, 0, root);
@@ -654,9 +659,10 @@
       steer.push(mkWheel(0, r, t.len * 0.4, r, 0.14));
       mkWheel(0, r, -t.len * 0.38, r, 0.16);
       seat = { x: 0, y: 0.15, z: -0.25 };
+      seats = [seat, { x: 0, y: 0.22, z: -0.72 }];
     }
     root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    return { root, wheels, steer, seat, glassZ, color };
+    return { root, wheels, steer, seat, seats, glassZ, color };
   };
   L.buildHeli = function (color) {
     const root = new T.Group(), box = G().box;

@@ -350,7 +350,7 @@
       stance: 'stand', mode: 'idle', alive: true, vehicle: null, belted: false, sel: 0, hot: {}, bag: new Array(15).fill(null),
       safe: L.save.safe ? Object.assign({}, L.save.safe) : null, fireCd: 0, swing: -1, throwT: -1, eatT: -1, reloadT: -1,
       phase: 0, stepAcc: 0, noiseShow: 0, knockT: 0, air: false, tumble: 0, hurtFlash: 0, exhausted: false, flash: false,
-      aiming: false, kills: 0, deathT: 0, cause: '', beltWarnT: 0, camDist: 4, freeLookT: 0, starve: 0, gone: false, animSt: { mode: 'walk' }
+      aiming: false, kills: 0, deathT: 0, cause: '', beltWarnT: 0, camDist: 4, freeLookT: 0, starve: 0, gone: false, seat: 0, animSt: { mode: 'walk' }
     });
     if (P.rig) L.scene.remove(P.rig.root);
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
@@ -380,7 +380,7 @@
     P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
     P.fireCd -= dt;
     if (L.hit('KeyL')) { P.flash = !P.flash; L.snd.key(); }
-    if (P.vehicle) { updateDriving(dt); return; }
+    if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
     const S = L.S(), sens = 0.0022 * S.sens;
     P.camYaw -= L.mouse.dx * sens;
     P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.6, 1.2);
@@ -627,21 +627,31 @@
     for (const it of E.items) { const d = L.dist(P.x, P.z, it.x, it.z); if (d < bd) { bd = d; best = it; } }
     return best;
   }
+  // Welcher Sitz ist frei? 0 = Fahrer, 1+ = Mitfahrer, -1 = voll
+  function seatFor(v) {
+    const seats = v.rig.seats || [v.rig.seat];
+    if (!v.occupied) return 0;
+    const R = L.remote;
+    for (let s = 1; s < seats.length; s++) if (!(R && R.inVeh && R.vehId === v.id && R.seat === s)) return s;
+    return -1;
+  }
   function nearestVehicle() {
     let best = null, bd = 3.8;
-    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z); if (d < bd && v.hp > 0 && !v.occupied) { bd = d; best = v; } }
+    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z); if (d < bd && v.hp > 0 && seatFor(v) >= 0) { bd = d; best = v; } }
     return best;
   }
   L.interactHint = function () {
     if (!P.alive) return '';
     if (P.vehicle) {
       const t = P.vehicle.t;
-      return t.kind === 'car' ? `F aussteigen · B ${P.belted ? 'Gurt lösen' : 'anschnallen'} · H Hupe · Leertaste Handbremse` : 'F absteigen · H Hupe';
+      if (P.seat > 0) return (t.kind === 'car' ? `F aussteigen · B ${P.belted ? 'Gurt lösen' : 'anschnallen'}` : 'F absteigen') + (P.vehicle.occupied ? ' · du fährst mit' : ' · E: ans Steuer');
+      return t.kind === 'car' ? `F aussteigen · B ${P.belted ? 'Gurt lösen' : 'anschnallen'} · H Hupe · Leertaste Handbremse` : 'F absteigen · H Hupe · Leertaste Handbremse';
     }
     const it = nearestItem();
     if (it) return it.note !== undefined ? 'E: Zettel lesen' : `E: ${ITEMS[it.type].name}${it.count > 1 ? ' ×' + it.count : ''} aufheben`;
     const v = nearestVehicle();
-    if (v) return `F oder E: ${v.t.kind === 'car' ? 'einsteigen' : 'aufsteigen'} (${v.t.name}, max. ${v.t.vmax} km/h, Zustand ${Math.round(v.hp / v.t.hp * 100)}%)`;
+    if (v && seatFor(v) > 0) return `F oder E: bei ${L.remote ? L.remote.name : 'deinem Freund'} mitfahren (${v.t.name})`;
+    if (v) return `F oder E: ${v.t.kind === 'car' ? 'einsteigen' : 'aufsteigen'} (${v.t.name}, max. ${v.t.vmax} km/h, ${(v.rig.seats || [1]).length} Plätze, Zustand ${Math.round(v.hp / v.t.hp * 100)}%)`;
     const I = L.interact, R = L.round;
     if (L.dist(P.x, P.z, I.bunker.x, I.bunker.z) < 3) return R.bunkerOpen ? 'Bunker offen – geh hinein!' : 'E: Code am Bunker eingeben';
     if (L.dist(P.x, P.z, I.radio.x, I.radio.z) < 3) {
@@ -717,21 +727,28 @@
     rig.root.position.set(sp.x, 0, sp.z); rig.root.rotation.y = sp.yaw;
   }
   function enterVehicle(v) {
-    P.vehicle = v; P.belted = false; P.stance = 'stand'; P.vx = P.vz = 0; P.beltWarnT = 2;
+    const seat = seatFor(v);
+    if (seat < 0) { L.msg('Kein Platz mehr frei.'); return; }
+    P.vehicle = v; P.seat = seat; P.belted = false; P.stance = 'stand'; P.vx = P.vz = 0; P.beltWarnT = 2;
     P.freeLookT = 0; P.camYaw = v.yaw;
-    if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id });
+    if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id, seat });
+    L.snd.key();
+    if (seat > 0) { L.msg(`👥 Du fährst bei ${L.remote ? L.remote.name : 'deinem Freund'} mit${v.t.kind === 'car' ? ' – B zum Anschnallen!' : ' – halt dich fest!'}`); return; }
     L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
     L.snd.key();
   }
   function leaveVehicle(silent) {
     const v = P.vehicle; if (!v) return;
     const kmh = Math.abs(v.speed) * 3.6;
-    const rx = -Math.cos(v.yaw), rz = Math.sin(v.yaw), side = v.t.kind === 'car' ? v.t.wid / 2 + 0.9 : 1.1;
-    P.x = v.x - rx * side; P.z = v.z - rz * side; P.y = 0;
+    const seat = P.seat || 0, st = (v.rig.seats || [v.rig.seat])[seat] || v.rig.seat;
+    // auf der Seite des eigenen Sitzes aussteigen
+    const rx = -Math.cos(v.yaw), rz = Math.sin(v.yaw), fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    const side = (v.t.kind === 'car' ? v.t.wid / 2 + 0.9 : 1.1) * (st.x >= 0 ? 1 : -1);
+    P.x = v.x - rx * side + fx * st.z; P.z = v.z - rz * side + fz * st.z; P.y = 0;
     L.collide(P.x, P.z, 0.4, 0, RES); P.x = RES.x; P.z = RES.z;
-    P.vehicle = null; P.belted = false;
+    P.vehicle = null; P.belted = false; P.seat = 0;
     L.engine.set(false, 0);
-    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
+    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, seat, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
     if (!silent && kmh > 20) {
       P.vx = Math.sin(v.yaw) * v.speed * 0.6; P.vz = Math.cos(v.yaw) * v.speed * 0.6; P.vy = 2; P.air = true; P.tumble = 0.01;
       L.hurtPlayer((kmh - 20) * 0.5, 'Aus dem fahrenden Fahrzeug gesprungen');
@@ -739,8 +756,9 @@
   }
   function eject(v, spd, kmh) {
     const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
-    P.vehicle = null; P.belted = false; L.engine.set(false, 0);
-    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
+    const seat = P.seat || 0;
+    P.vehicle = null; P.belted = false; P.seat = 0; L.engine.set(false, 0);
+    if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, seat, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
     P.x = v.x + fx * (v.t.len * 0.55); P.z = v.z + fz * (v.t.len * 0.55); P.y = 1.3;
     L.collide(P.x, P.z, 0.4, 0, RES); P.x = RES.x; P.z = RES.z;
     P.vx = fx * spd * 0.62; P.vz = fz * spd * 0.62; P.vy = 4 + spd * 0.08;
@@ -756,8 +774,16 @@
     L.makeNoise(v.x, v.z, 60 + kmh * 0.8, isPlayer ? P : null);
     L.fx('#9a9a9a', v.x, 1, v.z, Math.min(20, kmh / 5), 3, { size: 0.08 });
     if (!isPlayer) return;
+    // fährt der Freund mit, bekommt er den Unfall auch ab
+    const R = L.remote;
+    if (R && R.inVeh && R.vehId === v.id && R.seat > 0) L.mp.send({ t: 'vcrash', id: v.id, impact });
+    L.crashHurt(v, impact);
+  }
+  // Unfallschaden für den Spieler (Fahrer oder Mitfahrer)
+  L.crashHurt = function (v, impact) {
+    const kmh = impact * 3.6;
     L.shake = Math.max(L.shake, L.clamp(kmh / 80, 0.2, 1.5));
-    if (kmh < 18) return;
+    if (kmh < 18 || !P.alive) return;
     const helm = (L.save.char || {}).hat === 'helm';
     if (v.t.kind === 'car') {
       if (P.belted) L.hurtPlayer((kmh - 18) * 0.28, `Unfall mit ${Math.round(kmh)} km/h (angeschnallt)`);
@@ -769,6 +795,39 @@
       L.hurtPlayer((kmh - 15) * 0.55 * (helm ? 0.6 : 1), `Motorradunfall mit ${Math.round(kmh)} km/h`);
       if (kmh > 28 && P.alive) eject(v, impact, kmh);
     }
+  };
+  // Mitfahrer: der Freund steuert, man kann sich umsehen, anschnallen, aussteigen oder ans Steuer wechseln
+  function updatePassenger(dt) {
+    const v = P.vehicle, t = v.t, block = L.uiBlock;
+    const sens = 0.0022 * L.S().sens;
+    if (L.mouse.dx || L.mouse.dy) P.freeLookT = 1.5;
+    P.camYaw -= L.mouse.dx * sens; P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.3, 1.0);
+    P.freeLookT -= dt;
+    if (P.freeLookT <= 0) P.camYaw += L.angDiff(P.camYaw, v.yaw) * Math.min(1, dt * 3);
+    if (!block) {
+      if (L.hit('KeyF')) { leaveVehicle(false); return; }
+      if (L.hit('KeyB') && t.kind === 'car') { P.belted = !P.belted; L.snd.belt(P.belted); L.msg(P.belted ? '✅ Angeschnallt' : '⚠️ Gurt gelöst'); }
+      if (L.hit('KeyE') && !v.occupied && v.hp > 0) {
+        // Fahrer ist ausgestiegen: selbst ans Steuer
+        if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, seat: P.seat, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
+        P.seat = 0; v.netPose = null; v.speed = 0; v.lat = 0;
+        if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id, seat: 0 });
+        L.msg('🚗 Du sitzt jetzt am Steuer'); L.snd.key();
+        return;
+      }
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+    }
+    P.x = v.x; P.z = v.z; P.y = 0;
+    const rpm = Math.abs(v.speed) / (t.vmax / 3.6);
+    L.engine.set(v.occupied && v.hp > 0, t.electric ? rpm : (rpm * 3) % 1 * 0.5 + rpm * 0.6, t.kind === 'bike', t.electric);
+    const r = P.rig, s = (v.rig.seats || [v.rig.seat])[P.seat] || v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
+    r.root.rotation.set(0, v.yaw, 0); r.root.rotateZ(-v.lean);
+    L.setHeld(r, null);
+    P.animSt = { mode: t.scooter ? 'scooter' : t.kind === 'bike' ? 'ride' : 'sit' };
+    L.animHuman(r, P.animSt);
+    if (!v.occupied && !P.noDriverMsg) { P.noDriverMsg = true; L.msg('Der Fahrer ist ausgestiegen – E: selbst ans Steuer, F: aussteigen'); }
+    if (v.occupied) P.noDriverMsg = false;
   }
   function updateDriving(dt) {
     const v = P.vehicle, t = v.t, block = L.uiBlock;
@@ -909,8 +968,9 @@
   }
   function updateVehicles(dt) {
     for (const v of E.vehicles) {
-      if (v === P.vehicle) continue;
+      if (v === P.vehicle && !(P.seat > 0)) continue;
       if (v.netPose) { netVeh(v, dt); continue; }
+      if (v === P.vehicle) continue;
       if (Math.abs(v.speed) > 0.05 && !isClient()) driveVehicle(v, dt, 0, 0, false, false);
       v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < (v.t.kind === 'bike' ? 200 : 300);
       if (v.hp <= 0 && Math.random() < dt * 4 && v.rig.root.visible) L.fx('#2a2a2a', v.x, 1.5, v.z, 1, 0.4, { size: 0.5, life: 2, g: -0.2, grow: 0.6 });
@@ -1518,7 +1578,7 @@
     if (R.over) return;
     R.over = true;
     L.engine.set(false, 0);
-    if (P.vehicle) { if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: P.vehicle.id, x: P.vehicle.x, z: P.vehicle.z, yaw: P.vehicle.yaw, hp: P.vehicle.hp }); P.vehicle = null; }
+    if (P.vehicle) { if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: P.vehicle.id, seat: P.seat || 0, x: P.vehicle.x, z: P.vehicle.z, yaw: P.vehicle.yaw, hp: P.vehicle.hp }); P.vehicle = null; }
     P.gone = true;
     if (P.rig && result === 'escape') P.rig.root.visible = false;
     if (NET() !== 'solo') L.mp.send({ t: 'done', result, why });

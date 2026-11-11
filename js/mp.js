@@ -116,19 +116,22 @@
   function removeRemote() { if (L.remote && L.remote.rig) L.scene.remove(L.remote.rig.root); L.remote = null; }
   function freeRemoteVehicle() {
     const R = L.remote; if (!R || !R.inVeh) return;
-    const v = L.byId.get('v' + R.vehId); if (v) { v.occupied = false; v.netPose = null; v.speed = 0; }
-    R.inVeh = false; R.vehId = 0;
+    const v = L.byId.get('v' + R.vehId); if (v && !(R.seat > 0)) { v.occupied = false; v.netPose = null; v.speed = 0; }
+    R.inVeh = false; R.vehId = 0; R.seat = 0;
   }
   function applyPs(R, m) {
     R.nx = m.x; R.ny = m.y; R.nz = m.z; R.nyaw = m.yaw;
     if (!R.got) { R.x = m.x; R.y = m.y; R.z = m.z; R.yaw = m.yaw; R.got = true; }
     R.st = m.st || R.st; R.stance = m.stance; R.moving = m.moving; R.alive = m.alive; R.gone = m.gone;
     R.held = m.held; R.flash = m.flash; R.hp = m.hp;
-    if (m.veh) {
+    if (m.veh && m.veh.length === 2) {
+      // Freund fährt nur mit (Sitz m.veh[1]), er steuert nicht
+      R.inVeh = true; R.vehId = m.veh[0]; R.seat = m.veh[1];
+    } else if (m.veh) {
       const v = L.byId.get('v' + m.veh[0]);
-      if (v) { v.occupied = true; v.netPose = { x: m.veh[1], z: m.veh[2], yaw: m.veh[3], speed: m.veh[4], steer: m.veh[5], hp: m.veh[6] }; }
-      R.inVeh = true; R.vehId = m.veh[0];
-    } else if (R.inVeh) R.inVeh = false;
+      if (v) { v.occupied = true; if (v !== P.vehicle || P.seat > 0) v.netPose = { x: m.veh[1], z: m.veh[2], yaw: m.veh[3], speed: m.veh[4], steer: m.veh[5], hp: m.veh[6] }; }
+      R.inVeh = true; R.vehId = m.veh[0]; R.seat = 0;
+    } else if (R.inVeh) { R.inVeh = false; R.seat = 0; }
   }
   function updateRemote(dt) {
     const R = L.remote; if (!R) return;
@@ -140,7 +143,8 @@
     const rig = R.rig;
     const v = R.inVeh ? L.byId.get('v' + R.vehId) : null;
     if (v) {
-      const s = v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+      const s = (v.rig.seats || [v.rig.seat])[R.seat || 0] || v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+      R.x = R.nx = v.x; R.z = R.nz = v.z;
       rig.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
       rig.root.rotation.set(0, v.yaw, 0); rig.root.rotateZ(-v.lean);
     } else { rig.root.position.set(R.x, R.y, R.z); rig.root.rotation.set(0, R.yaw, 0); }
@@ -198,15 +202,39 @@
       case 'iadd': if (N.role === 'client' && L.state === 'game') { const a = m.it; L.spawnItem(a[1], a[2], a[3], a[4], a[5] === null ? undefined : a[5], a[6] === null ? undefined : a[6], a[0]); } break;
       case 'irem': if (N.role === 'client') { const it = L.byId.get('i' + m.id); if (it) G().removeItem(it); } break;
       case 'venter': {
-        const v = L.byId.get('v' + m.id);
-        if (v) { v.occupied = true; v.netPose = { x: v.x, z: v.z, yaw: v.yaw, speed: 0 }; if (v === P.vehicle) { L.msg('Dein Freund sitzt schon drin.'); } }
-        if (R) { R.inVeh = true; R.vehId = m.id; }
+        const v = L.byId.get('v' + m.id), seat = m.seat || 0;
+        if (seat > 0) {
+          // Freund steigt als Mitfahrer ein
+          if (R) { R.inVeh = true; R.vehId = m.id; R.seat = seat; }
+          if (v && v === P.vehicle && !(P.seat > 0)) L.msg('👥 ' + friendName() + ' fährt bei dir mit!');
+          break;
+        }
+        if (v) {
+          v.occupied = true;
+          if (v === P.vehicle && !(P.seat > 0)) L.msg('Dein Freund sitzt schon drin.');
+          else v.netPose = { x: v.x, z: v.z, yaw: v.yaw, speed: 0 };
+          if (v === P.vehicle && P.seat > 0) L.msg('🚗 ' + friendName() + ' fährt jetzt');
+        }
+        if (R) { R.inVeh = true; R.vehId = m.id; R.seat = 0; }
         break;
       }
       case 'vleave': {
         const v = L.byId.get('v' + m.id);
-        if (v) { v.occupied = false; v.netPose = null; v.x = m.x; v.z = m.z; v.yaw = m.yaw; v.hp = m.hp; v.speed = 0; v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0); }
-        if (R) { R.inVeh = false; R.vehId = 0; }
+        if (m.seat > 0) {
+          if (R) { R.inVeh = false; R.vehId = 0; R.seat = 0; }
+          if (v && v === P.vehicle) L.msg('👥 ' + friendName() + ' ist ausgestiegen');
+          break;
+        }
+        if (v) {
+          v.occupied = false; v.netPose = null; v.x = m.x; v.z = m.z; v.yaw = m.yaw; v.hp = m.hp; v.speed = 0; v.lat = 0;
+          v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
+        }
+        if (R) { R.inVeh = false; R.vehId = 0; R.seat = 0; }
+        break;
+      }
+      case 'vcrash': {
+        const v = P.vehicle;
+        if (v && v.id === m.id && P.seat > 0) L.crashHurt(v, m.impact);
         break;
       }
       case 'radio':
@@ -282,7 +310,7 @@
       t: 'ps', x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), st: P.animSt, stance: P.stance,
       moving: Math.hypot(P.vx || 0, P.vz || 0) > 0.4 || !!(v && Math.abs(v.speed) > 0.5),
       alive: !!P.alive, gone: !!P.gone, held: P.rig ? P.rig.heldType : null, flash: !!P.flash, hp: Math.round(P.hp || 0),
-      veh: v ? [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp)] : 0
+      veh: v ? (P.seat > 0 ? [v.id, P.seat] : [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp)]) : 0
     });
   }
   function sendSnap() {
@@ -299,7 +327,8 @@
     }
     for (const v of E.vehicles) {
       if (v.netPose) continue;
-      if (v === P.vehicle || Math.abs(v.speed) > 0.05) V.push([v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), v === P.vehicle ? 1 : 0]);
+      const hostDrives = v === P.vehicle && !(P.seat > 0);
+      if (hostDrives || (Math.abs(v.speed) > 0.05 && v !== P.vehicle)) V.push([v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), hostDrives ? 1 : 0]);
     }
     const b = L.boss;
     const B = b ? [r1(b.x), r1(b.z), r2(b.yaw), r1(b.hy), b.rig.beam.g.visible ? 1 : 0, r1(b.aimX || 0), r1(b.aimZ || 0), r2(b.stompT || 0), b.dead ? 1 : 0] : null;

@@ -225,7 +225,7 @@
     if (R.gate === 'open') obj = '🚧 Schranke offen – nach Norden raus!';
     $('objective').textContent = obj;
     const fr = L.remote;
-    $('friendInfo').textContent = fr && fr.inRound && !fr.gone ? `👥 ${fr.name}: ${Math.round(L.dist(P.x, P.z, fr.x, fr.z))} m · ${fr.alive ? '❤️ ' + fr.hp : '💀 tot'}${fr.inVeh ? ' · fährt' : ''}` : (L.net.connected ? '👥 ' + (fr ? fr.name : 'Freund') + ' ist nicht in der Runde' : '');
+    $('friendInfo').textContent = fr && fr.inRound && !fr.gone ? `👥 ${fr.name}: ${Math.round(L.dist(P.x, P.z, fr.x, fr.z))} m · ${fr.alive ? '❤️ ' + fr.hp : '💀 tot'}${fr.inVeh ? (fr.seat > 0 ? ' · fährt mit' : ' · fährt') : ''}` : (L.net.connected ? '👥 ' + (fr ? fr.name : 'Freund') + ' ist nicht in der Runde' : '');
     $('bHp').style.width = P.hp + '%'; $('bFood').style.width = P.food + '%'; $('bWater').style.width = P.water + '%'; $('bStam').style.width = P.stam + '%';
     $('moveMode').textContent = P.vehicle ? (P.vehicle.t.kind === 'car' ? '🚗 Fahren' : '🏍️ Fahren') : (MODE_TXT[P.mode] || '🧍 Stehen');
     const nz = P.noiseShow;
