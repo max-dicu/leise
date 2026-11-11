@@ -207,6 +207,12 @@
     },
     charge(pos) { L.tn({ f: 200, fTo: 1600, dur: 1.2, type: 'sawtooth', vol: 0.14, pos, at: 0.3 }); },
     ray(pos) { L.tn({ f: 900, fTo: 1300, dur: 0.35, type: 'sawtooth', vol: 0.14, pos }); L.nz({ dur: 0.35, f: 3200, type: 'highpass', vol: 0.18, pos }); },
+    // tiefes Riesen-Bellen von GIGA-CAPY
+    capyRoar(pos) {
+      [48, 72].forEach((f, i) => L.tn({ f, fTo: f * 0.7, dur: 2.2, type: 'sawtooth', vol: 0.4 - i * 0.12, pos, at: 0.1, rev: true }));
+      for (let k = 0; k < 3; k++) L.tn({ f: 140, fTo: 90, dur: 0.35, type: 'square', vol: 0.18, pos, delay: 0.25 + k * 0.45 });
+      L.nz({ dur: 2, f: 260, vol: 0.5, pos, at: 0.1, rev: true });
+    },
     stomp(pos) { L.tn({ f: 42, fTo: 18, dur: 1.3, vol: 1, pos }); L.nz({ dur: 1.1, f: 220, fTo: 60, vol: 0.9, pos, rev: true }); },
     bossRoar(pos) {
       [62, 93, 124].forEach((f) => L.tn({ f, fTo: f * 0.6, dur: 3, type: 'sawtooth', vol: 0.35, pos, at: 0.2, rev: true }));

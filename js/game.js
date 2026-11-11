@@ -1300,6 +1300,53 @@
     if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how });
     L.bossAppear(b);
   }
+  // ---------- GIGA-CAPY: steigt aus dem Boden, packt MAMA IVA und zieht sie in die Tiefe ----------
+  // Zeitplan (Sekunden): 0–5 aufsteigen · 5–7,5 brüllen · 7,5–9,5 packen · 9,5–15 MAMA IVA versinkt · 10,5–16 GIGA-CAPY taucht hinterher
+  L.CAPY_TOTAL = 16.5;
+  L.capyStart = function (b) {
+    if (b.capy) return;
+    const rig = L.buildGigaCapy(); L.scene.add(rig.root);
+    // neben MAMA IVA, etwas zum Spieler hin – damit man GIGA-CAPY ganz sieht
+    const a = Math.atan2(P.x - b.x, P.z - b.z) + (Math.random() < 0.5 ? 1 : -1) * 1.0;
+    const x = b.x + Math.sin(a) * 55, z = b.z + Math.cos(a) * 55;
+    b.capy = { rig, x, z, yaw: Math.atan2(b.x - x, b.z - z), y: -85, roared: false, rumbleT: 0 };
+    rig.root.position.set(x, -85, z); rig.root.rotation.y = b.capy.yaw;
+    L.banner('GIGA-CAPY ERWACHT', 'Ein riesiges Capybara bricht aus dem Boden …');
+  };
+  const ease3 = (k) => 1 - Math.pow(1 - L.clamp(k, 0, 1), 3);
+  // gibt zurück, wie weit MAMA IVA schon im Boden ist (0 … 1)
+  L.capyUpdate = function (b, dt) {
+    const c = b.capy; if (!c) return Math.min(1, b.sinking / 7);
+    const t = b.sinking, r = c.rig;
+    // Höhe
+    if (t < 5) c.y = -85 * (1 - ease3(t / 5));
+    else if (t < 10.5) c.y = 0;
+    else c.y = -90 * ease3((t - 10.5) / 5.5);
+    // beim Packen ein Stück auf MAMA IVA zu
+    const reach = L.clamp((t - 7.5) / 2, 0, 1) * 18;
+    r.root.position.set(c.x + Math.sin(c.yaw) * reach, c.y + L.mountainH(c.x, c.z), c.z + Math.cos(c.yaw) * reach);
+    r.root.rotation.y = c.yaw;
+    // Arme: hängen → hochreißen (Brüllen) → nach vorne packen
+    let armX = 0, elbowX = 0, lean = 0;
+    if (t >= 5 && t < 7.5) { const k = ease3((t - 5) / 0.8); armX = -2.5 * k; elbowX = -0.5 * k; lean = -0.12 * k; }
+    else if (t >= 7.5) { const k = ease3((t - 7.5) / 1.2); armX = L.lerp(-2.5, -1.25, k); elbowX = L.lerp(-0.5, -0.9, k); lean = L.lerp(-0.12, 0.38, k); }
+    for (let i = 0; i < 2; i++) { r.arms[i].arm.rotation.set(armX + Math.sin(t * 3 + i) * 0.05, 0, (i ? -1 : 1) * 0.18); r.arms[i].elbow.rotation.x = elbowX; }
+    r.torso.rotation.x = lean;
+    r.head.rotation.set(t >= 5 && t < 7.5 ? -0.35 : 0.1, 0, Math.sin(t * 0.8) * 0.06);
+    if (t >= 5 && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
+    // Beben, Staub und Steine beim Auf- und Abtauchen
+    if (t < 5 || t > 9.5) {
+      const d = L.dist(P.x, P.z, c.x, c.z);
+      L.shake = Math.max(L.shake, L.clamp((450 - d) / 450, 0, 0.9));
+      if (Math.random() < dt * 14) L.fx(Math.random() < 0.5 ? '#5a4630' : '#3a3a36', c.x + L.rand(-18, 18), 0.5, c.z + L.rand(-18, 18), 3, 10, { size: 0.9, life: 2 });
+      c.rumbleT -= dt; if (c.rumbleT <= 0) { c.rumbleT = 0.6; L.snd.stomp({ x: c.x, y: 0, z: c.z }); }
+    }
+    if (t > 9.5) L.bossRise(b, dt);
+    if (t >= 9.5 && !c.pulled) { c.pulled = true; L.msg('🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!', 5000); }
+    return t < 9.5 ? 0 : ease3((t - 9.5) / 5.5);
+  };
+  L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); b.capy = null; } };
+
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {
     L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
@@ -1340,12 +1387,16 @@
       if (k >= 1) { b.rootY = 0; b.leaving = false; L.msg('👹 MAMA IVA ist da – ' + Math.round(b.life / 60) + ' Minuten lang!'); }
     } else if (!b.sinking) {
       b.life -= dt;
-      if (b.life <= 0) { b.sinking = 0.001; b.leaving = true; rig.beam.g.visible = false; L.msg('MAMA IVA versinkt im Boden … ' + L.S().bossMin + ' Minuten Pause.'); }
+      if (b.life <= 0) {
+        b.sinking = 0.001; b.leaving = true; rig.beam.g.visible = false;
+        L.capyStart(b);
+        if (isHost()) L.mp.send({ t: 'capy', x: b.capy.x, z: b.capy.z, yaw: b.capy.yaw });
+      }
     } else {
       b.sinking += dt;
-      b.rootY = -65 * Math.min(1, b.sinking / 7);
-      L.bossRise(b, dt);
-      if (b.sinking >= 7) { L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); return; }
+      // GIGA-CAPY zieht MAMA IVA in den Boden
+      b.rootY = -72 * L.capyUpdate(b, dt);
+      if (b.sinking >= L.CAPY_TOTAL) { L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + L.S().bossMin + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
     }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
     if (!b.leaving) for (const t of players()) {

@@ -316,7 +316,8 @@
         if (host && Rd && !Rd.bunkerOpen) { Rd.bunkerOpen = true; Rd.doorT = 0; L.interact.bunker.led.material = L.mat('#20ff40', { basic: true }); L.snd.door(); L.msg('🔓 ' + nameOf(from) + ' hat den Bunker geöffnet!'); }
         break;
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
-      case 'bossGone': if (!host && L.boss) { L.scene.remove(L.boss.rig.root); L.boss = null; } break;
+      case 'bossGone': if (!host && L.boss) { L.capyRemove(L.boss); L.scene.remove(L.boss.rig.root); L.boss = null; } break;
+      case 'capy': if (!host && L.boss && !L.boss.capy) { L.boss.sinking = 0.001; L.capyStart(L.boss); const c = L.boss.capy; c.x = m.x; c.z = m.z; c.yaw = m.yaw; } break;
       case 'stomp':
         L.snd.stomp({ x: m.x, y: 0, z: m.z });
         L.shake = Math.max(L.shake, L.clamp(1.6 - L.dist(P.x, P.z, m.x, m.z) / 120, 0, 1.6));
@@ -652,7 +653,8 @@
     if (b.roarT <= 0) { b.roarT = L.rand(15, 30); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
     rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(0, b.yaw, Math.sin(b.t * 0.9) * 0.04);
     rig.root.position.y = (b.rootY || 0) + L.mountainH(b.x, b.z);
-    if ((b.rootY || 0) < -0.5) { b.sinking = b.life <= 0 ? 1 : 0; L.bossRise(b, dt); }
+    if (b.capy) { b.sinking += dt; L.capyUpdate(b, dt); }
+    else if ((b.rootY || 0) < -0.5) { b.sinking = b.life <= 0 ? 1 : 0; L.bossRise(b, dt); }
     const sw = Math.sin(b.t * 1.4), st = b.stompT > 0 ? 1.5 : 0;
     rig.arms[0].arm.rotation.set(-sw * 0.3 - st, 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - st, 0, -0.3);
     rig.thin[0].arm.rotation.set(-1.2 + Math.sin(b.t * 2.1) * 0.4, 0, 0.6); rig.thin[1].arm.rotation.set(-1.2 + Math.cos(b.t * 1.9) * 0.4, 0, -0.6);

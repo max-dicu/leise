@@ -566,6 +566,53 @@
     return { root, hull: pelvis, torso, arms, thin, neck, head, mouth, core, legs, beam, legA: 19, legB: 21, hipR: 5, footR: 17 };
   };
 
+  // ---------- GIGA-CAPY: riesiges, aufrecht stehendes Capybara, das MAMA IVA in die Tiefe zieht ----------
+  L.buildGigaCapy = function () {
+    const root = new T.Group(), sph = G().sph, box = G().box;
+    const FUR = '#8b5e3c', DARK = '#6a4429', LIGHT = '#a87a52', NOSE = '#3a2416';
+    const body = grp(root);
+    // kräftige Hinterbeine mit großen Füßen
+    for (const s of [-1, 1]) {
+      part(sph, DARK, 9, 12, 10, s * 9, 11, -1, body);
+      part(box, DARK, 8, 3.5, 15, s * 9, 1.6, 3, body);
+      for (let k = -1; k <= 1; k++) part(box, '#2a1a10', 1.4, 1.6, 2.2, s * 9 + k * 2.4, 1.2, 10.8, body, { noShadow: true });
+    }
+    // fassförmiger Körper mit hellem Bauch und dunklen Fellbüscheln
+    const torso = grp(body, 0, 0, 0);
+    part(sph, FUR, 17, 26, 15, 0, 34, 0, torso);
+    part(sph, LIGHT, 12, 19, 5, 0, 31, 10.5, torso, { noShadow: true });
+    for (const [x, y, z] of [[-9, 44, -10], [8, 38, -12], [0, 26, -13], [-11, 28, -8], [11, 48, -6]]) part(sph, DARK, 4, 5, 3, x, y, z, torso, { noShadow: true });
+    // Kopf: groß, eckig, stumpfe Schnauze
+    const head = grp(torso, 0, 57, 4);
+    part(sph, FUR, 12, 11, 13, 0, 0, 0, head);
+    part(box, FUR, 15, 12, 12, 0, -2, 9, head);
+    part(box, NOSE, 13, 6, 2, 0, -2, 15.2, head, { noShadow: true });
+    for (const s of [-1, 1]) part(box, '#120a06', 2, 2.6, 1, s * 3.2, -1.5, 16.4, head, { noShadow: true });
+    part(box, '#2a1a10', 6, 1.2, 1, 0, -6.5, 15.2, head, { noShadow: true });
+    // ruhige schwarze Augen mit Glanzpunkt
+    for (const s of [-1, 1]) {
+      part(sph, '#120a06', 1.6, 1.8, 1.2, s * 7.2, 3.5, 6.5, head, { noShadow: true });
+      part(sph, '#ffffff', 0.45, 0.45, 0.3, s * 7.4, 4.2, 7.6, head, { basic: true, noShadow: true });
+      part(sph, DARK, 2.8, 2.2, 1.6, s * 7.5, 9.5, -3, head);   // kleine Ohren
+    }
+    // Markenzeichen: eine Yuzu-Frucht auf dem Kopf
+    part(sph, '#f2a81d', 3.6, 3.4, 3.6, 0, 12.5, 1, head);
+    part(box, '#3d7a2a', 2.6, 0.5, 1.4, 1.2, 16, 1, head, { noShadow: true });
+    // Arme mit Krallenpfoten
+    const arms = [];
+    for (const s of [-1, 1]) {
+      const arm = grp(torso, s * 15, 47, 4);
+      part(sph, FUR, 5.2, 12, 5.2, 0, -10, 0, arm);
+      const elbow = grp(arm, 0, -20, 0);
+      part(sph, FUR, 4.4, 10, 4.4, 0, -9, 0, elbow);
+      part(box, DARK, 6.5, 4.5, 7, 0, -19.5, 1, elbow);
+      for (let k = -1; k <= 1; k++) part(box, '#1a0f08', 1.2, 3.2, 1.2, k * 2.2, -22.5, 3.5, elbow, { noShadow: true });
+      arms.push({ arm, elbow });
+    }
+    root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return { root, body, torso, head, arms };
+  };
+
   // ---------- Fahrzeuge ----------
   L.VTYPES = {
     kleinwagen: { name: 'Kleinwagen', vmax: 140, acc: 6.5, hp: 100, kind: 'car', len: 3.8, wid: 1.7, off: 0.6, h: 1.45 },

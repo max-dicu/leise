@@ -215,7 +215,7 @@
     const h = Math.floor(E.time), m = Math.floor((E.time - h) * 60);
     $('clock').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     $('weather').textContent = (E.day < 0.3 ? '🌙 Nacht · ' : '') + (E.label || '');
-    $('bossTimer').textContent = L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA ist da – noch ${L.fmt(L.boss.life)}` : '👹 MAMA IVA versinkt …') : `👹 MAMA IVA in ${L.fmt(R.bossT)}`;
+    $('bossTimer').textContent = L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA ist da – noch ${L.fmt(L.boss.life)}` : (L.boss.capy ? '🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!' : '👹 MAMA IVA versinkt …')) : `👹 MAMA IVA in ${L.fmt(R.bossT)}`;
     const nf = R.found.filter(Boolean).length;
     $('codes').textContent = nf ? '🔒 Bunker-Code: ' + R.code.map((c, i) => (R.found[i] ? c : '_')).join(' ') : '';
     let obj = '';
