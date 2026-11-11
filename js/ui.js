@@ -138,7 +138,8 @@
     if (invSel.where === 'hot') btn('In den Rucksack', () => { const i = P.bag.findIndex((x) => !x); if (i < 0) { L.msg('🎒 Rucksack voll!'); return; } P.bag[i] = it; setSel(null); invSel = null; });
     if (invSel.where !== 'safe') btn('🔒 In den Tresor', () => { const old = P.safe; P.safe = it; setSel(old || null); invSel = null; L.save.safe = Object.assign({}, P.safe); L.persist(); L.msg('🔒 ' + d.name + ' ist jetzt sicher – auch wenn du stirbst.'); });
     else btn('In den Rucksack', () => { const i = P.bag.findIndex((x) => !x); if (i < 0) { L.msg('🎒 Rucksack voll!'); return; } P.bag[i] = it; P.safe = null; invSel = null; L.save.safe = null; L.persist(); });
-    if (L.mp.friendNear(6)) btn('🎁 ' + L.remote.name + ' geben', () => { L.mp.gift(it); setSel(null); if (invSel.where === 'safe') { L.save.safe = null; L.persist(); } invSel = null; });
+    const nf = L.mp.nearestFriend(6);
+    if (nf) btn('🎁 ' + nf.name + ' geben', () => { L.mp.gift(it, nf.pid); setSel(null); if (invSel.where === 'safe') { L.save.safe = null; L.persist(); } invSel = null; });
     btn('Wegwerfen', () => { L.dropItem(it); setSel(null); if (invSel.where === 'safe') { L.save.safe = null; L.persist(); } invSel = null; });
   }
 
@@ -165,10 +166,10 @@
     for (const w of L.ents.walkers) { if (w.dead || L.dist(w.x, w.z, P.x, P.z) > 220) continue; const [x, y] = toM(w.x, w.z); g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fill(); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
-    const fr = L.remote;
-    if (fr && fr.inRound && !fr.gone) {
+    for (const fr of L.remotes.values()) {
+      if (!fr.inRound || fr.gone) continue;
       const [fx, fy] = toM(L.clamp(fr.x, P.x - 200, P.x + 200), L.clamp(fr.z, P.z - 200, P.z + 200));
-      arrow(g, fx, fy, fr.yaw, 8, fr.alive ? '#5ab0ff' : '#777');
+      arrow(g, fx, fy, fr.yaw, 8, fr.alive ? L.mp.color(fr.pid) : '#777');
     }
     arrow(g, S / 2, S / 2, P.vehicle ? P.vehicle.yaw : P.camYaw, 9, '#ffe080');
     g.restore();
@@ -188,11 +189,11 @@
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.boss.x, L.boss.z); g.font = '26px sans-serif'; g.fillText('👹', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '20px sans-serif'; g.fillText('🚁', x, y); }
-    const fr = L.remote;
-    if (fr && fr.inRound && !fr.gone) {
-      const [fx, fy] = toM(fr.x, fr.z);
-      arrow(g, fx, fy, fr.yaw, 10, fr.alive ? '#5ab0ff' : '#777');
-      g.font = 'bold 13px Oswald, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#000'; g.fillText(fr.name, fx + 1, fy - 13); g.fillStyle = '#8ac8ff'; g.fillText(fr.name, fx, fy - 14);
+    for (const fr of L.remotes.values()) {
+      if (!fr.inRound || fr.gone) continue;
+      const [fx, fy] = toM(fr.x, fr.z), col = L.mp.color(fr.pid);
+      arrow(g, fx, fy, fr.yaw, 10, fr.alive ? col : '#777');
+      g.font = 'bold 13px Oswald, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#000'; g.fillText(fr.name, fx + 1, fy - 13); g.fillStyle = col; g.fillText(fr.name, fx, fy - 14);
     }
     const [px, py] = toM(P.x, P.z);
     arrow(g, px, py, P.vehicle ? P.vehicle.yaw : P.camYaw, 11, '#ffe080');
@@ -224,8 +225,14 @@
     if (R.gate === 'opening') obj = `🚧 Schranke offen in ${L.fmt(R.gateT)}`;
     if (R.gate === 'open') obj = '🚧 Schranke offen – nach Norden raus!';
     $('objective').textContent = obj;
-    const fr = L.remote;
-    $('friendInfo').textContent = fr && fr.inRound && !fr.gone ? `👥 ${fr.name}: ${Math.round(L.dist(P.x, P.z, fr.x, fr.z))} m · ${fr.alive ? '❤️ ' + fr.hp : '💀 tot'}${fr.inVeh ? (fr.seat > 0 ? ' · fährt mit' : ' · fährt') : ''}` : (L.net.connected ? '👥 ' + (fr ? fr.name : 'Freund') + ' ist nicht in der Runde' : '');
+    const fi = $('friendInfo'); fi.innerHTML = '';
+    for (const fr of [...L.remotes.values()].sort((a, b) => a.pid - b.pid)) {
+      const line = document.createElement('div'); line.style.color = L.mp.color(fr.pid);
+      line.textContent = fr.inRound && !fr.gone
+        ? `● ${fr.name}: ${Math.round(L.dist(P.x, P.z, fr.x, fr.z))} m · ${fr.alive ? '❤️ ' + fr.hp : '💀 tot'}${fr.inVeh ? (fr.seat > 0 ? ' · fährt mit' : ' · fährt') : ''}`
+        : `● ${fr.name}: nicht in der Runde`;
+      fi.appendChild(line);
+    }
     $('bHp').style.width = P.hp + '%'; $('bFood').style.width = P.food + '%'; $('bWater').style.width = P.water + '%'; $('bStam').style.width = P.stam + '%';
     $('moveMode').textContent = P.vehicle ? (P.vehicle.t.kind === 'car' ? '🚗 Fahren' : '🏍️ Fahren') : (MODE_TXT[P.mode] || '🧍 Stehen');
     const nz = P.noiseShow;
@@ -266,13 +273,14 @@
   ui.showEnd = function (result, why, items) {
     L.state = 'end'; L.unlock(); closeOverlays();
     $('hud').hidden = true; L.uiBlock = false;
-    endResult = result; endItems = items.map((it) => ({ it, on: true, friend: false }));
-    const canGift = result === 'escape' && online() && L.remote;
+    endResult = result; endItems = items.map((it) => ({ it, on: true, friend: null }));
+    const friends = [...L.remotes.values()].sort((a, b) => a.pid - b.pid);
+    const canGift = result === 'escape' && online() && friends.length > 0;
     const list = $('endList'); list.innerHTML = '';
     if (result === 'escape') {
       $('endTitle').textContent = '✅ ENTKOMMEN';
       $('endText').textContent = `Du bist über ${why} entkommen. Zeit: ${L.fmt(L.round.time)} · Erledigte Gegner: ${P.kills}. ` +
-        (canGift ? `Klick die Sachen an: grün = in dein Versteck, blau = in das Versteck von ${L.remote.name}, grau = wegwerfen.` : 'Wähl aus, was du in dein Versteck legst (grün = mitnehmen).');
+        (canGift ? `Klick die Sachen an, um sie zu verteilen: grün = dein Versteck, farbig = Versteck von ${friends.map((f) => f.name).join(' / ')}, grau = wegwerfen.` : 'Wähl aus, was du in dein Versteck legst (grün = mitnehmen).');
       L.music.set('menu');
     } else {
       $('endTitle').textContent = '💀 GESTORBEN';
@@ -283,13 +291,23 @@
       list.innerHTML = '';
       endItems.forEach((e) => {
         const el = slotEl(e.it, {
-          on: result === 'escape' && e.on && !e.friend, onclick: result === 'escape' ? () => {
-            if (canGift) { if (e.on && !e.friend) e.friend = true; else if (e.friend) { e.friend = false; e.on = false; } else e.on = true; }
-            else e.on = !e.on;
+          on: result === 'escape' && e.on && e.friend === null, onclick: result === 'escape' ? () => {
+            if (canGift) {
+              // Reihenfolge: eigenes Versteck → Mitspieler 1, 2, 3 → wegwerfen → eigenes Versteck
+              if (e.on && e.friend === null) e.friend = friends[0].pid;
+              else if (e.friend !== null) {
+                const i = friends.findIndex((f) => f.pid === e.friend);
+                if (i >= 0 && i < friends.length - 1) e.friend = friends[i + 1].pid; else { e.friend = null; e.on = false; }
+              } else e.on = true;
+            } else e.on = !e.on;
             render();
           } : null
         });
-        if (e.friend) el.classList.add('friend');
+        if (e.friend !== null) {
+          const f = L.remotes.get(e.friend), col = L.mp.color(e.friend);
+          el.classList.add('friend'); el.style.borderColor = col; el.style.boxShadow = `0 0 0 2px ${col} inset`;
+          if (f) { const tag = document.createElement('span'); tag.className = 'k'; tag.style.color = col; tag.textContent = f.name.slice(0, 8); el.appendChild(tag); }
+        }
         list.appendChild(el);
       });
       if (!endItems.length) list.innerHTML = '<p class="small">Du hattest nichts dabei.</p>';
@@ -301,13 +319,17 @@
   $('endOk').onclick = () => {
     if (endResult === 'escape') {
       let lost = 0;
-      const gift = [];
+      const gifts = new Map();
       for (const e of endItems) {
-        if (e.friend) { gift.push(e.it); continue; }
+        if (e.friend !== null) { if (!gifts.has(e.friend)) gifts.set(e.friend, []); gifts.get(e.friend).push(e.it); continue; }
         if (!e.on) continue;
         if (L.save.stash.length < MAX_STASH) L.save.stash.push(e.it); else lost++;
       }
-      if (gift.length && online()) { L.mp.stashGift(gift); L.msg(`🎁 ${gift.length} Sachen an ${L.remote ? L.remote.name : 'deinen Freund'} geschickt`); }
+      if (online()) for (const [pid, items] of gifts) {
+        L.mp.stashGift(pid, items);
+        const f = L.remotes.get(pid);
+        L.msg(`🎁 ${items.length} Sachen an ${f ? f.name : 'Mitspieler'} geschickt`);
+      }
       if (lost) alert(lost + ' Gegenstände passten nicht mehr ins Versteck.');
       L.persist();
     }
@@ -327,7 +349,7 @@
   $('btnPlay').onclick = () => {
     firstSound();
     if (online() && L.net.role === 'client') { show('mpScreen'); L.mp.renderLobby(); return; }
-    if (online() && L.remote && L.remote.inRound) { show('mpScreen'); L.mp.renderLobby(); return; }
+    if (online() && L.mp.anyInRound()) { show('mpScreen'); L.mp.renderLobby(); return; }
     ui.play();
   };
   $('btnChar').onclick = () => { firstSound(); openChar(); };

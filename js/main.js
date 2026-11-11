@@ -97,7 +97,7 @@
     try {
       const client = L.net && L.net.role === 'client';
       // Host: Welt läuft weiter, solange der Freund noch in der Runde ist
-      const hostKeepsRunning = L.net && L.net.role === 'host' && L.remote && L.remote.inRound && L.round && L.state !== 'game';
+      const hostKeepsRunning = L.net && L.net.role === 'host' && L.mp.anyInRound() && L.round && L.state !== 'game';
       if (L.state === 'game' && !L.paused) {
         t += dt;
         L.updateGame(dt, t);

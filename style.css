@@ -147,6 +147,7 @@ button { font: inherit; cursor: pointer; }
 .center { text-align: center; }
 #mpCode { font: inherit; font-size: 20px; letter-spacing: .1em; text-transform: uppercase; padding: 8px 12px; width: 200px; background: #1c1d22; color: var(--text); border: 1px solid #333; border-radius: 3px; }
 #friendInfo { font-size: 15px; color: #8ac8ff; margin-top: 4px; }
+.plist { margin-top: 12px; padding: 10px 14px; background: rgba(0, 0, 0, .35); border: 1px solid var(--line); border-radius: 4px; text-align: left; display: inline-block; min-width: 260px; }
 #chat { position: fixed; left: 16px; bottom: 140px; width: 380px; z-index: 12; pointer-events: none; }
 #chatLog div { background: rgba(0, 0, 0, .55); padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-size: 15px; transition: opacity 1s; text-shadow: 0 1px 2px #000; }
 #chatLog div b { color: #8ac8ff; }

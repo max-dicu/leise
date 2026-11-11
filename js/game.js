@@ -40,14 +40,24 @@
   L.byId = new Map();
   const NET = () => (L.net ? L.net.role : 'solo');
   const isClient = () => NET() === 'client', isHost = () => NET() === 'host';
-  const RP = () => (isHost() && L.remote && L.remote.inRound && L.remote.alive ? L.remote : null);
-  function players() { const a = []; if (P.alive && !P.gone) a.push(P); if (RP()) a.push(RP()); return a; }
+  // alle Mitspieler (bis zu 3 neben einem selbst)
+  L.remotes = new Map();
+  const remotesList = () => [...L.remotes.values()];
+  const isRemote = (e) => !!e && e.kind === 'remote';
+  // aus Sicht des Hosts: Mitspieler, die gerade lebend in der Runde sind
+  const RPs = () => (isHost() ? remotesList().filter((r) => r.inRound && r.alive && !r.gone) : []);
+  function players() { const a = []; if (P.alive && !P.gone) a.push(P); for (const r of RPs()) a.push(r); return a; }
   function nearestPlayer(x, z) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
-  function hurtRemote(dmg, cause, kx, kz, ky, sneak) { L.mp.send({ t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
-  function hurtAny(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (t === L.remote) hurtRemote(dmg, cause); }
-  let remoteAcc = 0;
-  function dps(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (t === L.remote) { remoteAcc += dmg; if (remoteAcc >= 8) { hurtRemote(remoteAcc, cause); remoteAcc = 0; } } }
-  function nearDist(x, z, dP) { const rp = RP(); return rp ? Math.min(dP, L.dist(rp.x, rp.z, x, z)) : dP; }
+  function hurtRemote(r, dmg, cause, kx, kz, ky, sneak) { L.mp.sendTo(r.pid, { t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
+  function hurtAny(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (isRemote(t)) hurtRemote(t, dmg, cause); }
+  function dps(t, dmg, cause) {
+    if (t === P) L.hurtPlayer(dmg, cause);
+    else if (isRemote(t)) { t.acc = (t.acc || 0) + dmg; if (t.acc >= 8) { hurtRemote(t, t.acc, cause); t.acc = 0; } }
+  }
+  function nearDist(x, z, dP) { let d = dP; for (const r of RPs()) d = Math.min(d, L.dist(r.x, r.z, x, z)); return d; }
+  const validTarget = (t) => t && (t === P || RPs().includes(t));
+  // wer sitzt am Steuer von Fahrzeug v? (Name für Hinweise)
+  function driverName(v) { for (const r of remotesList()) if (r.inVeh && r.vehId === v.id && !(r.seat > 0)) return r.name; return 'deinem Freund'; }
   const RES = {}, V1 = new T.Vector3(), V2 = new T.Vector3(), V3 = new T.Vector3();
   L.shake = 0;
 
@@ -168,7 +178,7 @@
     for (const n of E.npcs) if (!n.dead) a.push(n);
     for (const w of E.walkers) if (!w.dead) a.push(w);
     if (L.boss && !L.boss.dead) a.push(L.boss);
-    if (L.remote && L.remote.inRound && L.remote.alive && !L.remote.inVeh) a.push(L.remote);
+    for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
   L.rayHit = function (o, d, maxD, minT) {
@@ -211,13 +221,13 @@
   }
   L.damageEnt = function (e, dmg, fromX, fromZ, src) {
     if (e.dead) return;
-    if (e.kind === 'remote') { if (src === P) { L.mp.send({ t: 'pvp', dmg, by: (L.save.char || {}).name || 'Freund' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
+    if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
     const hy = e.kind === 'walker' ? e.hy : e.kind === 'boss' ? e.hy + 8 : 1.5;
     if (e.kind === 'walker' || e.kind === 'boss') L.fx('#ffb040', e.x, hy, e.z, 6, 4, { basic: true, size: 0.15, life: 0.5 });
     else L.blood(e.x, hy, e.z, 10);
-    const byPlayer = src && (src === P || src === L.remote);
+    const byPlayer = src && (src === P || isRemote(src));
     if ((e.kind === 'viktor' || e.kind === 'daniel') && byPlayer) { e.state = 'chase'; e.tx = src.x; e.tz = src.z; e.prey = src; }
     if (e.kind === 'npc' && byPlayer) { e.hostile = true; e.alertT = 10; }
     if (e.kind === 'walker' && byPlayer) walkerHear(e, src.x, src.z);
@@ -631,8 +641,7 @@
   function seatFor(v) {
     const seats = v.rig.seats || [v.rig.seat];
     if (!v.occupied) return 0;
-    const R = L.remote;
-    for (let s = 1; s < seats.length; s++) if (!(R && R.inVeh && R.vehId === v.id && R.seat === s)) return s;
+    for (let s = 1; s < seats.length; s++) if (!remotesList().some((r) => r.inVeh && r.vehId === v.id && r.seat === s)) return s;
     return -1;
   }
   function nearestVehicle() {
@@ -650,7 +659,7 @@
     const it = nearestItem();
     if (it) return it.note !== undefined ? 'E: Zettel lesen' : `E: ${ITEMS[it.type].name}${it.count > 1 ? ' ×' + it.count : ''} aufheben`;
     const v = nearestVehicle();
-    if (v && seatFor(v) > 0) return `F oder E: bei ${L.remote ? L.remote.name : 'deinem Freund'} mitfahren (${v.t.name})`;
+    if (v && seatFor(v) > 0) return `F oder E: bei ${driverName(v)} mitfahren (${v.t.name}, Platz ${seatFor(v) + 1})`;
     if (v) return `F oder E: ${v.t.kind === 'car' ? 'einsteigen' : 'aufsteigen'} (${v.t.name}, max. ${v.t.vmax} km/h, ${(v.rig.seats || [1]).length} Plätze, Zustand ${Math.round(v.hp / v.t.hp * 100)}%)`;
     const I = L.interact, R = L.round;
     if (L.dist(P.x, P.z, I.bunker.x, I.bunker.z) < 3) return R.bunkerOpen ? 'Bunker offen – geh hinein!' : 'E: Code am Bunker eingeben';
@@ -733,7 +742,7 @@
     P.freeLookT = 0; P.camYaw = v.yaw;
     if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id, seat });
     L.snd.key();
-    if (seat > 0) { L.msg(`👥 Du fährst bei ${L.remote ? L.remote.name : 'deinem Freund'} mit${v.t.kind === 'car' ? ' – B zum Anschnallen!' : ' – halt dich fest!'}`); return; }
+    if (seat > 0) { L.msg(`👥 Du fährst bei ${driverName(v)} mit${v.t.kind === 'car' ? ' – B zum Anschnallen!' : ' – halt dich fest!'}`); return; }
     L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
     L.snd.key();
   }
@@ -775,8 +784,7 @@
     L.fx('#9a9a9a', v.x, 1, v.z, Math.min(20, kmh / 5), 3, { size: 0.08 });
     if (!isPlayer) return;
     // fährt der Freund mit, bekommt er den Unfall auch ab
-    const R = L.remote;
-    if (R && R.inVeh && R.vehId === v.id && R.seat > 0) L.mp.send({ t: 'vcrash', id: v.id, impact });
+    for (const r of remotesList()) if (r.inVeh && r.vehId === v.id && r.seat > 0) L.mp.sendTo(r.pid, { t: 'vcrash', id: v.id, impact });
     L.crashHurt(v, impact);
   }
   // Unfallschaden für den Spieler (Fahrer oder Mitfahrer)
@@ -1016,8 +1024,7 @@
   function monsterVictims(m) {
     const list = [];
     if (P.alive && !P.gone) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
-    const rp = RP();
-    if (rp) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
+    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
     for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
     return list;
   }
@@ -1120,12 +1127,12 @@
         P.vx = dx / d * k; P.vz = dz / d * k; P.vy = m.kind === 'daniel' ? 6 : 4.5; P.air = true; P.tumble = 0.01; P.knockT = 1.2;
         L.msg('😱 Getroffen und weggeschleudert! Bleib leise ...');
       }
-    } else if (v === L.remote) {
+    } else if (isRemote(v)) {
       const sneaking = v.stance !== 'stand' && !v.inVeh;
       let dmg = sneaking ? (m.kind === 'daniel' ? 45 : 35) * dmul : 999;
       if (v.inVeh) dmg = (m.kind === 'daniel' ? 50 : 35) * dmul;
       const k = m.kind === 'daniel' ? 15 : 10;
-      hurtRemote(dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : 'Viktor hat dich erwischt', dx / d * k, dz / d * k, m.kind === 'daniel' ? 6 : 4.5, sneaking);
+      hurtRemote(v, dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : 'Viktor hat dich erwischt', dx / d * k, dz / d * k, m.kind === 'daniel' ? 6 : 4.5, sneaking);
       L.blood(v.x, 1.3, v.z, 20, true); L.snd.splat({ x: v.x, y: 1, z: v.z });
     } else {
       L.damageEnt(v, 120, m.x, m.z, m);
@@ -1226,13 +1233,13 @@
           w.state = 'fire'; w.chargeT = 1.3; w.fireT = 3; w.aimX = t.x; w.aimZ = t.z; w.target = t;
           L.snd.charge({ x: w.x, y: w.hy, z: w.z });
           const txt = '⚠️ Ein Stelzer hat dich entdeckt! Versteck dich hinter Gebäuden!';
-          if (t === P) L.msg(txt); else L.mp.send({ t: 'msg', text: txt });
+          if (t === P) L.msg(txt); else if (isRemote(t)) L.mp.sendTo(t.pid, { t: 'msg', text: txt });
           break;
         }
       }
     }
     if (w.state === 'fire') {
-      const T = w.target && (w.target === P || w.target === RP()) ? w.target : P;
+      const T = validTarget(w.target) ? w.target : P;
       const see = canSee(w.x, w.hy - 2, w.z, 170, T);
       w.yaw += L.clamp(L.angDiff(w.yaw, Math.atan2(T.x - w.x, T.z - w.z)), -1.2 * dt, 1.2 * dt);
       if (see) { const k = Math.min(1, dt * 1.6); w.aimX += (T.x - w.aimX) * k; w.aimZ += (T.z - w.aimZ) * k; }
@@ -1319,10 +1326,9 @@
           if (P.alive && !P.vehicle) { const k = 16; P.vx = (P.x - b.x) / (d || 1) * k; P.vz = (P.z - b.z) / (d || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
         }
         for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, b.x, b.z) < 26) L.damageEnt(n, 200, b.x, b.z, b);
-        const rp = RP();
-        if (rp) {
+        for (const rp of RPs()) {
           const d2 = L.dist(rp.x, rp.z, b.x, b.z);
-          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote((sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Vom Koloss zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
+          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Vom Koloss zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
         }
         if (isHost()) L.mp.send({ t: 'stomp', x: b.x, z: b.z });
       }
@@ -1338,7 +1344,7 @@
     }
     if (b.beamT > 0) {
       b.beamT -= dt;
-      const T = b.target && (b.target === P || b.target === RP()) ? b.target : P;
+      const T = validTarget(b.target) ? b.target : P;
       const see = canSee(chest.x, chest.y, chest.z, 130, T);
       if (see) { const k = Math.min(1, dt * 1.3); b.aimX += (T.x - b.aimX) * k; b.aimZ += (T.z - b.aimZ) * k; }
       if (b.beamT < 2.8) {
@@ -1438,7 +1444,7 @@
     if (isHost()) L.mp.send({ t: 'shot', a: [a.x, a.y, a.z], b: [b.x, b.y, b.z], w: n.weapon });
     const hitP = L.clamp(0.75 - dist / 80, 0.08, 0.75) * L.nd.acc * (target === P && P.stance !== 'stand' ? 0.6 : 1);
     if (Math.random() < hitP) {
-      if (target === P || target === L.remote) hurtAny(target, d.dmg * (d.pellets ? 3 : 1) * 0.6 * L.nd.dmg, 'Von einem anderen Überlebenden erschossen');
+      if (target === P || isRemote(target)) hurtAny(target, d.dmg * (d.pellets ? 3 : 1) * 0.6 * L.nd.dmg, 'Von einem anderen Überlebenden erschossen');
       else L.damageEnt(target, d.dmg * (d.pellets ? 3 : 1), n.x, n.z, n);
     }
   }

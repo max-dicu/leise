@@ -1,22 +1,42 @@
 'use strict';
-// Mehrspieler: zwei Geräte direkt verbunden (PeerJS). Der Host berechnet die Welt,
-// der Freund bekommt laufend Positionen von Monstern, NPCs, Stelzern, Koloss und Fahrzeugen.
+// Mehrspieler für bis zu 4 Spieler (PeerJS). Der Host berechnet die Welt und ist mit allen verbunden;
+// er leitet Positionen, Chat, Fahrzeuge und Treffer zwischen den Mitspielern weiter.
 (function () {
   const L = window.L, T = THREE, $ = L.$;
   const P = L.player, E = L.ents;
-  const N = L.net = { role: 'solo', peer: null, conn: null, code: '', connected: false };
+  const MAXP = 4;
+  const N = L.net = { role: 'solo', peer: null, conn: null, conns: new Map(), code: '', connected: false, pid: 0 };
   const mp = L.mp = {};
-  L.remote = null;
+  const RM = L.remotes;
   const G = () => L._g;
   const STATES = ['wander', 'investigate', 'chase', 'search', 'listen', 'attack'];
   const ANIMS = ['walk', 'run', 'crawl', 'search', 'attack', 'alert', 'idle'];
   const WSTATES = ['patrol', 'hunt', 'fire'];
+  const COLORS = ['#ffb050', '#5ab0ff', '#7cff8a', '#ff7ce0'];
+  mp.color = (pid) => COLORS[pid % COLORS.length];
   const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
   const myName = () => String((L.save.char || {}).name || 'Spieler').slice(0, 18);
-  const friendName = () => (L.remote ? L.remote.name : 'Dein Freund');
+  const nameOf = (pid) => (RM.get(pid) ? RM.get(pid).name : 'Mitspieler');
   const V1 = new T.Vector3(), V2 = new T.Vector3(), V3 = new T.Vector3(), DOWN = new T.Vector3(0, -1, 0);
+  // Nachrichten, die der Host von einem Mitspieler an alle anderen weiterreicht
+  const FWD = new Set(['ps', 'chat', 'venter', 'vleave', 'done', 'ready', 'shot', 'boom']);
 
-  mp.send = function (o) { if (N.conn && N.connected) { try { N.conn.send(o); } catch (e) { /* Verbindung weg */ } } };
+  // ---------- Senden ----------
+  function rawSend(c, o) { if (c && c.open) { try { c.send(o); } catch (e) { /* Verbindung weg */ } } }
+  // an alle (Host) bzw. an den Host (Mitspieler)
+  mp.send = function (o) {
+    if (!N.connected) return;
+    if (N.role === 'host') for (const c of N.conns.values()) rawSend(c, o);
+    else rawSend(N.conn, o);
+  };
+  // an einen bestimmten Spieler
+  mp.sendTo = function (pid, o) {
+    if (!N.connected || pid === N.pid) return;
+    if (N.role === 'host') rawSend(N.conns.get(pid), o);
+    else if (pid === 0) rawSend(N.conn, o);
+    else rawSend(N.conn, { t: 'relay', to: pid, m: o });
+  };
+  function forward(fromPid, o) { const m = Object.assign({}, o, { from: fromPid }); for (const [pid, c] of N.conns) if (pid !== fromPid) rawSend(c, m); }
 
   // ---------- Verbindung und Lobby ----------
   function status(t) { const s = $('mpStatus'); if (s) s.innerHTML = t; }
@@ -24,23 +44,46 @@
   const peerId = (code) => 'leise-spiel-' + String(code).toUpperCase().replace(/[^A-Z0-9]/g, '');
   function cleanup() {
     try { if (N.conn) N.conn.close(); } catch (e) { /* egal */ }
+    for (const c of N.conns.values()) { try { c.close(); } catch (e) { /* egal */ } }
     try { if (N.peer) N.peer.destroy(); } catch (e) { /* egal */ }
-    N.peer = null; N.conn = null; N.connected = false; N.role = 'solo';
-    removeRemote();
+    N.peer = null; N.conn = null; N.conns.clear(); N.connected = false; N.role = 'solo'; N.pid = 0;
+    for (const pid of [...RM.keys()]) removeRemote(pid);
   }
   function noLib() { status('❌ Der Mehrspieler-Teil konnte nicht geladen werden. Bist du mit dem Internet verbunden?'); }
   mp.host = function () {
     if (typeof Peer === 'undefined') { noLib(); return; }
     cleanup(); L.initAudio();
-    N.code = codeGen(); N.role = 'host';
+    N.code = codeGen(); N.role = 'host'; N.pid = 0;
     status('⏳ Raum wird erstellt …');
     N.peer = new Peer(peerId(N.code));
-    N.peer.on('open', () => { status(`Dein Raum-Code:<div class="bigcode">${N.code}</div>Sag ihn deinem Freund. Warte auf Verbindung …`); renderLobby(); });
-    N.peer.on('connection', (c) => { if (N.conn) { c.on('open', () => c.close()); return; } setupConn(c); });
+    N.peer.on('open', () => renderLobby());
+    N.peer.on('connection', (c) => setupHostConn(c));
     N.peer.on('error', (e) => { status(e.type === 'unavailable-id' ? 'Der Code ist gerade belegt. Bitte nochmal „Raum erstellen“.' : '❌ Fehler: ' + e.type); });
     N.peer.on('disconnected', () => { try { if (N.peer && !N.peer.destroyed) N.peer.reconnect(); } catch (e) { /* egal */ } });
     renderLobby();
   };
+  function setupHostConn(c) {
+    c.on('open', () => {
+      // freie Spielernummer suchen (1..3)
+      let pid = 0;
+      for (let i = 1; i < MAXP; i++) if (!N.conns.has(i)) { pid = i; break; }
+      if (!pid) { rawSend(c, { t: 'full' }); setTimeout(() => c.close(), 500); return; }
+      c.pid = pid; N.conns.set(pid, c); N.connected = true;
+      c.on('data', (m) => { try { hostReceive(m, pid); } catch (e) { console.error(e); } });
+      c.on('close', () => hostLost(pid));
+      c.on('error', () => hostLost(pid));
+    });
+  }
+  function hostLost(pid) {
+    if (!N.conns.has(pid)) return;
+    N.conns.delete(pid);
+    const r = RM.get(pid);
+    if (r) { freeRemoteVehicle(r); L.msg('⚠️ ' + r.name + ' hat das Spiel verlassen'); addChat('System', r.name + ' hat das Spiel verlassen', true); }
+    removeRemote(pid);
+    mp.send({ t: 'leave', pid });
+    N.connected = N.conns.size > 0 || N.role === 'host';
+    renderLobby();
+  }
   mp.join = function (code) {
     if (typeof Peer === 'undefined') { noLib(); return; }
     code = String(code || '').trim().toUpperCase();
@@ -49,92 +92,93 @@
     N.role = 'client'; N.code = code;
     status('⏳ Verbinde mit Raum ' + code + ' …');
     N.peer = new Peer();
-    N.peer.on('open', () => setupConn(N.peer.connect(peerId(code), { reliable: true })));
+    N.peer.on('open', () => {
+      const c = N.peer.connect(peerId(code), { reliable: true });
+      N.conn = c;
+      c.on('open', () => { N.connected = true; rawSend(c, { t: 'hello', app: L.save.char || L.DEFAULT_CHAR, name: myName() }); renderLobby(); });
+      c.on('data', (m) => { try { handle(m, m.from === undefined ? 0 : m.from); } catch (e) { console.error(e); } });
+      c.on('close', clientLost); c.on('error', clientLost);
+    });
     N.peer.on('error', (e) => {
-      status(e.type === 'peer-unavailable' ? '❌ Raum nicht gefunden. Ist der Code richtig und wartet dein Freund noch?' : '❌ Fehler: ' + e.type);
+      status(e.type === 'peer-unavailable' ? '❌ Raum nicht gefunden. Ist der Code richtig und wartet der Raum noch?' : '❌ Fehler: ' + e.type);
       if (!N.connected) { try { N.peer.destroy(); } catch (x) { /* egal */ } N.peer = null; N.role = 'solo'; renderLobby(); }
     });
     renderLobby();
   };
-  function setupConn(c) {
-    N.conn = c;
-    c.on('open', () => {
-      N.connected = true;
-      mp.send({ t: 'hello', app: L.save.char || L.DEFAULT_CHAR, name: myName() });
-      renderLobby();
-    });
-    c.on('data', (m) => { try { onData(m); } catch (e) { console.error(e); } });
-    c.on('close', lost); c.on('error', lost);
-  }
-  function lost() {
+  function clientLost() {
     if (!N.connected) return;
     N.connected = false;
-    const wasClient = N.role === 'client';
-    L.msg('⚠️ Verbindung zum Freund verloren');
-    removeRemote();
+    L.msg('⚠️ Verbindung zum Host verloren');
+    for (const pid of [...RM.keys()]) removeRemote(pid);
     try { if (N.peer) N.peer.destroy(); } catch (e) { /* egal */ }
-    N.peer = null; N.conn = null; N.role = 'solo';
-    if (wasClient && L.state === 'game' && L.round && !L.round.over) L.endRound('escape', 'die Trennung vom Host (du behältst deine Sachen)');
+    N.peer = null; N.conn = null; N.role = 'solo'; N.pid = 0;
+    if (L.state === 'game' && L.round && !L.round.over) L.endRound('escape', 'die Trennung vom Host (du behältst deine Sachen)');
     status('Verbindung getrennt.');
     renderLobby();
   }
+  mp.anyInRound = () => [...RM.values()].some((r) => r.inRound);
   function renderLobby() {
     const idle = !N.peer;
     $('mpIdle').hidden = !idle;
     $('mpLeave').hidden = idle;
-    $('mpStart').hidden = !(N.role === 'host' && N.connected && !(L.remote && L.remote.inRound));
-    if (N.connected) {
-      if (N.role === 'host') status(`✅ <b>${esc(friendName())}</b> ist verbunden (Raum ${N.code}).<br>Du bist der Host. Starte die Runde, wenn ihr bereit seid.` + (L.remote && L.remote.inRound ? '<br>⏳ Dein Freund ist noch in der laufenden Runde.' : ''));
-      else status(`✅ Verbunden mit <b>${esc(friendName())}</b>.<br>Warte, bis dein Freund die Runde startet …`);
-    }
+    const others = [...RM.values()];
+    $('mpStart').hidden = !(N.role === 'host' && others.length > 0 && !mp.anyInRound());
+    if (idle) return;
+    const list = [`<span style="color:${mp.color(N.pid)}">● ${esc(myName())} (du${N.role === 'host' ? ', Host' : ''})</span>`]
+      .concat(others.sort((a, b) => a.pid - b.pid).map((r) => `<span style="color:${mp.color(r.pid)}">● ${esc(r.name)}${r.pid === 0 ? ' (Host)' : ''}${r.inRound ? ' – spielt gerade' : ''}</span>`));
+    let head = '';
+    if (N.role === 'host') head = N.peer && N.peer.open ? `Raum-Code:<div class="bigcode">${N.code}</div>Bis zu ${MAXP} Spieler. Gib den Code deinen Freunden.` : '⏳ Raum wird erstellt …';
+    else head = N.connected ? '✅ Verbunden. Warte, bis der Host die Runde startet …' : '⏳ Verbinde …';
+    status(`${head}<div class="plist">Spieler (${others.length + 1}/${MAXP}):<br>${list.join('<br>')}</div>` + (N.role === 'host' && mp.anyInRound() ? '<br>⏳ Es läuft noch eine Runde. Warte, bis alle fertig sind.' : ''));
   }
   mp.renderLobby = renderLobby;
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
   $('mpHost').onclick = () => mp.host();
   $('mpJoin').onclick = () => mp.join($('mpCode').value);
-  $('mpCode').addEventListener('keydown', (e) => { if (e.code === 'Enter') mp.join($('mpCode').value); });
+  $('mpCode').addEventListener('keydown', (e) => { if (e.code === 'Enter' || e.key === 'Enter') mp.join($('mpCode').value); });
   $('mpLeave').onclick = () => { cleanup(); status('Verbindung getrennt.'); renderLobby(); };
-  $('mpStart').onclick = () => { if (L.remote && L.remote.inRound) { L.msg('Warte, bis dein Freund die laufende Runde beendet hat.'); return; } L.ui.play(); };
+  $('mpStart').onclick = () => { if (mp.anyInRound()) { L.msg('Warte, bis alle die laufende Runde beendet haben.'); return; } L.ui.play(); };
 
-  // ---------- Der andere Spieler ----------
-  function nameTag(name) {
+  // ---------- Mitspieler-Figuren ----------
+  function nameTag(name, color) {
     const c = document.createElement('canvas'); c.width = 256; c.height = 48;
     const g = c.getContext('2d');
     g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(0, 0, 256, 48);
-    g.fillStyle = '#9ad0ff'; g.font = 'bold 30px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = color; g.font = 'bold 30px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(name, 128, 26);
     const s = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(c), depthTest: false, transparent: true }));
     s.scale.set(1.4, 0.26, 1);
     return s;
   }
-  function makeRemote(app, name) {
-    removeRemote();
-    const rig = L.buildHuman(app); rig.root.visible = false; L.scene.add(rig.root);
-    const tag = nameTag(name); tag.position.y = 2.2; rig.root.add(tag);
-    L.remote = { kind: 'remote', key: 'remote', rig, name, app, x: 0, y: 0, z: 0, yaw: 0, nx: 0, ny: 0, nz: 0, nyaw: 0, alive: true, inRound: false, gone: false, stance: 'stand', moving: false, inVeh: false, vehId: 0, flash: false, hp: 100, st: { mode: 'walk' }, held: null, got: false, dead: false };
+  function makeRemote(pid, app, name) {
+    removeRemote(pid);
+    const rig = L.buildHuman(app || L.DEFAULT_CHAR); rig.root.visible = false;
+    if (L.scene) L.scene.add(rig.root);
+    const tag = nameTag(name, mp.color(pid)); tag.position.y = 2.2; rig.root.add(tag);
+    const r = { kind: 'remote', key: 'remote' + pid, pid, rig, name, app, x: 0, y: 0, z: 0, yaw: 0, nx: 0, ny: 0, nz: 0, nyaw: 0, alive: true, inRound: false, gone: false, stance: 'stand', moving: false, inVeh: false, vehId: 0, seat: 0, flash: false, hp: 100, st: { mode: 'walk' }, held: null, got: false, dead: false, acc: 0 };
+    RM.set(pid, r);
+    return r;
   }
-  function removeRemote() { if (L.remote && L.remote.rig) L.scene.remove(L.remote.rig.root); L.remote = null; }
-  function freeRemoteVehicle() {
-    const R = L.remote; if (!R || !R.inVeh) return;
-    const v = L.byId.get('v' + R.vehId); if (v && !(R.seat > 0)) { v.occupied = false; v.netPose = null; v.speed = 0; }
-    R.inVeh = false; R.vehId = 0; R.seat = 0;
+  function removeRemote(pid) { const r = RM.get(pid); if (r && r.rig && L.scene) L.scene.remove(r.rig.root); RM.delete(pid); }
+  function freeRemoteVehicle(r) {
+    if (!r || !r.inVeh) return;
+    const v = L.byId.get('v' + r.vehId);
+    if (v && !(r.seat > 0)) { v.occupied = false; v.netPose = null; v.speed = 0; }
+    r.inVeh = false; r.vehId = 0; r.seat = 0;
   }
   function applyPs(R, m) {
     R.nx = m.x; R.ny = m.y; R.nz = m.z; R.nyaw = m.yaw;
     if (!R.got) { R.x = m.x; R.y = m.y; R.z = m.z; R.yaw = m.yaw; R.got = true; }
     R.st = m.st || R.st; R.stance = m.stance; R.moving = m.moving; R.alive = m.alive; R.gone = m.gone;
     R.held = m.held; R.flash = m.flash; R.hp = m.hp;
-    if (m.veh && m.veh.length === 2) {
-      // Freund fährt nur mit (Sitz m.veh[1]), er steuert nicht
-      R.inVeh = true; R.vehId = m.veh[0]; R.seat = m.veh[1];
-    } else if (m.veh) {
+    if (m.veh && m.veh.length === 2) { R.inVeh = true; R.vehId = m.veh[0]; R.seat = m.veh[1]; }
+    else if (m.veh) {
       const v = L.byId.get('v' + m.veh[0]);
       if (v) { v.occupied = true; if (v !== P.vehicle || P.seat > 0) v.netPose = { x: m.veh[1], z: m.veh[2], yaw: m.veh[3], speed: m.veh[4], steer: m.veh[5], hp: m.veh[6] }; }
       R.inVeh = true; R.vehId = m.veh[0]; R.seat = 0;
     } else if (R.inVeh) { R.inVeh = false; R.seat = 0; }
   }
-  function updateRemote(dt) {
-    const R = L.remote; if (!R) return;
+  function updateRemote(R, dt) {
     const vis = R.inRound && !R.gone;
     R.rig.root.visible = vis;
     if (!vis) return;
@@ -152,23 +196,53 @@
     L.animHuman(rig, R.st || { mode: 'walk' });
   }
 
-  // ---------- Nachrichten ----------
-  function onData(m) {
-    const R = L.remote, Rd = L.round;
+  // ---------- Empfangen ----------
+  // Host: Nachricht von Mitspieler pid
+  function hostReceive(m, pid) {
+    if (m.t === 'relay') {
+      if (m.to === 0) handle(m.m, pid);
+      else rawSend(N.conns.get(m.to), Object.assign({}, m.m, { from: pid }));
+      return;
+    }
+    if (m.t === 'hello') {
+      const r = makeRemote(pid, m.app, String(m.name || 'Spieler').slice(0, 18));
+      const players = [{ pid: 0, name: myName(), app: L.save.char || L.DEFAULT_CHAR, inRound: L.state === 'game' && !P.gone }]
+        .concat([...RM.values()].filter((o) => o.pid !== pid).map((o) => ({ pid: o.pid, name: o.name, app: o.app, inRound: o.inRound })));
+      rawSend(N.conns.get(pid), { t: 'welcome', pid, players });
+      forward(pid, { t: 'join', pid, name: r.name, app: r.app });
+      L.msg('👋 ' + r.name + ' ist beigetreten'); addChat('System', r.name + ' ist beigetreten', true);
+      renderLobby();
+      return;
+    }
+    handle(m, pid);
+    if (FWD.has(m.t)) forward(pid, m);
+  }
+  // Nachricht verarbeiten (from = Spielernummer des Absenders)
+  function handle(m, from) {
+    const R = RM.get(from), Rd = L.round, host = N.role === 'host';
     switch (m.t) {
-      case 'hello':
-        makeRemote(m.app || L.DEFAULT_CHAR, String(m.name || 'Freund').slice(0, 18));
-        L.msg('👋 ' + L.remote.name + ' ist verbunden'); addChat('System', L.remote.name + ' ist verbunden', true);
-        renderLobby(); break;
-      case 'chat': addChat(friendName(), String(m.text || '').slice(0, 160)); break;
-      case 'start': if (N.role === 'client') { mp.pending = m; L.ui.clientStartRequest(); } break;
+      case 'welcome':
+        N.pid = m.pid;
+        for (const p of m.players) { const r = makeRemote(p.pid, p.app, p.name); r.inRound = false; }
+        L.msg('✅ Verbunden – du bist Spieler ' + (m.pid + 1)); renderLobby(); break;
+      case 'join':
+        makeRemote(m.pid, m.app, m.name);
+        L.msg('👋 ' + m.name + ' ist beigetreten'); addChat('System', m.name + ' ist beigetreten', true); renderLobby(); break;
+      case 'leave': {
+        const r = RM.get(m.pid);
+        if (r) { freeRemoteVehicle(r); L.msg('⚠️ ' + r.name + ' hat das Spiel verlassen'); addChat('System', r.name + ' hat das Spiel verlassen', true); }
+        removeRemote(m.pid); renderLobby(); break;
+      }
+      case 'full': status('❌ Der Raum ist voll (höchstens ' + MAXP + ' Spieler).'); break;
+      case 'chat': addChat(nameOf(from), String(m.text || '').slice(0, 160), false, from); break;
+      case 'start': if (!host) { mp.pending = m; L.ui.clientStartRequest(); } break;
       case 'ready':
         if (R) { R.inRound = true; R.alive = true; R.gone = false; R.got = false; R.nx = m.x; R.nz = m.z; }
-        L.msg('👥 ' + friendName() + ' ist jetzt in der Runde (blauer Pfeil auf der Karte)'); renderLobby(); break;
+        L.msg('👥 ' + nameOf(from) + ' ist jetzt in der Runde'); renderLobby(); break;
       case 'ps': if (R) applyPs(R, m); break;
       case 'snap': applySnap(m); break;
       case 'rs': applyRound(m); break;
-      case 'nz': if (N.role === 'host' && R && R.inRound) L.makeNoise(m.x, m.z, m.r, R); break;
+      case 'nz': if (host && R && R.inRound) L.makeNoise(m.x, m.z, m.r, R); break;
       case 'hurt':
         if (P.alive && !P.gone && L.state === 'game') {
           L.hurtPlayer(m.dmg, m.cause);
@@ -180,9 +254,9 @@
         break;
       case 'pvp': if (P.alive && !P.gone && L.state === 'game') L.hurtPlayer(m.dmg, 'Von ' + String(m.by).slice(0, 18) + ' getroffen'); break;
       case 'dmg':
-        if (N.role === 'host' && R) { const e = m.id === 'boss' ? L.boss : L.byId.get(m.id); if (e && !e.dead) L.damageEnt(e, m.dmg, R.x, R.z, R); }
+        if (host && R) { const e = m.id === 'boss' ? L.boss : L.byId.get(m.id); if (e && !e.dead) L.damageEnt(e, m.dmg, R.x, R.z, R); }
         break;
-      case 'boom': L.explode(m.x, m.y, m.z, m.rad, m.dmg, N.role === 'host' ? R : null, m.big, true); break;
+      case 'boom': if (L.state === 'game' || host) L.explode(m.x, m.y, m.z, m.rad, m.dmg, host ? R : null, m.big, true); break;
       case 'shot': {
         const a = V1.set(m.a[0], m.a[1], m.a[2]), b = V2.set(m.b[0], m.b[1], m.b[2]);
         L.tracer(a, b); L.snd.gun(m.w, { x: a.x, y: a.y, z: a.z });
@@ -190,30 +264,29 @@
         break;
       }
       case 'pick':
-        if (N.role === 'host') {
+        if (host) {
           const it = L.byId.get('i' + m.id); if (!it) break;
           if (it.note !== undefined && Rd) Rd.found[it.note] = true;
           G().removeItem(it);
-          mp.send({ t: 'got', type: it.type, count: it.count, mag: it.mag === undefined ? null : it.mag, note: it.note === undefined ? null : it.note });
+          mp.sendTo(from, { t: 'got', type: it.type, count: it.count, mag: it.mag === undefined ? null : it.mag, note: it.note === undefined ? null : it.note });
         }
         break;
       case 'got': gotItem(m); break;
-      case 'drop': if (N.role === 'host') L.spawnItem(m.type, m.x, m.z, m.count, m.mag === null ? undefined : m.mag); break;
-      case 'iadd': if (N.role === 'client' && L.state === 'game') { const a = m.it; L.spawnItem(a[1], a[2], a[3], a[4], a[5] === null ? undefined : a[5], a[6] === null ? undefined : a[6], a[0]); } break;
-      case 'irem': if (N.role === 'client') { const it = L.byId.get('i' + m.id); if (it) G().removeItem(it); } break;
+      case 'drop': if (host) L.spawnItem(m.type, m.x, m.z, m.count, m.mag === null ? undefined : m.mag); break;
+      case 'iadd': if (!host && L.state === 'game') { const a = m.it; L.spawnItem(a[1], a[2], a[3], a[4], a[5] === null ? undefined : a[5], a[6] === null ? undefined : a[6], a[0]); } break;
+      case 'irem': if (!host) { const it = L.byId.get('i' + m.id); if (it) G().removeItem(it); } break;
       case 'venter': {
         const v = L.byId.get('v' + m.id), seat = m.seat || 0;
         if (seat > 0) {
-          // Freund steigt als Mitfahrer ein
           if (R) { R.inVeh = true; R.vehId = m.id; R.seat = seat; }
-          if (v && v === P.vehicle && !(P.seat > 0)) L.msg('👥 ' + friendName() + ' fährt bei dir mit!');
+          if (v && v === P.vehicle) L.msg('👥 ' + nameOf(from) + ' fährt mit!');
           break;
         }
         if (v) {
           v.occupied = true;
-          if (v === P.vehicle && !(P.seat > 0)) L.msg('Dein Freund sitzt schon drin.');
+          if (v === P.vehicle && !(P.seat > 0)) L.msg(nameOf(from) + ' wollte auch fahren – du sitzt schon am Steuer.');
           else v.netPose = { x: v.x, z: v.z, yaw: v.yaw, speed: 0 };
-          if (v === P.vehicle && P.seat > 0) L.msg('🚗 ' + friendName() + ' fährt jetzt');
+          if (v === P.vehicle && P.seat > 0) L.msg('🚗 ' + nameOf(from) + ' fährt jetzt');
         }
         if (R) { R.inVeh = true; R.vehId = m.id; R.seat = 0; }
         break;
@@ -222,7 +295,7 @@
         const v = L.byId.get('v' + m.id);
         if (m.seat > 0) {
           if (R) { R.inVeh = false; R.vehId = 0; R.seat = 0; }
-          if (v && v === P.vehicle) L.msg('👥 ' + friendName() + ' ist ausgestiegen');
+          if (v && v === P.vehicle) L.msg('👥 ' + nameOf(from) + ' ist ausgestiegen');
           break;
         }
         if (v) {
@@ -232,22 +305,18 @@
         if (R) { R.inVeh = false; R.vehId = 0; R.seat = 0; }
         break;
       }
-      case 'vcrash': {
-        const v = P.vehicle;
-        if (v && v.id === m.id && P.seat > 0) L.crashHurt(v, m.impact);
-        break;
-      }
+      case 'vcrash': { const v = P.vehicle; if (v && v.id === m.id && P.seat > 0) L.crashHurt(v, m.impact); break; }
       case 'radio':
-        if (N.role === 'host' && Rd && Rd.radio === 'idle') { Rd.radio = 'calling'; Rd.radioT = 90; Rd.radioPing = 0; L.banner('HUBSCHRAUBER GERUFEN', friendName() + ' hat Hilfe gerufen. Überlebt 90 Sekunden!'); }
+        if (host && Rd && Rd.radio === 'idle') { Rd.radio = 'calling'; Rd.radioT = 90; Rd.radioPing = 0; L.banner('HUBSCHRAUBER GERUFEN', nameOf(from) + ' hat Hilfe gerufen. Überlebt 90 Sekunden!'); }
         break;
       case 'gate':
-        if (N.role === 'host' && Rd && Rd.gate === 'closed') { Rd.gate = 'opening'; Rd.gateT = 30; Rd.alarmT = 0; L.banner('SCHRANKE ÖFFNET SICH', friendName() + ' hat den Alarm ausgelöst!'); }
+        if (host && Rd && Rd.gate === 'closed') { Rd.gate = 'opening'; Rd.gateT = 30; Rd.alarmT = 0; L.banner('SCHRANKE ÖFFNET SICH', nameOf(from) + ' hat den Alarm ausgelöst!'); }
         break;
       case 'bunker':
-        if (N.role === 'host' && Rd && !Rd.bunkerOpen) { Rd.bunkerOpen = true; Rd.doorT = 0; L.interact.bunker.led.material = L.mat('#20ff40', { basic: true }); L.snd.door(); L.msg('🔓 ' + friendName() + ' hat den Bunker geöffnet!'); }
+        if (host && Rd && !Rd.bunkerOpen) { Rd.bunkerOpen = true; Rd.doorT = 0; L.interact.bunker.led.material = L.mat('#20ff40', { basic: true }); L.snd.door(); L.msg('🔓 ' + nameOf(from) + ' hat den Bunker geöffnet!'); }
         break;
-      case 'boss': if (N.role === 'client' && L.state === 'game') bossPuppet(m); break;
-      case 'bossGone': if (N.role === 'client' && L.boss) { L.scene.remove(L.boss.rig.root); L.boss = null; } break;
+      case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
+      case 'bossGone': if (!host && L.boss) { L.scene.remove(L.boss.rig.root); L.boss = null; } break;
       case 'stomp':
         L.snd.stomp({ x: m.x, y: 0, z: m.z });
         L.shake = Math.max(L.shake, L.clamp(1.6 - L.dist(P.x, P.z, m.x, m.z) / 120, 0, 1.6));
@@ -255,14 +324,14 @@
         break;
       case 'msg': L.msg(String(m.text)); break;
       case 'done':
-        if (R) { freeRemoteVehicle(); R.inRound = false; R.rig.root.visible = false; }
-        L.msg(m.result === 'escape' ? `🏁 ${friendName()} ist entkommen (über ${m.why})!` : `💀 ${friendName()} ist gestorben: ${m.why}`, 6000);
-        addChat('System', m.result === 'escape' ? friendName() + ' ist entkommen' : friendName() + ' ist gestorben', true);
+        if (R) { freeRemoteVehicle(R); R.inRound = false; R.rig.root.visible = false; }
+        L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);
+        addChat('System', m.result === 'escape' ? nameOf(from) + ' ist entkommen' : nameOf(from) + ' ist gestorben', true);
         renderLobby(); break;
       case 'gift': {
         const it = m.it || {}, d = L.ITEMS[it.type]; if (!d) break;
         const left = L.giveItem(it.type, it.count, it.mag === null ? undefined : it.mag);
-        L.msg(`🎁 ${friendName()} hat dir ${d.icon} ${d.name} gegeben`); L.snd.pickup();
+        L.msg(`🎁 ${nameOf(from)} hat dir ${d.icon} ${d.name} gegeben`); L.snd.pickup();
         if (left > 0) L.dropItem({ type: it.type, count: left, mag: it.mag });
         break;
       }
@@ -270,8 +339,8 @@
         let n = 0;
         for (const it of m.items || []) if (L.ITEMS[it.type] && L.save.stash.length < 40) { L.save.stash.push(it); n++; }
         L.persist();
-        L.msg(`🎁 ${friendName()} hat dir ${n} Sachen in dein Versteck gelegt!`, 6000);
-        addChat('System', friendName() + ' hat dir ' + n + ' Sachen ins Versteck gelegt', true);
+        L.msg(`🎁 ${nameOf(from)} hat dir ${n} Sachen in dein Versteck gelegt!`, 6000);
+        addChat('System', nameOf(from) + ' hat dir ' + n + ' Sachen ins Versteck gelegt', true);
         break;
       }
     }
@@ -288,9 +357,14 @@
     L.snd.pickup(); L.msg(`+ ${d.icon} ${d.name}${m.count - left > 1 ? ' ×' + (m.count - left) : ''}`);
     if (left > 0) L.dropItem({ type: m.type, count: left, mag: m.mag });
   }
-  mp.gift = function (it) { mp.send({ t: 'gift', it: { type: it.type, count: it.count, mag: it.mag === undefined ? null : it.mag } }); L.msg('🎁 An ' + friendName() + ' gegeben'); };
-  mp.stashGift = function (items) { if (items.length) mp.send({ t: 'stashGift', items }); };
-  mp.friendNear = function (r) { const R = L.remote; return R && R.inRound && !R.gone && R.alive && L.dist(R.x, R.z, P.x, P.z) < r; };
+  mp.gift = function (it, pid) { mp.sendTo(pid, { t: 'gift', it: { type: it.type, count: it.count, mag: it.mag === undefined ? null : it.mag } }); L.msg('🎁 An ' + nameOf(pid) + ' gegeben'); };
+  mp.stashGift = function (pid, items) { if (items.length) mp.sendTo(pid, { t: 'stashGift', items }); };
+  // nächster Mitspieler in der Nähe (für „geben“)
+  mp.nearestFriend = function (rad) {
+    let best = null, bd = rad;
+    for (const r of RM.values()) { if (!r.inRound || r.gone || !r.alive) continue; const d = L.dist(r.x, r.z, P.x, P.z); if (d < bd) { bd = d; best = r; } }
+    return best;
+  };
 
   // ---------- Regelmäßig senden ----------
   let psT = 0, snapT = 0, rsT = 0;
@@ -299,10 +373,10 @@
     psT -= dt; snapT -= dt; rsT -= dt;
     if (psT <= 0) { psT = 1 / 15; sendPs(); }
     if (N.role === 'host') {
-      if (snapT <= 0) { snapT = 0.1; sendSnap(); }
+      if (snapT <= 0) { snapT = 0.1; for (const r of RM.values()) if (r.inRound) sendSnap(r); }
       if (rsT <= 0) { rsT = 0.5; sendRound(); }
     }
-    updateRemote(dt);
+    for (const r of RM.values()) updateRemote(r, dt);
   };
   function sendPs() {
     const v = P.vehicle;
@@ -313,8 +387,8 @@
       veh: v ? (P.seat > 0 ? [v.id, P.seat] : [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp)]) : 0
     });
   }
-  function sendSnap() {
-    const R = L.remote; if (!R || !R.inRound) return;
+  // Host: Schnappschuss für einen Mitspieler (nur was in seiner Nähe ist)
+  function sendSnap(R) {
     const M = [], W = [], NN = [], V = [];
     for (const m of E.monsters) {
       if (L.dist(m.x, m.z, R.x, R.z) > 330) continue;
@@ -332,26 +406,21 @@
     }
     const b = L.boss;
     const B = b ? [r1(b.x), r1(b.z), r2(b.yaw), r1(b.hy), b.rig.beam.g.visible ? 1 : 0, r1(b.aimX || 0), r1(b.aimZ || 0), r2(b.stompT || 0), b.dead ? 1 : 0] : null;
-    mp.send({ t: 'snap', M, W, N: NN, V, B });
+    mp.sendTo(R.pid, { t: 'snap', M, W, N: NN, V, B });
   }
   function sendRound() {
-    const R = L.round; if (!R || !L.remote || !L.remote.inRound) return;
+    const R = L.round; if (!R || !mp.anyInRound()) return;
     const H = L.heli;
     mp.send({ t: 'rs', bossT: Math.round(R.bossT), radio: R.radio, radioT: r1(R.radioT || 0), gate: R.gate, gateT: r1(R.gateT || 0), bunker: !!R.bunkerOpen, found: R.found, heli: H ? [r1(H.x), r1(H.y), r1(H.z), H.state, r1(H.t)] : null, time: r2(L.env.time), weather: L.env.weather });
   }
 
-  // ---------- Runde starten (Host schickt die ganze Welt) ----------
+  // ---------- Runde starten (Host schickt allen die ganze Welt) ----------
   mp.sendStart = function () {
-    const R = L.remote; if (!N.connected || !R) return;
-    R.inRound = false; R.got = false;
-    let sx = P.x + 40, sz = P.z;
-    for (let k = 0; k < 40; k++) {
-      const a = Math.random() * 6.28, d = L.rand(30, 60), x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
-      if (Math.abs(x) < 1470 && Math.abs(z) < 1470 && !L.queryBoxes(x, z, 1.5).length) { sx = x; sz = z; break; }
-    }
+    if (!N.connected || !N.conns.size) return;
+    for (const r of RM.values()) { r.inRound = false; r.got = false; }
     const Rd = L.round;
-    mp.send({
-      t: 'start', spawn: [r1(sx), r1(sz)], md: L.S().monsterDiff,
+    const base = {
+      t: 'start', md: L.S().monsterDiff,
       round: { code: Rd.code, found: Rd.found, bossT: Rd.bossT, gate: Rd.gate, radio: Rd.radio, bunkerOpen: Rd.bunkerOpen },
       env: { time: L.env.time, weather: L.env.weather },
       items: E.items.map((it) => [it.id, it.type, r2(it.x), r2(it.z), it.count, it.mag === undefined ? null : it.mag, it.note === undefined ? null : it.note]),
@@ -359,8 +428,21 @@
       mon: E.monsters.map((m) => [m.id, m.kind, m.variant || null, r1(m.x), r1(m.z), r2(m.yaw)]),
       walk: E.walkers.map((w) => [w.id, r1(w.x), r1(w.z), r2(w.yaw)]),
       npc: E.npcs.map((n) => [n.id, r1(n.x), r1(n.z), n.app, n.weapon])
-    });
-    L.msg('⏳ ' + friendName() + ' wählt noch die Ausrüstung …', 5000);
+    };
+    // jeder bekommt einen eigenen Startpunkt 25–60 m vom Host entfernt
+    const used = [[P.x, P.z]];
+    for (const pid of N.conns.keys()) {
+      let sx = P.x + 30 + pid * 8, sz = P.z;
+      for (let k = 0; k < 60; k++) {
+        const a = Math.random() * 6.28, d = L.rand(25, 60), x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
+        if (Math.abs(x) > 1470 || Math.abs(z) > 1470 || L.queryBoxes(x, z, 1.5).length) continue;
+        if (used.some((u) => L.dist(u[0], u[1], x, z) < 10)) continue;
+        sx = x; sz = z; break;
+      }
+      used.push([sx, sz]);
+      mp.sendTo(pid, Object.assign({}, base, { spawn: [r1(sx), r1(sz)] }));
+    }
+    L.msg('⏳ Deine Mitspieler wählen noch ihre Ausrüstung …', 5000);
   };
   mp.startClient = function (loadout) {
     const d = mp.pending; if (!d) return false;
@@ -382,15 +464,16 @@
     for (const a of d.walk) { const w = g.spawnWalker(a[1], a[2], a[0]); w.yaw = a[3]; g.initGait(w, w.rig); }
     for (const a of d.npc) { const n = g.spawnNpc(a[1], a[2], false, a[0], a[3], a[4]); n.rig.root.visible = false; }
     L.env.time = d.env.time; L.setWeather(d.env.weather);
-    if (L.remote) { L.remote.inRound = true; L.remote.gone = false; L.remote.alive = true; L.remote.got = false; }
+    // der Host spielt mit; andere Mitspieler melden sich mit „ready“
+    for (const r of RM.values()) { r.inRound = r.pid === 0; r.gone = false; r.alive = true; r.got = false; }
     L.state = 'game'; L.paused = false;
     L.music.set('calm');
     mp.send({ t: 'ready', x: P.x, z: P.z });
-    L.msg('Ihr seid zu zweit! ' + friendName() + ' ist in der Nähe (blauer Pfeil auf der Karte). Enter = Chat.', 7000);
+    L.msg('Ihr spielt zusammen! Mitspieler siehst du als farbige Pfeile auf der Karte. Enter = Chat.', 7000);
     return true;
   };
 
-  // ---------- Freund-Gerät: Schnappschüsse anwenden ----------
+  // ---------- Mitspieler-Gerät: Schnappschüsse anwenden ----------
   const occ = new Set();
   function applySnap(s) {
     if (N.role !== 'client' || !L.round || L.state !== 'game') return;
@@ -418,11 +501,11 @@
     }
     const seen = new Set();
     for (const a of s.V) {
-      const v = L.byId.get('v' + a[0]); if (!v || v === P.vehicle) continue;
+      const v = L.byId.get('v' + a[0]); if (!v || (v === P.vehicle && !(P.seat > 0))) continue;
       v.netPose = { x: a[1], z: a[2], yaw: a[3], speed: a[4], steer: a[5], hp: a[6], until: now + 700 };
       if (a[7]) { v.occupied = true; seen.add(v); occ.add(v); }
     }
-    for (const v of [...occ]) if (!seen.has(v)) { v.occupied = false; occ.delete(v); }
+    for (const v of [...occ]) if (!seen.has(v)) { if (![...RM.values()].some((r) => r.inVeh && r.vehId === v.id && !(r.seat > 0))) v.occupied = false; occ.delete(v); }
     if (s.B && L.boss) {
       const b = L.boss, B = s.B;
       b.nx = B[0]; b.nz = B[1]; b.nyaw = B[2]; b.hy = B[3]; b.beamOn = !!B[4]; b.aimX = B[5]; b.aimZ = B[6]; b.stompT = B[7];
@@ -468,7 +551,7 @@
     L.banner('DER KOLOSS IST ERWACHT', 'Daniel, Viktor und etwas Fremdes – verschmolzen zu einem Riesen. Versteck dich!');
   }
 
-  // ---------- Freund-Gerät: Figuren bewegen und animieren ----------
+  // ---------- Mitspieler-Gerät: Figuren bewegen und animieren ----------
   mp.puppets = function (dt) {
     const now = performance.now();
     for (const m of E.monsters) {
@@ -587,11 +670,12 @@
   }
 
   // ---------- Chat ----------
-  function addChat(name, text, system) {
+  function addChat(name, text, system, pid) {
     const log = $('chatLog'); if (!log) return;
     const d = document.createElement('div');
     if (system) d.className = 'sys';
     const b = document.createElement('b'); b.textContent = name + ': ';
+    if (!system && pid !== undefined) b.style.color = mp.color(pid);
     d.appendChild(b); d.appendChild(document.createTextNode(text));
     log.appendChild(d);
     while (log.children.length > 8) log.firstChild.remove();
@@ -610,7 +694,7 @@
     if (e.target === inp) {
       if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === 'Enter') {
         const t = inp.value.trim();
-        if (t) { mp.send({ t: 'chat', text: t.slice(0, 160) }); addChat('Du', t); }
+        if (t) { mp.send({ t: 'chat', text: t.slice(0, 160) }); addChat('Du', t, false, N.pid); }
         closeChat(); e.preventDefault();
       } else if (e.code === 'Escape') { closeChat(); e.preventDefault(); }
       e.stopPropagation();
