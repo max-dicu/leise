@@ -174,6 +174,8 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       if (fp) piv.y += 0.12;
       if (!P.alive) { dist = 6 + Math.min(4, P.deathT * 2); py = 1.0; }
     }
+    // drinnen: Kamera näher dran und unter der Decke
+    if (L.indoor && !v) dist = Math.min(dist, 2.4);
     P.camDist = dist;
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(py), sp = Math.sin(py);
     const side = v || fp ? 0 : (P.aiming ? 0.7 : 0.55) * Math.min(1, dist / 2);
@@ -189,6 +191,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     }
     camera.position.lerpVectors(piv, want, Math.max(0.12, ok));
     { const gy = L.seaFloor(camera.position.x, camera.position.z); if (camera.position.y < gy + 0.3) camera.position.y = gy + 0.3; }
+    if (L.indoor && !v) camera.position.y = Math.min(camera.position.y, L.indoor.ceil - 0.35);
     look.set(piv.x + sy * cp * 20, piv.y - sp * 20, piv.z + cy * cp * 20);
     if (L.shake > 0) {
       const s = L.shake * 0.25;

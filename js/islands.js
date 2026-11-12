@@ -171,7 +171,9 @@
       const v = L.ents.vehicles[L.ents.vehicles.length - 1]; v.isl = I;
       L.tintRig(v.rig.root, I.vehCol, 0.6);
     }
-    for (let i = 0; i < 18; i++) { const [x, z] = spot(10); L.spawnItem(L.pick(['konserve', 'wasser', 'verband', '9mm', 'schrot', 'riegel', 'cola', 'gold', 'granate']), x, z, 1); }
+    // Boote an der Küste
+    for (let i = 0; i < 3; i++) { const a = Math.random() * 6.28; g.spawnVehicle({ type: L.pick(['jetski', 'motorboot', 'jetski']), x: I.x + Math.sin(a) * (I.r + 28), z: I.z + Math.cos(a) * (I.r + 28), yaw: a + 1.57 }); L.ents.vehicles[L.ents.vehicles.length - 1].isl = I; }
+    for (let i = 0; i < 40; i++) { const [x, z] = spot(10); L.spawnItem(L.pick(['konserve', 'wasser', 'verband', '9mm', 'schrot', 'riegel', 'cola', 'gold', 'granate']), x, z, 1); }
     I.populated = true;
   }
   // zufälliges Wanderziel auf der eigenen Insel

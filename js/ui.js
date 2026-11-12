@@ -168,6 +168,7 @@
     for (const I of L.ISL || []) { const [ix, iy] = toM(I.x, I.z), ir = I.r / view * S; if (ix + ir < 0 || ix - ir > S || iy + ir < 0 || iy - ir > S) continue; g.fillStyle = I.ground[0]; g.beginPath(); g.arc(ix, iy, ir, 0, 6.28); g.fill(); }
     g.drawImage(L.mapCanvas, (P.x + L.HALF) * k - src / 2, (P.z + L.HALF) * k - src / 2, src, src, 0, 0, S, S);
     L.drawRoute(g, toM, 3);
+    L.drawRimIcons(g, S, view);
     g.font = '14px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const p of L.POIS) { const [x, y] = toM(p.x, p.z); if (x > -10 && x < S + 10 && y > -10 && y < S + 10) g.fillText(p.icon, x, y); }
     g.fillStyle = '#ddd';
@@ -175,7 +176,7 @@
     for (const w of L.ents.walkers) { if (w.dead || L.dist(w.x, w.z, P.x, P.z) > 220) continue; const [x, y] = toM(w.x, w.z); g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fill(); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
     if (L.wboss) { const [x, y] = toM(L.clamp(L.wboss.x, P.x - 200, P.x + 200), L.clamp(L.wboss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
-    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub) { const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText(v.t.plane ? '✈️' : '⚓', x, y); }
+    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub || v.t.heli || v.t.boat || v.t.special) { if (L.dist(v.x, v.z, P.x, P.z) > 210 && (v.t.boat || v.t.heli)) continue; const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); g.font = '16px sans-serif'; g.fillText(v.t.plane ? '✈️' : v.t.sub ? '⚓' : v.t.heli ? '🚁' : v.t.special ? (v.t.kind === 'bike' ? '🏍️' : '🏎️') : '🚤', x, y); }
     { const [x, y] = toM(L.clamp(L.PORTAL.x, P.x - 200, P.x + 200), L.clamp(L.PORTAL.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText('🌀', x, y); }
     if (L.TOWER) { const big = L.boss && !L.boss.dead, [x, y] = toM(L.clamp(L.TOWER.x, P.x - 200, P.x + 200), L.clamp(L.TOWER.z, P.z - 200, P.z + 200)); g.font = (big ? 22 + Math.sin(performance.now() / 200) * 4 : 14) + 'px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
@@ -239,7 +240,7 @@
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.boss.x, L.boss.z); g.font = '26px sans-serif'; g.fillText('👹', x, y); }
     if (L.wboss) { const [x, y] = toM(L.wboss.x, L.wboss.z); g.font = '26px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
-    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub) { const [x, y] = toM(L.clamp(v.x, -L.HALF + 30, L.HALF - 30), L.clamp(v.z, -L.HALF + 30, L.HALF - 30)); g.font = '26px sans-serif'; g.fillText(v.t.plane ? '✈️' : '⚓', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText(v.t.plane ? 'FLUGZEUG' : 'U-BOOT', x, y + 20); }
+    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub || v.t.heli || v.t.boat || v.t.special) { if (v.isl) continue; const [x, y] = toM(L.clamp(v.x, -L.HALF + 30, L.HALF - 30), L.clamp(v.z, -L.HALF + 30, L.HALF - 30)); g.font = (v.t.boat ? 18 : 26) + 'px sans-serif'; g.fillText(v.t.plane ? '✈️' : v.t.sub ? '⚓' : v.t.heli ? '🚁' : v.t.special ? (v.t.kind === 'bike' ? '🏍️' : '🏎️') : '🚤', x, y); g.font = 'bold 11px sans-serif'; g.fillStyle = '#fff'; g.fillText(v.t.name.toUpperCase(), x, y + 18); }
     for (const t of L.tornados || []) { const [x, y] = toM(t.x, t.z); g.font = '26px sans-serif'; g.fillText('🌪️', x, y); }
     drawTsu(g, toM);
     if (L.TOWER) { const [x, y] = toM(L.TOWER.x, L.TOWER.z); g.font = '28px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); g.font = 'bold 13px sans-serif'; g.fillStyle = L.towerSafe() ? '#7cf' : '#f66'; g.fillText(L.towerSafe() ? 'SICHERER TURM' : 'TURM ZERSTÖRT', x, y + 22); }
@@ -594,6 +595,10 @@
     const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 18; inp.value = charApp.name || '';
     inp.oninput = () => { charApp.name = inp.value; };
     nameD.appendChild(inp); box.appendChild(nameD);
+    { const d = document.createElement('div'); d.className = 'opt'; d.innerHTML = '<label>⭐ Exklusive Skins</label>';
+      const ch = document.createElement('div'); ch.className = 'choices';
+      for (const [k, nm] of L.SKINS) { const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
+      d.appendChild(ch); box.appendChild(d); }
     for (const key in L.CHAR_OPTS) {
       const d = document.createElement('div'); d.className = 'opt';
       d.innerHTML = `<label>${CHAR_LABELS[key] || key}</label>`;

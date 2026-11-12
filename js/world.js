@@ -64,11 +64,17 @@
     return qbuf;
   };
   // schiebt einen Kreis aus allen Hindernissen heraus
+  // Kasten, der erst in Höhe y0 anfängt (Wände in oberen Stockwerken)
+  L.addBoxY = function (x1, z1, x2, z2, y0, h, kind) { const b = L.addBox(x1, z1, x2, z2, h, kind); b.y0 = y0; return b; };
+  L.removeBox = function (b) {
+    for (let cx = Math.floor(b.x1 / CELL); cx <= Math.floor(b.x2 / CELL); cx++)
+      for (let cz = Math.floor(b.z1 / CELL); cz <= Math.floor(b.z2 / CELL); cz++) { const a = grid.get(ck(cx, cz)); if (a) { const i = a.indexOf(b); if (i >= 0) a.splice(i, 1); } }
+  };
   L.collide = function (x, z, r, y, res) {
     res.x = x; res.z = z; res.hit = false; res.nx = 0; res.nz = 0;
     const list = L.queryBoxes(x, z, r + 0.5).slice();
     for (let pass = 0; pass < 2; pass++) for (const b of list) {
-      if (y !== undefined && b.h < y + 0.35) continue;
+      if (y !== undefined && (b.h < y + 0.35 || (b.y0 !== undefined && b.y0 > y + 1.7))) continue;
       const cx = L.clamp(res.x, b.x1, b.x2), cz = L.clamp(res.z, b.z1, b.z2);
       let dx = res.x - cx, dz = res.z - cz;
       const d2 = dx * dx + dz * dz;
@@ -89,7 +95,7 @@
   };
   L.blockedAt = function (x, y, z) {
     const l = L.queryBoxes(x, z, 0.05);
-    for (const b of l) if (y < b.h && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2) return true;
+    for (const b of l) if (y < b.h && (b.y0 === undefined || y >= b.y0) && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2) return true;
     return false;
   };
   // Sichtlinie (wird durch Gebäude unterbrochen)
@@ -219,7 +225,8 @@
   }
 
   // ---------- Sammellisten für Instanzen ----------
-  const inst = { low: [], mid: [], tall: [], roof: [], pine: [], pineTrunk: [], leafy: [], leafTrunk: [], wreck: [], wreckTop: [], fence: [], lampPole: [], lampHead: [], bale: [] };
+  L.buildings = [];
+  const inst = { door: [], low: [], mid: [], tall: [], roof: [], pine: [], pineTrunk: [], leafy: [], leafTrunk: [], wreck: [], wreckTop: [], fence: [], lampPole: [], lampHead: [], bale: [] };
   L.mapRects = [];
   L.lootSpots = [];
   L.vehSpots = [];
@@ -242,7 +249,11 @@
     o = o || {};
     const cls = h < 10 ? 'low' : h < 28 ? 'mid' : 'tall';
     inst[cls].push({ x, z, w, d, h, color });
-    L.addBox(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h, 'building');
+    const box = L.addBox(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h, 'building');
+    // begehbar: Tür auf der Südseite, Inneres wird erzeugt, wenn man in die Nähe kommt
+    L.buildings.push({ x, z, w, d, h, box, poi: o.poi || 'stadt', id: L.buildings.length, pitched: !!o.roof });
+    const dcols = Math.max(1, Math.round(w / 11));
+    inst.door.push({ x: x - w / 2 + (Math.floor(dcols / 2) + 0.5) * w / dcols, y: 0, z: z + d / 2 + 0.03, w: 2.2, h: 2.6, d: 0.1, color: '#1a120c' });
     L.mapRects.push({ x, z, w, d, c: o.mapC || '#3b3b40' });
     if (o.roof) inst.roof.push({ x, y: h, z, w: w + 0.6, h: o.roofH || Math.min(w, d) * 0.45, d: d + 0.6, color: o.roof });
     if (o.loot !== 0) lootAround(x, z, w, d, o.loot || 2, o.poi);
@@ -919,6 +930,7 @@
       0.5, 0, -0.5, 0.5, 0, 0.5, 0, 1, 0.5, 0.5, 0, -0.5, 0, 1, 0.5, 0, 1, -0.5];
     roofGeo.setAttribute('position', new T.Float32BufferAttribute(v, 3)); roofGeo.computeVertexNormals();
     makeInst(inst.roof, roofGeo, new T.MeshLambertMaterial({ side: T.DoubleSide }), true);
+    makeInst(inst.door, new T.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new T.MeshLambertMaterial(), false);
     makeInst(inst.pineTrunk, new T.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
     makeInst(inst.pine, new T.ConeGeometry(1, 1, 7).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
     makeInst(inst.leafTrunk, new T.CylinderGeometry(0.25, 0.35, 1, 6).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);

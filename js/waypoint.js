@@ -74,6 +74,49 @@
     else if (L.route && L.route.length) L.route[0] = [P.x, P.z];
     if (beam) beam.material.opacity = 0.35 + Math.sin(performance.now() / 300) * 0.12;
   };
+  L.updateNav = function (dt) { L.updateWaypoint(dt); L.updateCompass(dt); };
+  // ---------- Kompass oben im Bild: Himmelsrichtungen, Inseln, Heimat, Turm, Portal, Wegpunkt ----------
+  const comp = document.createElement('div'); comp.id = 'compass'; comp.hidden = true; document.body.appendChild(comp);
+  const cst = document.createElement('style');
+  cst.textContent = '#compass{position:fixed;top:4px;left:50%;transform:translateX(-50%);width:min(520px,70vw);height:40px;overflow:hidden;background:linear-gradient(90deg,transparent,rgba(0,0,0,.55) 15%,rgba(0,0,0,.55) 85%,transparent);z-index:5;pointer-events:none;font-family:inherit}'
+    + '#compass span{position:absolute;top:2px;transform:translateX(-50%);color:#fff;font-size:15px;text-align:center;white-space:nowrap;line-height:1.05;text-shadow:0 0 3px #000}'
+    + '#compass span small{display:block;font-size:10px;opacity:.85}#compass span.card{font-weight:800;color:#ffdd66;top:10px}#compass:after{content:"▼";position:absolute;left:50%;top:-3px;transform:translateX(-50%);color:#ffdd66;font-size:10px}'
+    + 'body.touch #compass{top:2px;height:34px}';
+  document.head.appendChild(cst);
+  const CARD = [['N', 0, -1], ['NO', 0.707, -0.707], ['O', 1, 0], ['SO', 0.707, 0.707], ['S', 0, 1], ['SW', -0.707, 0.707], ['W', -1, 0], ['NW', -0.707, -0.707]];
+  let compT = 0;
+  L.updateCompass = function (dt) {
+    comp.hidden = L.state !== 'game' || !P.alive;
+    compT -= dt; if (comp.hidden || compT > 0) return; compT = 0.05;
+    const cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw), half = 1.15;
+    const rel = (dx, dz) => Math.atan2(dx * -cy + dz * sy, dx * sy + dz * cy);
+    let html = '';
+    const put = (dx, dz, label, cls) => { const r = rel(dx, dz); if (Math.abs(r) > half) return; html += '<span class="' + (cls || '') + '" style="left:' + (50 + r / half * 50).toFixed(1) + '%">' + label + '</span>'; };
+    for (const c of CARD) put(c[1], c[2], c[0], 'card');
+    const km = (x, z) => { const d = Math.hypot(x - P.x, z - P.z); return d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'; };
+    const tgt = (x, z, icon, name) => { if (Math.hypot(x - P.x, z - P.z) < 40) return; put(x - P.x, z - P.z, icon + '<small>' + name + ' ' + km(x, z) + '</small>'); };
+    if (L.inDim(P.x)) { if (L.DIM_PORTAL) tgt(L.DIM_PORTAL.x, L.DIM_PORTAL.z, '🌀', 'Heimweg'); }
+    else {
+      for (const I of L.ISL || []) if (!I.dim && L.curIsland !== I) tgt(I.x, I.z, I.icon, I.name.replace('Götterinsel ', '').replace('insel', ''));
+      if (Math.max(Math.abs(P.x), Math.abs(P.z)) > 1600) tgt(0, 0, '🏠', 'Heimat');
+      else if (L.TOWER) tgt(L.TOWER.x, L.TOWER.z, '🗼', 'Turm');
+      if (L.PORTAL) tgt(L.PORTAL.x, L.PORTAL.z, '🌀', 'Portal');
+    }
+    if (L.waypoint) tgt(L.waypoint.x, L.waypoint.z, '📍', 'Ziel');
+    comp.innerHTML = html;
+  };
+  // Inseln am Rand der Minikarte
+  L.drawRimIcons = function (g, S, view) {
+    if (L.inDim(P.x)) return;
+    g.save(); g.font = '13px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const I of L.ISL || []) {
+      if (I.dim) continue;
+      const dx = I.x - P.x, dz = I.z - P.z, d = Math.hypot(dx, dz); if (d < view * 0.5 + I.r) continue;
+      const x = S / 2 + dx / d * (S / 2 - 11), y = S / 2 + dz / d * (S / 2 - 11);
+      g.fillStyle = 'rgba(0,0,0,0.55)'; g.beginPath(); g.arc(x, y, 9, 0, 6.28); g.fill(); g.fillText(I.icon, x, y + 1);
+    }
+    g.restore();
+  };
   // Route auf eine Karte zeichnen (toM: Welt → Pixel)
   L.drawRoute = function (g, toM, width) {
     const w = L.waypoint; if (!w) return;

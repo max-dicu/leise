@@ -180,7 +180,27 @@
   }
 
   // ---------- Mensch (Spieler und NPCs) ----------
+  // Exklusive Skins: Der Wächter, Viktor, Daniel, Richard
+  L.GUARD_APP = { name: 'Der Wächter', skin: '#c98e65', hair: 'kurz', hairColor: '#1a1a1a', top: 'anzug', topColor: '#1a1a24', pants: 'anzughose', pantsColor: '#1a1a24', shoeType: 'stiefel', shoes: '#1a1a1a', build: 'muskuloes', height: 'gross', glasses: 'skibrille', glassesColor: '#2a2a3a', hat: 'keine', beard: 'kein', mouth: 'ernst', brows: 'boese' };
+  L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard']];
+  function buildSpecial(app) {
+    const sp = app.special;
+    if (sp === 'richard') { const r = L.buildHuman(Object.assign({}, L.RICHARD_APP || {}, { name: app.name })); r.app = Object.assign({}, r.app, { special: 'richard' }); return r; }
+    if (sp === 'waechter') {
+      const r = L.buildHuman(Object.assign({}, L.GUARD_APP, { name: app.name }));
+      const cape = new T.Mesh(G().box, L.mat('#5a0a14')); cape.scale.set(0.62, 1.25, 0.05); cape.position.set(0, -0.68, -0.17); r.torso.add(cape); r.cape = cape;
+      const em = new T.Mesh(new T.CircleGeometry(0.1, 16), new T.MeshBasicMaterial({ color: 0xffd040 })); em.position.set(0, 0.45, 0.14); r.torso.add(em);
+      r.app = Object.assign({}, r.app, { special: 'waechter' }); return r;
+    }
+    const r = sp === 'viktor' ? L.buildViktor('grey') : L.buildDaniel();
+    r.hipY = r.hips.position.y;
+    const hand = new T.Group(); hand.position.set(0, sp === 'viktor' ? -0.75 : -0.55, 0.05); r.arms[0].elbow.add(hand); r.hand = hand;
+    r.held = null; r.heldType = null; r.app = Object.assign({}, L.DEFAULT_CHAR, app); r.monsterKind = r.kind; r.kind = 'human';
+    r.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return r;
+  }
   L.buildHuman = function (app) {
+    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter')) return buildSpecial(app);
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
     const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32, extrem: 1.8 }[A.build] || 1;
     const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
@@ -448,7 +468,8 @@
   L.animHuman = function (r, s) {
     const legs = r.legs, arms = r.arms, ph = s.phase || 0, sp = s.speed || 0;
     r.body.rotation.set(0, 0, 0); r.body.position.set(0, 0, 0);
-    r.hips.position.y = 0.95; r.torso.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0);
+    const HY = (r.hipY || 0.95) - 0.95;
+    r.hips.position.y = 0.95 + HY; r.torso.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0);
     for (const l of legs) { l.leg.rotation.set(0, 0, 0); l.knee.rotation.set(0, 0, 0); }
     for (const a of arms) { a.arm.rotation.set(0, 0, 0); a.elbow.rotation.set(0, 0, 0); }
     const m = s.mode;
@@ -470,7 +491,7 @@
       return;
     }
     if (m === 'sit' || m === 'ride') {
-      r.hips.position.y = m === 'ride' ? 0.75 : 0.55;
+      r.hips.position.y = (m === 'ride' ? 0.75 : 0.55) + HY;
       for (const l of legs) { l.leg.rotation.x = m === 'ride' ? -1.1 : -1.45; l.knee.rotation.x = m === 'ride' ? 1.3 : 1.45; }
       legs[0].leg.rotation.z = m === 'ride' ? 0.25 : 0; legs[1].leg.rotation.z = m === 'ride' ? -0.25 : 0;
       for (const a of arms) { a.arm.rotation.x = -1.05; a.elbow.rotation.x = -0.35; }
@@ -487,7 +508,7 @@
         legs[i].leg.rotation.z = (i ? -1 : 1) * 0.12;
       }
     } else if (m === 'crouch') {
-      r.hips.position.y = 0.62; r.torso.rotation.x = 0.4; r.neck.rotation.x = -0.3;
+      r.hips.position.y = 0.62 + HY; r.torso.rotation.x = 0.4; r.neck.rotation.x = -0.3;
       for (let i = 0; i < 2; i++) {
         const w = Math.sin(ph + i * Math.PI) * sp;
         legs[i].leg.rotation.x = -1.05 + w * 0.4; legs[i].knee.rotation.x = 1.55 - w * 0.25;
@@ -498,7 +519,7 @@
       arms[0].arm.rotation.z = 0.5; arms[1].arm.rotation.z = -0.5; arms[0].arm.rotation.x = arms[1].arm.rotation.x = -0.6;
     } else {
       const run = m === 'run', amp = (run ? 0.95 : 0.55) * sp;
-      r.hips.position.y = 0.95 + (run ? Math.abs(Math.sin(ph)) * 0.06 : Math.abs(Math.sin(ph)) * 0.025 * sp);
+      r.hips.position.y = 0.95 + HY + (run ? Math.abs(Math.sin(ph)) * 0.06 : Math.abs(Math.sin(ph)) * 0.025 * sp);
       r.torso.rotation.x = run ? 0.25 : 0.03;
       for (let i = 0; i < 2; i++) {
         const w = Math.sin(ph + i * Math.PI);
@@ -961,9 +982,15 @@
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6 },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95 },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5 },
+    jetski: { name: 'Jetski', vmax: 110, acc: 13, hp: 60, kind: 'bike', boat: true, len: 3, wid: 1.2, off: 1 },
+    motorboot: { name: 'Motorboot', vmax: 85, acc: 7, hp: 140, kind: 'car', boat: true, len: 7, wid: 2.6, off: 1, h: 2 },
+    kutter: { name: 'Fischkutter', vmax: 50, acc: 3.5, hp: 300, kind: 'car', boat: true, len: 14, wid: 4.6, off: 1, h: 6 },
+    heli: { name: 'Hubschrauber', vmax: 260, acc: 11, hp: 180, kind: 'car', fly: true, heli: true, len: 9, wid: 2.4, off: 1, h: 3 },
     uboot: { name: 'U-Boot', vmax: 110, acc: 7, hp: 240, kind: 'car', sub: true, len: 10, wid: 2.8, off: 1, h: 3 },
     flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55 },
+    nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true },
+    schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65 }
   };
   const CAR_COLORS = ['#b02a2a', '#2a4a8a', '#e8e8e8', '#1a1a1a', '#7a7a7a', '#c0a020', '#2a6a3a', '#5a2a6a', '#d06a20'];
@@ -979,7 +1006,32 @@
       wheels.push(wm); return piv;
     };
     let seat, seats, glassZ = 0;
-    if (t.sub) {
+    if (t.boat) {
+      // Boote: Rumpf, Aufbau, Sitze, Motor hinten
+      const hc = type === 'jetski' ? L.pick(['#e03a2a', '#2a8ae0', '#e8c020']) : type === 'kutter' ? '#b03028' : '#f2f2f2', L2 = t.len, W = t.wid;
+      part(box, hc, W, 0.8, L2 * 0.8, 0, 0.4, -L2 * 0.05, root);
+      const bow = part(G().cone, hc, W * 0.5, L2 * 0.3, 0.8, 0, 0.45, L2 * 0.42, root); bow.rotation.x = Math.PI / 2; bow.scale.set(W * 0.5, L2 * 0.3, 0.8);
+      part(box, '#1a2a3a', W * 1.02, 0.12, L2 * 0.8, 0, 0.05, -L2 * 0.05, root);
+      if (type === 'jetski') { part(box, '#1a1a1a', 0.5, 0.25, 1.2, 0, 0.9, -0.3, root); part(box, '#333', 0.8, 0.06, 0.06, 0, 1.25, 0.5, root); part(box, '#333', 0.06, 0.45, 0.06, 0, 1.0, 0.45, root); }
+      else if (type === 'motorboot') { part(box, '#1d2228', W * 0.8, 0.6, 0.1, 0, 1.1, L2 * 0.12, root, { opacity: 0.7 }); for (const z2 of [0, -L2 * 0.25]) part(box, '#d8d0c0', W * 0.8, 0.4, 0.9, 0, 0.95, z2, root); part(box, '#3a3a3a', 0.5, 0.7, 0.5, 0, 0.9, -L2 * 0.45, root); }
+      else { part(box, '#f2f2f2', W * 0.7, 2.4, L2 * 0.28, 0, 1.6, -L2 * 0.12, root); part(box, '#1d2228', W * 0.72, 0.6, 0.1, 0, 2.3, L2 * 0.02 + 0.05, root); part(G().cyl, '#5a3a20', 0.12, 7, 0.12, 0, 0.8, L2 * 0.2, root); part(box, '#5a3a20', W * 0.9, 0.12, 0.12, 0, 5, L2 * 0.2, root); for (let k = 0; k < 4; k++) part(box, '#c8a040', 0.6, 0.4, 0.6, (k % 2 - 0.5) * 1.6, 1.0, -L2 * 0.38 + Math.floor(k / 2) * 0.8, root); }
+      const pp = grp(root, 0, 0.2, -L2 * 0.47); pp.rotation.y = Math.PI / 2; const prop = grp(pp); part(box, '#222', 0.06, 0.6, 0.15, 0, 0, 0, prop); part(box, '#222', 0.06, 0.15, 0.6, 0, 0, 0, prop); wheels.push(prop);
+      if (type === 'jetski') { seat = { x: 0, y: 0.75, z: -0.3 }; seats = [seat, { x: 0, y: 0.75, z: -0.9 }]; }
+      else if (type === 'motorboot') { seat = { x: 0.5, y: 0.6, z: 0 }; seats = [seat, { x: -0.5, y: 0.6, z: 0 }, { x: 0.5, y: 0.6, z: -L2 * 0.25 }, { x: -0.5, y: 0.6, z: -L2 * 0.25 }]; }
+      else { seat = { x: 0.6, y: 0.9, z: -L2 * 0.12 }; seats = [seat, { x: -0.6, y: 0.9, z: -L2 * 0.12 }, { x: 0.8, y: 0.9, z: -L2 * 0.35 }, { x: -0.8, y: 0.9, z: -L2 * 0.35 }]; }
+    } else if (t.heli) {
+      // Hubschrauber: Kanzel, Heckausleger, Kufen, Haupt- und Heckrotor
+      const hc = L.pick(['#c02a2a', '#2a4a8a', '#3a4a30', '#e8e8e8']);
+      part(G().sph, hc, 1.4, 1.3, 2.2, 0, 1.9, 0.6, root);
+      part(G().sph, '#1d2228', 1.2, 1.0, 1.4, 0, 2.1, 1.6, root, { opacity: 0.8 });
+      part(box, hc, 0.4, 0.4, 5, 0, 2.2, -3.4, root); part(box, hc, 0.15, 1.4, 1, 0, 2.8, -5.8, root);
+      for (const s2 of [-1, 1]) { part(box, '#2a2a2a', 0.12, 0.12, 4, s2 * 1.1, 0.25, 0.4, root); part(box, '#2a2a2a', 0.1, 0.8, 0.1, s2 * 1.0, 0.65, 1.2, root); part(box, '#2a2a2a', 0.1, 0.8, 0.1, s2 * 1.0, 0.65, -0.6, root); }
+      const rot = grp(root, 0, 3.3, 0.4); part(box, '#1a1a1a', 0.3, 0.3, 0.3, 0, 0, 0, rot); part(box, '#222', 11, 0.06, 0.4, 0, 0.15, 0, rot); part(box, '#222', 0.4, 0.06, 11, 0, 0.15, 0, rot);
+      const tr = grp(root, 0.2, 2.8, -5.8); part(box, '#222', 0.05, 1.8, 0.2, 0, 0, 0, tr);
+      root.userData.rotor = rot; root.userData.tail = tr;
+      seat = { x: 0.4, y: 1.0, z: 1.0 };
+      seats = [seat, { x: -0.4, y: 1.0, z: 1.0 }, { x: 0.4, y: 1.0, z: -0.1 }, { x: -0.4, y: 1.0, z: -0.1 }];
+    } else if (t.sub) {
       // U-Boot: gelber Rumpf, Turm mit Periskop, Bullaugen, Scheinwerfer, Propeller hinten
       const yc = '#e8c020';
       part(G().cyl, yc, 1.4, 8, 1.4, 0, 1.4, 0, root).rotation.x = Math.PI / 2;
@@ -1016,6 +1068,42 @@
       seat = { x: 0.35, y: 1.05, z: 1.8 };
       seats = [seat, { x: -0.35, y: 1.05, z: 1.8 }, { x: 0.35, y: 1.05, z: 0.5 }, { x: -0.35, y: 1.05, z: 0.5 }];
       glassZ = 2.5;
+    } else if (type === 'nachtfalke') {
+      // Nachtfalke (eigener Entwurf): flacher, gepanzerter Schwarzwagen mit Flügel-Finnen und Düsentriebwerk
+      const bk = '#141418', gd = '#ffc030', L2 = t.len, W = t.wid;
+      part(box, bk, W, 0.5, L2, 0, 0.6, 0, root);
+      part(box, bk, W * 0.8, 0.3, L2 * 0.35, 0, 0.5, L2 * 0.55, root).rotation.x = 0.18;
+      part(box, '#0a0a0e', W * 0.62, 0.42, L2 * 0.3, 0, 1.05, -L2 * 0.02, root, { opacity: 0.85 });
+      part(box, bk, W * 0.66, 0.08, L2 * 0.32, 0, 1.28, -L2 * 0.04, root);
+      for (const s of [-1, 1]) {
+        const fin = part(box, bk, 0.1, 1.1, 1.6, s * W * 0.42, 1.2, -L2 * 0.4, root); fin.rotation.x = -0.5; fin.rotation.z = s * 0.25;
+        part(box, gd, 0.12, 0.08, 1.4, s * W * 0.42, 1.55, -L2 * 0.47, root, { basic: true, noShadow: true });
+        part(box, bk, 0.5, 0.35, L2 * 0.9, s * W * 0.55, 0.45, 0, root);
+        part(box, gd, 0.04, 0.05, L2 * 0.8, s * W * 0.81, 0.62, 0, root, { basic: true, noShadow: true });
+        part(box, '#ffe9a0', 0.35, 0.08, 0.05, s * W * 0.3, 0.6, L2 / 2 + 0.25, root, { basic: true, noShadow: true });
+      }
+      part(G().cyl, '#2a2a30', 0.45, 0.6, 0.45, 0, 0.7, -L2 / 2 - 0.1, root).rotation.x = Math.PI / 2;
+      const flame = part(G().cone, '#ff7a20', 0.35, 1.4, 0.35, 0, 0.7, -L2 / 2 - 0.9, root, { basic: true, noShadow: true }); flame.rotation.x = -Math.PI / 2; root.userData.flame = flame;
+      const r = 0.5, wz = L2 * 0.33;
+      for (const s of [-1, 1]) { steer.push(mkWheel(s * W * 0.5, r, wz, r, 0.4)); mkWheel(s * W * 0.5, r + 0.08, -wz, r + 0.08, 0.5); }
+      seat = { x: 0.35, y: 0.3, z: -L2 * 0.03 };
+      seats = [seat, { x: -0.35, y: 0.3, z: -L2 * 0.03 }];
+      glassZ = L2 * 0.12;
+    } else if (type === 'schattenrad') {
+      // Schattenrad (eigener Entwurf): breites Panzer-Motorrad mit Riesenreifen und goldenen Streifen
+      const bk = '#141418', gd = '#ffc030';
+      part(box, bk, 0.55, 0.45, 1.8, 0, 0.75, 0, root);
+      part(box, bk, 0.7, 0.3, 0.7, 0, 1.0, 0.55, root).rotation.x = -0.25;
+      part(box, '#0a0a0e', 0.5, 0.25, 0.08, 0, 1.25, 0.85, root, { opacity: 0.8 });
+      part(box, '#111', 0.42, 0.14, 0.8, 0, 1.0, -0.4, root);
+      for (const s of [-1, 1]) part(box, gd, 0.03, 0.05, 1.7, s * 0.29, 0.8, 0, root, { basic: true, noShadow: true });
+      part(box, '#888', 0.9, 0.05, 0.05, 0, 1.3, 0.75, root);
+      part(box, '#ffe9a0', 0.3, 0.08, 0.06, 0, 0.95, 1.12, root, { basic: true, noShadow: true });
+      part(box, '#ff3010', 0.3, 0.06, 0.05, 0, 0.95, -1.2, root, { basic: true, noShadow: true });
+      steer.push(mkWheel(0, 0.48, 1.05, 0.48, 0.42));
+      mkWheel(0, 0.5, -1.0, 0.5, 0.5);
+      seat = { x: 0, y: 0.25, z: -0.35 };
+      seats = [seat, { x: 0, y: 0.32, z: -0.85 }];
     } else if (t.kind === 'car') {
       const L2 = t.len, W = t.wid, low = type === 'sportwagen';
       part(box, color, W, low ? 0.55 : 0.7, L2, 0, low ? 0.55 : 0.7, 0, root);
