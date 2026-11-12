@@ -174,7 +174,8 @@
     for (const w of L.ents.walkers) { if (w.dead || L.dist(w.x, w.z, P.x, P.z) > 220) continue; const [x, y] = toM(w.x, w.z); g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fill(); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
     if (L.wboss) { const [x, y] = toM(L.clamp(L.wboss.x, P.x - 200, P.x + 200), L.clamp(L.wboss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
-    for (const v of L.ents.vehicles) if (v.t.plane) { const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText('✈️', x, y); }
+    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub) { const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText(v.t.plane ? '✈️' : '⚓', x, y); }
+    { const [x, y] = toM(L.clamp(L.PORTAL.x, P.x - 200, P.x + 200), L.clamp(L.PORTAL.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText('🌀', x, y); }
     if (L.TOWER) { const big = L.boss && !L.boss.dead, [x, y] = toM(L.clamp(L.TOWER.x, P.x - 200, P.x + 200), L.clamp(L.TOWER.z, P.z - 200, P.z + 200)); g.font = (big ? 22 + Math.sin(performance.now() / 200) * 4 : 14) + 'px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
     for (const t of L.tornados || []) { const [x, y] = toM(L.clamp(t.x, P.x - 200, P.x + 200), L.clamp(t.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('🌪️', x, y); }
@@ -206,6 +207,8 @@
       g.font = '22px sans-serif'; g.fillText(I.icon, x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText(I.name + (cp[I.id] ? ' ✅' : ''), x, y + I.r * k + 10);
     }
     g.font = 'bold 13px sans-serif'; g.fillStyle = '#fff'; g.fillText('🏠 Heimat (Altheim)', toM(0, 0)[0], toM(0, 0)[1]);
+    { const [x, y] = toM(L.PORTAL.x, L.PORTAL.z); g.font = '26px sans-serif'; g.fillText('🌀', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#d0a0ff'; g.fillText('PORTAL (Tiefsee – nur mit U-Boot)', x, y + 20); }
+    for (const v of L.ents.vehicles) if (v.t.sub || v.t.plane) { const [x, y] = toM(v.x, v.z); g.font = '18px sans-serif'; g.fillText(v.t.sub ? '⚓' : '✈️', x, y); }
     const [px, py] = toM(P.x, P.z); arrow(g, px, py, P.vehicle ? P.vehicle.yaw : P.yaw, 9, '#ffdd33');
     g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffdd33'; g.fillText('WELTKARTE – Inseln erreichst du mit dem Flugzeug oder dem fliegenden JOYOR T10', S / 2, 16);
   }
@@ -224,7 +227,7 @@
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.boss.x, L.boss.z); g.font = '26px sans-serif'; g.fillText('👹', x, y); }
     if (L.wboss) { const [x, y] = toM(L.wboss.x, L.wboss.z); g.font = '26px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
-    for (const v of L.ents.vehicles) if (v.t.plane) { const [x, y] = toM(v.x, v.z); g.font = '26px sans-serif'; g.fillText('✈️', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText('FLUGZEUG', x, y + 20); }
+    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub) { const [x, y] = toM(L.clamp(v.x, -L.HALF + 30, L.HALF - 30), L.clamp(v.z, -L.HALF + 30, L.HALF - 30)); g.font = '26px sans-serif'; g.fillText(v.t.plane ? '✈️' : '⚓', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText(v.t.plane ? 'FLUGZEUG' : 'U-BOOT', x, y + 20); }
     for (const t of L.tornados || []) { const [x, y] = toM(t.x, t.z); g.font = '26px sans-serif'; g.fillText('🌪️', x, y); }
     drawTsu(g, toM);
     if (L.TOWER) { const [x, y] = toM(L.TOWER.x, L.TOWER.z); g.font = '28px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); g.font = 'bold 13px sans-serif'; g.fillStyle = L.towerSafe() ? '#7cf' : '#f66'; g.fillText(L.towerSafe() ? 'SICHERER TURM' : 'TURM ZERSTÖRT', x, y + 22); }
@@ -248,9 +251,11 @@
     hudT -= dt;
     // Wegweiser zum Turm, solange MAMA IVA da ist
     const tn = $('towerNav');
-    tn.hidden = !L.towerCall;
-    if (L.towerCall) {
-      const dx = L.TOWER.x - P.x, dz = L.TOWER.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
+    const inSub = P.vehicle && P.vehicle.t.sub, navT = L.towerCall ? L.TOWER : inSub ? L.PORTAL : null;
+    tn.hidden = !navT;
+    if (navT) {
+      tn.childNodes[1].textContent = L.towerCall ? ' 🗼 ' : ' 🌀 '; tn.querySelector('b').textContent = L.towerCall ? 'ZUM TURM' : 'ZUM PORTAL (Tiefe ' + Math.round(-L.PORTAL.y) + ' m)';
+      const dx = navT.x - P.x, dz = navT.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
       const fwd = dx * sy + dz * cy, right = dx * -cy + dz * sy;
       $('tnArrow').style.transform = 'rotate(' + Math.atan2(right, fwd).toFixed(2) + 'rad)';
       $('tnDist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
@@ -315,7 +320,8 @@
       $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`
         + (v.t.teleport ? (P.tpCd > 0 ? ` · 🌀 Teleport in ${Math.ceil(P.tpCd)} s` : ' · 🌀 T: Teleport bereit') : '')
         + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (E hoch, C/Shift runter, Leertaste driften)` : '')
-        + (v.t.plane ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m – ab 80 km/h: E steigen, C/Shift sinken` : '');
+        + (v.t.plane ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m – ab 80 km/h: E steigen, C/Shift sinken` : '')
+        + (v.t.sub ? ` · ⚓ Tiefe ${Math.max(0, Math.round(-(v.alt || 0)))} m · ⚡ Nitro ${L.nitro || 0}/3 (Leertaste) · E hoch, C/Shift runter` : '');
     }
     $('hint').textContent = L.uiBlock ? '' : L.interactHint();
     $('cross').className = P.aiming ? 'aim' : '';

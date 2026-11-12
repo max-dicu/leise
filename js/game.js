@@ -473,7 +473,7 @@
     if (!block && !P.swim && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2; P.air = true; P.stam -= 8; P.stance = 'stand'; }
     // Schwerkraft – Boden: an Land 0, am Strand der Sand, im tiefen Wasser schwimmt man oben
     const sf = L.seaFloor(P.x, P.z), depth = L.WATER_Y - sf;
-    P.swim = depth > 1.35;
+    P.swim = depth > 1.35 && !L.inDim(P.x);
     const gY = P.swim ? L.WATER_Y - 1.25 : sf;
     if (!P.air && Math.abs(P.y - gY) < 0.8) P.y = gY;
     if (P.air || P.y > gY) {
@@ -809,6 +809,7 @@
     L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
     L.snd.key();
   }
+  L._leaveVehicle = (s) => leaveVehicle(s);
   function leaveVehicle(silent) {
     const v = P.vehicle; if (!v) return;
     if ((v.alt || 0) > 1.5 && v.hp > 0 && !silent) { L.msg('✈️ Erst landen! (C oder Shift = runter, nur auf dem Boden aussteigen)', 2500); return; }
@@ -917,8 +918,9 @@
     }
     if (!block && L.hit('KeyT') && t.teleport) { if (P.tpCd > 0) L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); else teleportVehicle(v); }
     if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
+    if (t.sub) L.updateSub(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight), !block && L.hit('Space'));
     if (t.plane) updatePlane(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
-    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
+    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space && !t.sub, true);
     if (!P.vehicle) return;
     P.x = v.x; P.z = v.z; P.y = v.alt || 0;
     // Gurtwarner
@@ -1027,9 +1029,14 @@
       e.x += fx * 3; e.z += fz * 3;
     }
     L.clampWorld(v, true);
-    if (!t.fly && !(t.plane && alt > 0.5) && L.waterDepth(v.x, v.z) > 0.9) {
-      v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0;
-      if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('🌊 Zu tief für das Fahrzeug – nur der fliegende JOYOR T10 kommt übers Meer.', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
+    const wd = L.waterDepth(v.x, v.z);
+    if (t.sub) {
+      if (wd < 1.8 && !L.inDim(v.x)) { v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0; if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('⚓ Das U-Boot fährt nur im Wasser.', 2000); } }
+    } else if (!t.fly && !(t.plane && alt > 0.5) && wd > 0.9 && !L.inDim(v.x)) {
+      // ins Wasser gefahren: Motor säuft ab, das Fahrzeug wird langsam und geht kaputt
+      v.speed = L.clamp(v.speed, -2.5, 2.5); v.hp -= dt * 6;
+      if (wd > 2.6) { v.speed = 0; v.hp = Math.min(v.hp, 0); }
+      if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg(wd > 2.6 ? '🌊 Das Fahrzeug ist abgesoffen – steig aus und schwimm!' : '🌊 Der Motor säuft ab!', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
     }
     v.waterMsgT = (v.waterMsgT || 0) - dt;
     // Optik
@@ -1037,7 +1044,7 @@
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
     v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
-    v.rig.root.position.set(v.x, alt > 0 ? alt : Math.max(L.WATER_Y + 0.5, L.seaFloor(v.x, v.z)), v.z);
+    v.rig.root.position.set(v.x, t.sub ? (alt || 0) : alt > 0 ? alt : Math.max(L.WATER_Y + 0.5, Math.max(L.seaFloor(v.x, v.z), L.inDim(v.x) ? 0 : -2.2)), v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     if (alt > 0.5 && v.vy) v.rig.root.rotateX(-L.clamp(v.vy / 40, -0.3, 0.3));
@@ -1137,10 +1144,11 @@
       if (v.hp <= 0 && Math.random() < dt * 4 && v.rig.root.visible) L.fx('#2a2a2a', v.x, 1.5, v.z, 1, 0.4, { size: 0.5, life: 2, g: -0.2, grow: 0.6 });
     }
     const pv = P.vehicle, H = L.env.head;
-    if (pv && L.env.day < 0.6) {
-      const fx = Math.sin(pv.yaw), fz = Math.cos(pv.yaw);
-      H.position.set(pv.x + fx * pv.t.len * 0.5, 1, pv.z + fz * pv.t.len * 0.5);
-      H.target.position.set(pv.x + fx * 30, 0, pv.z + fz * 30); H.intensity = 2.2;
+    const subDeep = pv && pv.t.sub && (pv.alt || 0) < -3;
+    if (pv && (L.env.day < 0.6 || subDeep)) {
+      const fx = Math.sin(pv.yaw), fz = Math.cos(pv.yaw), hy = subDeep ? pv.alt + 1.2 : 1;
+      H.position.set(pv.x + fx * pv.t.len * 0.5, hy, pv.z + fz * pv.t.len * 0.5);
+      H.target.position.set(pv.x + fx * 30, hy - (subDeep ? 6 : 1), pv.z + fz * 30); H.intensity = subDeep ? 4 : 2.2;
     } else H.intensity = 0;
   }
 
@@ -1740,7 +1748,7 @@
     const rig = L.buildKoloss(); L.scene.add(rig.root);
     // bleibt bis zum Ende ihres Zeitfensters (Fusion und Aufsteigen abgezogen)
     const stay = Math.max(30, (left || L.S().bossMin * 60) - L.FUSION_T - 9);
-    const fromMountain = L.mountains && L.mountains.length && Math.random() < 0.5;
+    const fromMountain = !L.curIsland && L.mountains && L.mountains.length && Math.random() < 0.5;
     let x, z;
     if (fromMountain) {
       // hinter dem Berg, der dem Spieler am nächsten ist (vom Spieler aus gesehen dahinter)
@@ -2483,7 +2491,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearIslands) L.clearIslands(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2570,6 +2578,8 @@
       L.spawnItem('note', s.x - 0.6, s.z + 0.3, 1, undefined, ni); ni++;
     }
     for (const v of L.vehSpots) spawnVehicle(v);
+    // U-Boot im Wasser vor dem Oststrand (auf der Karte markiert)
+    spawnVehicle({ type: 'uboot', x: 1585, z: 200, yaw: Math.PI / 2 });
     // genau ein Flugzeug, irgendwo auf freiem Land
     for (let i = 0; i < 80; i++) {
       const x = L.rand(-1300, 1300), z = L.rand(-1300, 1300);
@@ -2721,6 +2731,7 @@
     L.updateRichard(dt);
     L.updateDuel(dt);
     L.updateIslands(dt);
+    L.updateOcean2(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);

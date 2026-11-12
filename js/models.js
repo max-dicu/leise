@@ -961,6 +961,7 @@
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6 },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95 },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5 },
+    uboot: { name: 'U-Boot', vmax: 110, acc: 7, hp: 240, kind: 'car', sub: true, len: 10, wid: 2.8, off: 1, h: 3 },
     flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55 },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65 }
@@ -978,7 +979,23 @@
       wheels.push(wm); return piv;
     };
     let seat, seats, glassZ = 0;
-    if (t.plane) {
+    if (t.sub) {
+      // U-Boot: gelber Rumpf, Turm mit Periskop, Bullaugen, Scheinwerfer, Propeller hinten
+      const yc = '#e8c020';
+      part(G().cyl, yc, 1.4, 8, 1.4, 0, 1.4, 0, root).rotation.x = Math.PI / 2;
+      part(G().sph, yc, 1.4, 1.4, 1.6, 0, 1.4, 4, root); part(G().sph, yc, 1.4, 1.4, 1.8, 0, 1.4, -4, root);
+      part(box, yc, 1.2, 1.4, 2.6, 0, 3.0, 0.5, root); part(box, '#c8a010', 1.3, 0.2, 2.7, 0, 3.75, 0.5, root);
+      part(G().cyl, '#555', 0.08, 1.6, 0.08, 0.3, 4.6, 1.2, root); part(box, '#555', 0.12, 0.12, 0.5, 0.3, 5.4, 1.4, root);
+      for (const s2 of [-1, 1]) { for (let k = -1; k <= 1; k++) part(G().sph, '#8fd8ff', 0.28, 0.28, 0.12, s2 * 1.38, 1.6, k * 2, root, { basic: true, noShadow: true }); part(box, yc, 0.15, 0.6, 1.6, s2 * 1.6, 1.4, -3.5, root); }
+      part(box, yc, 3.6, 0.15, 1.2, 0, 1.4, -4.6, root);
+      for (const s2 of [-1, 1]) part(G().sph, '#fff8d0', 0.3, 0.3, 0.2, s2 * 0.6, 1.2, 5.4, root, { basic: true, noShadow: true });
+      const pp = grp(root, 0, 1.4, -5.9); pp.rotation.y = Math.PI / 2;
+      const prop = grp(pp); part(box, '#3a3a3a', 0.1, 1.6, 0.3, 0, 0, 0, prop); part(box, '#3a3a3a', 0.1, 0.3, 1.6, 0, 0, 0, prop);
+      wheels.push(prop);
+      seat = { x: 0.4, y: 0.9, z: 1.5 };
+      seats = [seat, { x: -0.4, y: 0.9, z: 1.5 }, { x: 0.4, y: 0.9, z: -0.5 }, { x: -0.4, y: 0.9, z: -0.5 }];
+      glassZ = 0;
+    } else if (t.plane) {
       // kleines Propellerflugzeug: Rumpf, Flügel, Leitwerk, Propeller, drei Räder, vier Sitze
       const pc = L.pick(['#e8e8e8', '#c02a2a', '#2a6ac0', '#e8c020']);
       part(G().cyl, pc, 0.95, 8, 0.95, 0, 1.5, 0, root).rotation.x = Math.PI / 2;

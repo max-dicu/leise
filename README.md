@@ -51,3 +51,9 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 Rund um die Heimat liegen 8 Inseln im Meer – erreichbar mit dem Flugzeug oder dem fliegenden JOYOR T10:
 ❄️ Eisland · 🏜️ Wüsteninsel · 🌴 Dschungelinsel · 🌋 Vulkaninsel (Lavabomben) · ⚡ Götterinsel Asgard (Blitze, Regenbogenbrücke) · 🍄 Pilzinsel · 💎 Kristallinsel · 👻 Geisterinsel.
 Jede Insel hat eigene Landschaft, Gebäude, Wetter, Farben, Musik, eingefärbte Monster, Menschen und Fahrzeuge – und einen Checkpoint (Lichtsäule in der Mitte). Freigeschaltete Checkpoints kann man im Menü als Startpunkt wählen. Auf dem offenen Meer: Riesenhaie, Meeresriesen und Wasserhosen. Taste M zeigt unterwegs die Weltkarte.
+
+## U-Boot, Unterwasserwelt, Portal und Dimension
+- **U-Boot** (⚓ auf der Karte, vor dem Oststrand, 4 Plätze): E auftauchen, C/Shift tauchen, Leertaste = Nitro.
+- **Unterwasserwelt:** Riffe, Korallen, Seetang, Fischschwärme, Blasen; je tiefer, desto dunkler. Leuchtende **Nitro-Kristallwürfel** laden bis zu 3 Boosts. **Tiefenjäger** jagen das U-Boot – nur knapp langsamer als du.
+- **Portal** (🌀, in einem Tiefseegraben, Wegweiser im U-Boot) bringt dich per Kurzfilm in **die Dimension**: schwebende Inseln in der unendlichen Leere des Weltalls mit Kristallbrücken, Korallen, Quallen, schwarzen Löchern, eigenen Monstern, Bossen und Checkpoint. Wer herunterfällt, landet verletzt wieder am Checkpoint. Ein Rückportal führt nach Hause.
+- Keine unsichtbaren Wände mehr: Man kann überallhin fliegen und schwimmen, Autos saufen im tiefen Wasser ab statt an einer Wand zu stoppen.

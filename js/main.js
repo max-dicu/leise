@@ -164,7 +164,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     let fp = false;
     let dist, h, py = P.camPitch;
     if (v) {
-      dist = (v.t.plane ? 16 : v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
+      dist = (v.t.plane ? 16 : v.t.sub ? 14 : v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
       piv.set(v.x, 1.6 + (v.alt || 0), v.z);
     } else {
       const ph = !P.alive ? 0.4 : P.stance === 'crawl' ? 0.6 : P.stance === 'crouch' ? 1.1 : 1.6;
@@ -177,7 +177,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     P.camDist = dist;
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(py), sp = Math.sin(py);
     const side = v || fp ? 0 : (P.aiming ? 0.7 : 0.55) * Math.min(1, dist / 2);
-    if (P.rig && L.state === 'game') P.rig.root.visible = !fp;
+    if (P.rig && L.state === 'game') P.rig.root.visible = !fp && !(P.vehicle && P.vehicle.t.sub);
     const rx = -cy, rz = sy;
     piv.x += rx * side; piv.z += rz * side;
     want.set(piv.x - sy * cp * dist, piv.y + sp * dist, piv.z - cy * cp * dist);
@@ -188,7 +188,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       if (L.blockedAt(L.lerp(piv.x, want.x, t), L.lerp(piv.y, want.y, t), L.lerp(piv.z, want.z, t))) { ok = (i - 1) / 12; break; }
     }
     camera.position.lerpVectors(piv, want, Math.max(0.12, ok));
-    if (camera.position.y < 0.3) camera.position.y = 0.3;
+    { const gy = L.seaFloor(camera.position.x, camera.position.z); if (camera.position.y < gy + 0.3) camera.position.y = gy + 0.3; }
     look.set(piv.x + sy * cp * 20, piv.y - sp * 20, piv.z + cy * cp * 20);
     if (L.shake > 0) {
       const s = L.shake * 0.25;

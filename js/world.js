@@ -106,22 +106,28 @@
   L.FAR = 8800; L.WATER_Y = -0.6;
   // Inseln (werden in islands.js gefüllt): { x, z, r }
   L.ISLANDS = L.ISLANDS || [];
+  // Portal in der Tiefsee und die Dimension (weit weg, eigene Welt)
+  L.PORTAL = { x: 2600, z: 3600, y: -150 };
+  L.DIM = { x: 60000, z: 0 };
+  L.inDim = (x) => x > 40000;
   L.seaFloor = function (x, z) {
+    // Dimension: nur die schwebenden Inseln tragen – daneben ist die unendliche Leere
+    if (x > 40000) return L.dimLand && L.dimLand(x, z) ? 0 : -5000;
     // Heimat: Strand im Westen, Osten und Süden; im Norden ein schmaler Streifen Sperrgebiet, dahinter auch Meer
     let o = Math.max(Math.abs(x) - HALF, z - HALF, -z - HALF - 150);
-    for (const I of L.ISLANDS) { const d = Math.hypot(x - I.x, z - I.z) - I.r; if (d < o) o = d; }
-    return o <= 0 ? 0 : -Math.min(9, o * 0.06);
+    for (const I of L.ISLANDS) { if (I.dim) continue; const d = Math.hypot(x - I.x, z - I.z) - I.r; if (d < o) o = d; }
+    if (o <= 0) return 0;
+    let d = o <= 150 ? o * 0.06 : Math.min(110, 9 + (o - 150) * 0.035);
+    const dp = Math.hypot(x - L.PORTAL.x, z - L.PORTAL.z);
+    if (dp < 1200) d = Math.max(d, 185 - dp * 0.13);
+    return -d;
   };
   L.waterDepth = (x, z) => L.WATER_Y - L.seaFloor(x, z);
   L.clampWorld = function (o, far) {
     const lim = HALF - 3;
     if (far) {
-      o.x = L.clamp(o.x, -L.FAR, L.FAR); o.z = L.clamp(o.z, -L.FAR, L.FAR);
-      if (o.z < -lim && o.z > -HALF - 150 && !(L.gateOpen && Math.abs(o.x) < 7)) {
-        // nördlich vom Zaun ist ein Streifen Sperrgebiet: vom Land aus der Zaun, vom Meer aus die Küste
-        if (Math.abs(o.x) <= HALF) { if (Math.abs(o.x) > HALF - 40) o.x = Math.sign(o.x) * (HALF + 0.5); else if (o.z < -HALF - 75) o.z = -HALF - 150.5; else o.z = -lim; }
-      }
-      if (L.gateOpen && Math.abs(o.x) < 7) o.z = Math.max(o.z, -HALF - 30);
+      // Spieler und Fahrzeuge: keine unsichtbaren Wände – nur der echte Zaun im Norden hält auf
+      o.x = L.clamp(o.x, -150000, 150000); o.z = L.clamp(o.z, -150000, 150000);
       return;
     }
     // Wesen auf einer Insel bleiben auf ihrer Insel
@@ -770,11 +776,14 @@
     geo.computeVertexNormals();
     const bed = new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true }));
     bed.receiveShadow = true; L.scene.add(bed);
-    const deep = new T.Mesh(new T.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2), new T.MeshLambertMaterial({ color: '#2e3a40' }));
-    deep.position.y = -9.1; L.scene.add(deep);
+    // Meeresgrund überall (folgt der Kamera, Höhe nach seaFloor)
+    const bg = new T.PlaneGeometry(2400, 2400, 64, 64); bg.rotateX(-Math.PI / 2);
+    bg.setAttribute('color', new T.BufferAttribute(new Float32Array(bg.attributes.position.count * 3), 3));
+    const deep = new T.Mesh(bg, new T.MeshLambertMaterial({ vertexColors: true })); deep.frustumCulled = false; L.scene.add(deep);
+    L.seabed = { mesh: deep, geo: bg, base: Float32Array.from(bg.attributes.position.array), cx: 1e9, cz: 1e9 };
     // Wasser: folgt der Kamera, Wellen laufen auf den Strand zu
     const N = 70, W = 1500, wg = new T.PlaneGeometry(W, W, N, N); wg.rotateX(-Math.PI / 2);
-    const wm = new T.Mesh(wg, new T.MeshPhongMaterial({ color: 0x2a6a8a, transparent: true, opacity: 0.86, shininess: 60, specular: 0x6688aa, flatShading: true }));
+    const wm = new T.Mesh(wg, new T.MeshPhongMaterial({ color: 0x2a6a8a, transparent: true, opacity: 0.86, shininess: 60, specular: 0x6688aa, flatShading: true, side: T.DoubleSide }));
     wm.frustumCulled = false; L.scene.add(wm);
     const base = Float32Array.from(wg.attributes.position.array);
     // weiße Schaumkronen-Linie am Strand
@@ -783,8 +792,28 @@
   L.waveH = function (x, z, t) {
     return Math.sin(x * 0.035 + t * 1.3) * 0.22 + Math.sin(z * 0.03 - t * 1.1) * 0.22 + Math.sin((x + z) * 0.08 + t * 2.2) * 0.1;
   };
+  const cB = new T.Color(), cS = new T.Color('#c8b888'), cD = new T.Color('#0e1a22');
+  function updateSeabed(cam) {
+    const B = L.seabed; if (!B) return;
+    const dim = L.inDim(cam.position.x);
+    B.mesh.visible = !dim;
+    if (dim) return;
+    const cx = Math.round(cam.position.x / 75) * 75, cz = Math.round(cam.position.z / 75) * 75;
+    if (cx === B.cx && cz === B.cz) return;
+    B.cx = cx; B.cz = cz; B.mesh.position.set(cx, 0, cz);
+    const p = B.geo.attributes.position, c = B.geo.attributes.color, b = B.base;
+    for (let i = 0; i < p.count; i++) {
+      const x = b[i * 3] + cx, z = b[i * 3 + 2] + cz, h = L.seaFloor(x, z);
+      p.array[i * 3 + 1] = h < -0.5 ? h - 0.3 : -12;
+      cB.copy(cS).lerp(cD, L.clamp(-h / 120, 0, 1));
+      c.array[i * 3] = cB.r; c.array[i * 3 + 1] = cB.g; c.array[i * 3 + 2] = cB.b;
+    }
+    p.needsUpdate = true; c.needsUpdate = true; B.geo.computeVertexNormals();
+  }
   L.updateOcean = function (cam, t) {
+    updateSeabed(cam);
     const O = L.ocean; if (!O) return;
+    if (L.inDim(cam.position.x)) { O.mesh.visible = false; return; }
     const near = Math.max(Math.abs(cam.position.x), Math.abs(cam.position.z)) > HALF - 1000 || !!L.curIsland;
     O.mesh.visible = near;
     if (!near) return;
@@ -1042,6 +1071,20 @@
     E.glow.intensity = 0.6 + nightAmt * 1.6;
     E.campfire.intensity = (0.5 + nightAmt * 1.5) * (0.85 + Math.random() * 0.3);
     L.updateOcean(cam, performance.now() / 1000);
+    if (L.inDim(cam.position.x)) {
+      E.stars.material.opacity = 1; E.sunDisc.material.opacity = 0; E.moon.material.opacity = 0;
+      E.hemi.intensity = 0.55; E.sun.intensity = 0.5; E.sun.color.setRGB(0.8, 0.7, 1);
+    }
+    const uw = L.WATER_Y - cam.position.y;
+    L.underwater = uw > 0.15 && !L.inDim(cam.position.x);
+    if (L.underwater) {
+      const k = L.clamp(uw / 140, 0, 1);
+      cSky.setRGB(0.08, 0.32, 0.45).lerp(cTmp.setRGB(0.005, 0.02, 0.05), k);
+      L.scene.background.copy(cSky); L.scene.fog.color.copy(cSky);
+      L.scene.fog.near = 2; L.scene.fog.far = Math.max(28, 150 - uw * 0.9);
+      E.hemi.intensity = Math.max(E.hemi.intensity * Math.max(0.3, 1 - k * 0.7), 0.18); E.sun.intensity *= Math.max(0.05, 1 - k * 1.2);
+      E.sunDisc.material.opacity = 0; E.moon.material.opacity = 0; E.stars.material.opacity = 0;
+    }
     // Regen
     E.rainMesh.visible = E.rain > 0.02;
     if (E.rainMesh.visible) {

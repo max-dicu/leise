@@ -190,13 +190,14 @@
     for (let k = -3; k <= 3; k++) { const tt = new T.Mesh(L.GEO.cone, mat('#ffffff')); tt.scale.set(0.12, 0.35, 0.12); tt.rotation.x = Math.PI; tt.position.set(k * 0.22, -0.3, 5.3); g.add(tt); }
     g.scale.setScalar(1.6); L.scene.add(g); return g;
   }
-  function openSea(x, z) { let o = Math.max(Math.abs(x) - 1500, z - 1500, -z - 1650); for (const I of ISL) o = Math.min(o, Math.hypot(x - I.x, z - I.z) - I.r); return o; }
+  function openSea(x, z) { let o = Math.max(Math.abs(x) - 1500, z - 1500, -z - 1650); for (const I of ISL) if (!I.dim) o = Math.min(o, Math.hypot(x - I.x, z - I.z) - I.r); return o; }
   L.openSea = openSea;
   function updateSea(dt) {
+    if (L.inDim(P.x)) return;
     const ref = P.vehicle || P, alt = P.vehicle ? (P.vehicle.alt || 0) : (P.y || 0), os = openSea(P.x, P.z);
     // Riesenhaie springen vor dir aus dem Wasser
     L.sharkT = (L.sharkT === undefined ? 6 : L.sharkT) - dt;
-    if (os > 300 && alt < 35 && L.sharkT <= 0 && P.alive && !L.cine) {
+    if (os > 300 && alt < 35 && alt > -2 && L.sharkT <= 0 && P.alive && !L.cine) {
       L.sharkT = L.rand(7, 14);
       const yaw = P.vehicle ? P.vehicle.yaw : P.yaw, sp = P.vehicle ? Math.max(5, Math.abs(P.vehicle.speed)) : 2;
       const ahead = 2.6 * sp, cx = P.x + Math.sin(yaw) * ahead, cz = P.z + Math.cos(yaw) * ahead, side = Math.random() < 0.5 ? 1 : -1;
@@ -270,7 +271,7 @@
     let cur = null;
     for (const I of ISL) {
       const d = L.dist(P.x, P.z, I.x, I.z);
-      if (d < 3200 && !I.built) buildIsland(I);
+      if (d < 3200 && !I.built) (I.build || buildIsland)(I);
       if (I.group) I.group.visible = d < 3600;
       if (d < 1300 && !I.populated && L.state === 'game') populate(I);
       if (d < I.r + 250) cur = I;
@@ -287,7 +288,7 @@
       else if (lastIsl) { L.randomWeather(); }
       lastIsl = cur;
     }
-    L.envTint = cur ? { color: cur.tint, amt: 0.45 } : null;
+    L.envTint = cur ? { color: cur.tint, amt: cur.dim ? 0.97 : 0.45 } : null;
     updateSea(dt);
     updateHazards(cur, dt);
   };
