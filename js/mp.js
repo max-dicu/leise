@@ -316,6 +316,9 @@
         if (host && Rd && !Rd.bunkerOpen) { Rd.bunkerOpen = true; Rd.doorT = 0; L.interact.bunker.led.material = L.mat('#20ff40', { basic: true }); L.snd.door(); L.msg('🔓 ' + nameOf(from) + ' hat den Bunker geöffnet!'); }
         break;
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
+      case 'tower': if (!host) { if (m.down) L.towerDestroy(); else L.towerRestore(); } break;
+      case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;
+      case 'towerWarn': if (!host) L.msg('⚠️ MAMA IVA hat jemanden im Turm gehört! Sie kommt, um ihn einzureißen …', 7000); break;
       case 'bossGone': if (!host && L.boss) { L.capyRemove(L.boss); L.scene.remove(L.boss.rig.root); L.boss = null; } break;
       case 'capy': if (!host && L.boss && !L.boss.capy) { L.boss.sinking = 0.001; L.capyStart(L.boss); const c = L.boss.capy; c.x = m.x; c.z = m.z; c.yaw = m.yaw; } break;
       case 'stomp':
@@ -560,20 +563,21 @@
       const rig = m.rig;
       if (m.nx === undefined) { rig.root.visible = false; continue; }
       const dP = L.dist(P.x, P.z, m.x, m.z);
-      rig.root.visible = dP < (m.variant === 'lange' ? 300 : 260) && now - (m.seen || 0) < 2000;
+      const D = L.MK[m.kind] || L.MK.viktor;
+      rig.root.visible = dP < (m.variant === 'lange' ? 300 : D.view) && now - (m.seen || 0) < 2000;
       if (m.dead) {
-        if (m.kind === 'viktor') L.animViktor(rig, { mode: 'dead' }); else L.animDaniel(rig, { mode: 'dead' });
+        D.anim(rig, { mode: 'dead' });
         rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
         continue;
       }
       const k = Math.min(1, dt * 8);
       m.x += (m.nx - m.x) * k; m.z += (m.nz - m.z) * k; m.yaw += L.angDiff(m.yaw, m.nyaw) * k;
       m.phase += dt * (m.anim === 'crawl' ? 9 : m.anim === 'run' ? 6 : m.anim === 'walk' ? 3.2 : 2);
-      if (m.anim === 'alert' && m.lastAnim !== 'alert' && dP < 120) { if (m.kind === 'viktor') L.snd.viktor({ x: m.x, y: 2.5, z: m.z }); else L.snd.daniel({ x: m.x, y: 2, z: m.z }); }
+      if (m.anim === 'alert' && m.lastAnim !== 'alert' && dP < 120) D.voice({ x: m.x, y: 2.5, z: m.z });
       m.lastAnim = m.anim;
-      if (dP < 45 && Math.random() < dt * 0.35) { if (m.kind === 'viktor') L.snd.click({ x: m.x, y: 2.6, z: m.z }); else L.snd.heavy({ x: m.x, y: 0, z: m.z }, 0.2); }
+      if (dP < 45 && Math.random() < dt * 0.35) D.idle({ x: m.x, y: 2.6, z: m.z });
       if (!rig.root.visible) continue;
-      if (m.kind === 'viktor') L.animViktor(rig, { mode: m.anim, phase: m.phase, atk: m.atk }); else L.animDaniel(rig, { mode: m.anim, phase: m.phase, atk: m.atk });
+      D.anim(rig, { mode: m.fly ? 'fly' : m.anim, phase: m.phase, atk: m.atk });
       rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
     }
     for (const n of E.npcs) {

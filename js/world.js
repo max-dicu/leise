@@ -224,11 +224,85 @@
   }
 
   // ---------- Bauabschnitte ----------
+
+  // ---------- Der Turm: höchstes Gebäude der Stadt, einziger sicherer Ort vor den Monstern ----------
+  // Innen (Erdgeschoss) kommt kein Monster hinein. Nur MAMA IVA kann ihn zerstören, wenn es drinnen zu laut ist.
+  L.TOWER = { x: 38, z: 38, half: 12, h: 62 };
+  L.inTower = (x, z, m) => { const T0 = L.TOWER, r = 10.8 + (m || 0); return Math.abs(x - T0.x) < r && Math.abs(z - T0.z) < r; };
+  L.tower = { down: false, boxes: [], segs: [], group: null, fall: null };
+  L.towerSafe = () => !L.tower.down;
+  function buildTower() {
+    const T0 = L.TOWER, cx = T0.x, cz = T0.z, H = T0.h, hf = T0.half, g = new T.Group(); L.scene.add(g); L.tower.group = g;
+    const add = (seg, color, sx, sy, sz, x, y, z, o) => { const m = new T.Mesh(L.GEO.box, L.mat(color, o)); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = !(o && o.basic); m.receiveShadow = true; seg.add(m); return m; };
+    const floors = 8, fh = H / floors;
+    for (let f = 0; f < floors; f++) {
+      const seg = new T.Group(); seg.position.set(cx, f * fh, cz); g.add(seg);
+      const y = fh / 2, wall = '#2c3542', glass = { emissive: '#ffd88a', ei: 0.5 };
+      if (f === 0) {
+        // Erdgeschoss mit großem Tor nach Süden
+        add(seg, wall, hf * 2, fh, 0.8, 0, y, -hf + 0.4); add(seg, wall, 0.8, fh, hf * 2, -hf + 0.4, y, 0); add(seg, wall, 0.8, fh, hf * 2, hf - 0.4, y, 0);
+        add(seg, wall, hf - 3, fh, 0.8, -(hf + 3) / 2, y, hf - 0.4); add(seg, wall, hf - 3, fh, 0.8, (hf + 3) / 2, y, hf - 0.4);
+        add(seg, wall, 6, fh - 4.5, 0.8, 0, fh - (fh - 4.5) / 2, hf - 0.4);
+        add(seg, '#6a7380', hf * 2 - 1.6, 0.1, hf * 2 - 1.6, 0, 0.05, 0);
+        add(seg, '#fff2c0', 6, 0.15, 6, 0, fh - 0.3, 0, { basic: true });
+        add(seg, '#2a8a3a', 6.4, 1.1, 0.2, 0, 5.2, hf + 0.05, { basic: true });
+      } else {
+        add(seg, wall, hf * 2, fh, hf * 2, 0, y, 0);
+        for (const [sx, sz, x, z] of [[hf * 2 - 2, 0.1, 0, hf + 0.02], [hf * 2 - 2, 0.1, 0, -hf - 0.02], [0.1, hf * 2 - 2, hf + 0.02, 0], [0.1, hf * 2 - 2, -hf - 0.02, 0]])
+          add(seg, '#3a4a5a', sx, fh * 0.55, sz, x, y, z, Math.random() < 0.5 ? glass : undefined);
+      }
+      add(seg, '#9aa4b0', hf * 2 + 0.6, 0.5, hf * 2 + 0.6, 0, fh, 0);
+      L.tower.segs.push({ seg, y0: f * fh });
+    }
+    const top = new T.Group(); top.position.set(cx, H, cz); g.add(top);
+    add(top, '#9aa4b0', 0.5, 9, 0.5, 0, 4.5, 0);
+    add(top, '#ff2020', 1, 1, 1, 0, 9.3, 0, { basic: true });
+    L.tower.segs.push({ seg: top, y0: H });
+    // Kollision: Außenwände mit Tor
+    const B = (x1, z1, x2, z2) => L.tower.boxes.push(L.addBox(cx + x1, cz + z1, cx + x2, cz + z2, H, 'building'));
+    B(-hf, -hf, hf, -hf + 0.8); B(-hf, -hf, -hf + 0.8, hf); B(hf - 0.8, -hf, hf, hf); B(-hf, hf - 0.8, -3, hf); B(3, hf - 0.8, hf, hf);
+    L.mapRects.push({ x: cx, z: cz, w: hf * 2, d: hf * 2, c: '#2a6ad0' });
+    sign('TURM · SICHERER ORT', cx, 6.4, cz + hf + 0.12, 10, 1.4, 0, '#123', '#7cf');
+  }
+  L.towerDestroy = function () {
+    const TW = L.tower; if (TW.down) return;
+    TW.down = true;
+    for (const b of TW.boxes) b.on = false;
+    const T0 = L.TOWER;
+    TW.fall = TW.segs.map((s, i) => ({ s, vx: L.rand(-3, 3), vz: L.rand(-3, 3), vy: 0, rx: L.rand(-0.5, 0.5), rz: L.rand(-0.5, 0.5), delay: (TW.segs.length - i) * 0.12 }));
+    TW.fallT = 0;
+    L.snd.explosion({ x: T0.x, y: 30, z: T0.z }); L.snd.stomp({ x: T0.x, y: 0, z: T0.z });
+    L.shake = Math.max(L.shake, 1.4);
+    L.banner('DER TURM STÜRZT EIN!', 'MAMA IVA hat dich gehört – lauf!');
+    const P = L.player;
+    if (P.alive && !P.gone && L.inTower(P.x, P.z, 1)) L.hurtPlayer(45 * (L.md ? L.md.dmg : 1), 'Vom einstürzenden Turm erschlagen');
+  };
+  L.towerRestore = function () {
+    const TW = L.tower; if (!TW.group) return;
+    TW.down = false; TW.fall = null; TW.group.visible = true;
+    for (const b of TW.boxes) b.on = true;
+    for (const s of TW.segs) { s.seg.position.set(L.TOWER.x, s.y0, L.TOWER.z); s.seg.rotation.set(0, 0, 0); s.seg.visible = true; }
+  };
+  L.updateTower = function (dt) {
+    const TW = L.tower; if (!TW.fall) return;
+    TW.fallT += dt;
+    const T0 = L.TOWER;
+    for (const f of TW.fall) {
+      if (TW.fallT < f.delay) continue;
+      const p = f.s.seg.position;
+      f.vy -= 14 * dt; p.x += f.vx * dt; p.z += f.vz * dt; p.y += f.vy * dt;
+      f.s.seg.rotation.x += f.rx * dt; f.s.seg.rotation.z += f.rz * dt;
+      if (p.y < -12) f.s.seg.visible = false;
+    }
+    if (Math.random() < dt * 30 && TW.fallT < 5) L.fx(Math.random() < 0.5 ? '#8a8378' : '#5a554e', T0.x + L.rand(-16, 16), L.rand(1, 25), T0.z + L.rand(-16, 16), 3, 8, { size: 1.2, life: 2.5 });
+    if (TW.fallT > 6) { TW.fall = null; TW.group.visible = false; }
+  };
   function buildCity() {
     const specials = {
       '6,3': () => { building(114, -114, 52, 40, 22, '#e3e1da', { loot: 7, poi: 'krankenhaus', mapC: '#c95050' }); sign('KRANKENHAUS', 114, 16, -114 + 20.3, 22, 4, 0, '#b02020', '#ffffff'); },
       '3,6': () => { building(-114, 114, 42, 30, 12, '#5f7491', { loot: 7, poi: 'polizei', mapC: '#4060a0' }); sign('POLIZEI', -114, 9, 114 + 15.3, 14, 3, 0, '#1d3d70', '#ffffff'); },
       '7,7': () => { building(190, 190, 50, 34, 8, '#c9c2b0', { loot: 8, poi: 'supermarkt', mapC: '#60a060' }); sign('SUPERMARKT', 190, 6, 190 + 17.3, 20, 3, 0, '#2f7a3a', '#ffffff'); },
+      '5,5': () => buildTower(),
       '1,1': () => { for (let i = 0; i < 30; i++) inst_tree(-266 + rr(-28, 28), -266 + rr(-28, 28), true); L.lootSpots.push({ x: -266, z: -266, poi: 'stadt' }); }
     };
     for (let kx = 0; kx < 10; kx++) for (let kz = 0; kz < 10; kz++) {
@@ -238,7 +312,7 @@
       for (const lx of [-1, 1]) for (const lz of [-1, 1]) {
         if (R() < 0.08) { const px = cx + lx * 15, pz = cz + lz * 15, py = R() < 0.5 ? 0 : Math.PI / 2; parked(px, pz, py, true); continue; }
         const w = rr(16, 26), d = rr(16, 26);
-        const h = dc < 160 ? rr(26, 72) : dc < 290 ? rr(11, 30) : rr(6, 14);
+        const h = dc < 160 ? rr(24, 48) : dc < 290 ? rr(11, 30) : rr(6, 14);
         building(cx + lx * 15 + rr(-1.5, 1.5), cz + lz * 15 + rr(-1.5, 1.5), w, d, h,
           rpick(['#9a9890', '#b5ab9a', '#8f8a86', '#a39486', '#7d838a', '#c2b8a3', '#8a7f72', '#6f747a', '#a8a39a']), { loot: 2, poi: 'stadt' });
       }

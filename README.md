@@ -27,3 +27,10 @@ E aufheben · F ein-/aussteigen · B anschnallen · H hupen · L Taschenlampe ·
 
 ## Geplant für Version 2
 Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken.
+
+## Neue Monster und der Turm
+- **Der Gesichtslose** (springt beim Jagen nach vorne), **Der Rufer** (9 m groß, ruft alle Monster herbei), **Blocklinge** (grüne Aliens im Dreierpack), **Schwellengänger** (auf allen vieren, sehr schnell), **Greifer** und **Flugmaschinen** (nach „Krieg der Welten“, Suchlicht und schwarzer Rauch).
+- Wenn MAMA IVA kommt, verschmelzen alle Monster zu ihr (Kurzfilm). Danach drehen alle Monster durch und rasen auf dich zu.
+- MAMA IVA hört dich überall, außer wenn du schleichst.
+- Der **Turm** in der Stadtmitte (🗼 auf der Karte) ist der einzige sichere Ort: Monster kommen nicht hinein. Bist du dort zu laut, reißt MAMA IVA ihn ein.
+- Wenn MAMA IVA weg ist, laufen die Monster davon und alles wird wieder normal.

@@ -147,11 +147,18 @@
   L.makeNoise = function (x, z, rad, src) {
     if (rad <= 0) return;
     const hm = L.env.hearMul * L.md.hear;
+    // im Turm zu laut (rennen, schießen, hupen …) → MAMA IVA kommt und reißt ihn ein
+    const B0 = L.boss;
+    if (!isClient() && B0 && !B0.dead && !B0.leaving && !B0.towerAtk && rad >= 20 && L.towerSafe() && L.inTower(x, z, 1)) {
+      B0.towerAtk = true; B0.smashT = 0; B0.smashed = false;
+      L.msg('⚠️ MAMA IVA hat dich im Turm gehört! Sie kommt, um ihn einzureißen …', 7000);
+      if (NET() !== 'solo') L.mp.send({ t: 'towerWarn' });
+    }
     if (src === P) P.noiseShow = Math.max(P.noiseShow, rad);
     if (isClient()) { if (rad >= 4) L.mp.send({ t: 'nz', x, z, r: rad }); return; }
     for (const m of E.monsters) {
       if (m.dead) continue;
-      const d = L.dist(x, z, m.x, m.z), R = rad * hm;
+      const d = L.dist(x, z, m.x, m.z), R = rad * hm * (MK[m.kind].hear || 1);
       if (d < R) monsterHear(m, x, z, 1 - d / R, d, src);
     }
     if (rad >= 40) for (const w of E.walkers) { if (!w.dead && L.dist(x, z, w.x, w.z) < rad * 2.4 * hm) walkerHear(w, x, z); }
@@ -167,6 +174,7 @@
       if (e.anim === 'crawl') { out.push([e.x + Math.sin(e.yaw) * 0.6, 0.9 * s, e.z + Math.cos(e.yaw) * 0.6, 0.55 * s, 1], [e.x + Math.sin(e.yaw) * 1.3 * s, 1.2 * s, e.z + Math.cos(e.yaw) * 1.3 * s, 0.25 * s, 2]); }
       else out.push([e.x, 1.3 * s, e.z, 0.35 * s, 1], [e.x, 2.1 * s, e.z, 0.35 * s, 1], [e.x, 2.8 * s, e.z, 0.24 * s, 2]);
     } else if (e.kind === 'daniel') out.push([e.x, 1.0, e.z, 0.65, 1], [e.x, 1.9, e.z, 0.8, 1], [e.x, 2.5, e.z, 0.25, 2]);
+    else if (MK[e.kind]) { for (const h of MK[e.kind].hit) out.push([e.x, h[0], e.z, h[1], h[2]]); }
     else if (e.kind === 'npc') {
       const lowY = e.mode === 'crouch' ? 0.6 : 1;
       out.push([e.x, 0.9 * lowY, e.z, 0.42, 1], [e.x, 1.4 * lowY, e.z, 0.35, 1], [e.x, 1.75 * lowY, e.z, 0.17, 2]);
@@ -236,7 +244,7 @@
     if (e.kind === 'walker' || e.kind === 'boss') L.fx('#ffb040', e.x, hy, e.z, 6, 4, { basic: true, size: 0.15, life: 0.5 });
     else L.blood(e.x, hy, e.z, 10);
     const byPlayer = src && (src === P || isRemote(src));
-    if ((e.kind === 'viktor' || e.kind === 'daniel') && byPlayer) { e.state = 'chase'; e.tx = src.x; e.tz = src.z; e.prey = src; }
+    if (MK[e.kind] && byPlayer && (e.calmT || 0) <= 0) { e.state = 'chase'; e.tx = src.x; e.tz = src.z; e.prey = src; }
     if (e.kind === 'npc' && byPlayer) { e.hostile = true; e.alertT = 10; }
     if (e.kind === 'walker' && byPlayer) walkerHear(e, src.x, src.z);
     if (e.hp <= 0) killEnt(e, src);
@@ -244,10 +252,13 @@
   function killEnt(e, src) {
     e.dead = true; e.deadT = 0;
     if (src === P) P.kills++;
-    if (e.kind === 'viktor' || e.kind === 'daniel') { L.blood(e.x, 1.2, e.z, 30, true); L.decal(e.x, e.z, 2); L.snd.splat({ x: e.x, y: 1, z: e.z }); }
+    if (MK[e.kind]) {
+      if (MK[e.kind].metal) { L.fx('#ffb040', e.x, e.fly ? 16 : 2, e.z, 30, 8, { basic: true, size: 0.3, life: 1 }); L.snd.explosion({ x: e.x, y: 2, z: e.z }); }
+      else { L.blood(e.x, 1.2, e.z, 30, true); L.decal(e.x, e.z, 2); L.snd.splat({ x: e.x, y: 1, z: e.z }); }
+    }
     if (e.kind === 'npc') { L.blood(e.x, 1, e.z, 25, true); L.decal(e.x, e.z, 1.8); dropNpcLoot(e); }
     if (e.kind === 'walker') { L.explode(e.x, e.hy, e.z, 12, 0, null, true); L.msg('💥 Ein Stelzer ist zerstört!'); for (let i = 0; i < 2; i++) L.spawnItem('artefakt', e.x + L.rand(-6, 6), e.z + L.rand(-6, 6), 1); }
-    if (e.kind === 'boss') { L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('MAMA IVA IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
+    if (e.kind === 'boss') { calmMonsters(); L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('MAMA IVA IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
   }
 
   // ---------- Inventar ----------
@@ -948,10 +959,10 @@
     else if (impact > 0) { v.speed *= 0.8; v.lat *= 0.5; }
     // Monster und Menschen überfahren
     if (Math.abs(v.speed) > 3) for (const e of allTargets()) {
-      if (e.kind === 'walker' || e.kind === 'boss') continue;
+      if (e.kind === 'walker' || e.kind === 'boss' || e.fly) continue;
       if (L.dist(e.x, e.z, v.x + fx * t.len * 0.4, v.z + fz * t.len * 0.4) > (t.kind === 'bike' ? 1.2 : t.wid * 0.7 + 0.5)) continue;
       const sp = Math.abs(v.speed);
-      if (e.kind === 'daniel') { L.damageEnt(e, sp * 5, v.x, v.z, isPlayer ? P : null); v.speed *= 0.1; crash(v, sp * 0.7, isPlayer); }
+      if (MK[e.kind] && MK[e.kind].heavy) { L.damageEnt(e, sp * 5, v.x, v.z, isPlayer ? P : null); v.speed *= 0.1; crash(v, sp * 0.7, isPlayer); }
       else { L.damageEnt(e, sp * 7, v.x, v.z, isPlayer ? P : null); v.speed *= 0.85; L.snd.splat({ x: e.x, y: 1, z: e.z }); }
       e.x += fx * 3; e.z += fz * 3;
     }
@@ -999,21 +1010,41 @@
   // ---------- Viktor und Daniel ----------
   // [umherlaufen, Geräusch nachgehen, Jagd]
   const MSPD = { viktor: [1.9, 6.5, 8.8], lange: [2.2, 7.2, 10], daniel: [1.6, 5.5, 7] };
+  // Alle Monsterarten: Modell, Animation, Tempo, Leben, Reichweite, Schaden, Geräusche, Trefferzonen [Höhe, Radius, Kopfschuss-Faktor]
+  const MK = L.MK = {
+    viktor: { build: (v) => L.buildViktor(v), anim: (r, s) => L.animViktor(r, s), hp: 110, r: 0.45, reach: 2.9, grab: 2.4, atk: 0.85, wind: 0.4, dmg: 35, veh: 35, knock: 10, up: 4.5, chase: 'crawl', view: 260,
+      voice: (p) => L.snd.viktor(p), idle: (p) => L.snd.click(p), hit: [] },
+    daniel: { build: () => L.buildDaniel(), anim: (r, s) => L.animDaniel(r, s), spd: MSPD.daniel, hp: 280, r: 0.8, reach: 3.2, grab: 2.6, atk: 1.1, wind: 0.55, dmg: 45, veh: 50, knock: 15, up: 6, heavy: true, view: 260,
+      cause: 'Daniel hat dich zerquetscht', voice: (p) => L.snd.daniel(p), idle: (p) => L.snd.heavy(p, 0.2), hit: [] },
+    langer: { build: () => L.buildLanger(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 5.5, 9.5], hp: 140, r: 0.4, reach: 3.4, grab: 2.8, atk: 0.9, wind: 0.45, dmg: 40, veh: 35, knock: 11, up: 5, view: 300,
+      cause: 'Der Gesichtslose hat dich geholt', voice: (p) => L.snd.radio(p), idle: (p) => L.snd.radio(p), hit: [[1.4, 0.3, 1], [2.3, 0.3, 1], [3.1, 0.2, 2]] },
+    rufer: { build: () => L.buildRufer(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 4.5, 8], hp: 650, r: 1.1, reach: 6.5, grab: 5.5, atk: 1.5, wind: 0.6, dmg: 60, veh: 70, knock: 18, up: 8, heavy: true, view: 480,
+      cause: 'Der Rufer hat dich zertreten', voice: (p) => L.snd.horn(p), idle: (p) => L.snd.heavy(p, 0.5), hit: [[3.5, 0.9, 1], [6, 1, 1], [9, 1.1, 2]] },
+    blockling: { build: () => L.buildBlockling(), anim: (r, s) => L.animBeast(r, s), spd: [2.2, 7, 10.5], hp: 55, r: 0.4, reach: 2.2, grab: 2, atk: 0.6, wind: 0.3, dmg: 25, veh: 25, knock: 8, up: 4, view: 220,
+      cause: 'Ein Blockling hat dich erwischt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.click(p), hit: [[0.9, 0.3, 1], [1.6, 0.3, 2]] },
+    schwelle: { build: () => L.buildSchwelle(), anim: (r, s) => L.animBeast(r, s), spd: [1.4, 6, 12.5], hp: 90, r: 0.5, reach: 2.6, grab: 2.4, atk: 0.7, wind: 0.35, dmg: 40, veh: 35, knock: 10, up: 4.5, hear: 0.6, view: 240,
+      cause: 'Der Schwellengänger hat dich gepackt', voice: (p) => L.snd.scream(p), idle: (p) => L.snd.click(p), hit: [[1.0, 0.45, 1], [1.1, 0.25, 2]] },
+    greifer: { build: () => L.buildGreifer(), anim: (r, s) => L.animBeast(r, s), spd: [1.8, 6.5, 9.5], hp: 380, r: 1.6, reach: 4.5, grab: 3.8, atk: 1.0, wind: 0.5, dmg: 55, veh: 55, knock: 14, up: 6, heavy: true, metal: true, view: 320,
+      cause: 'Ein Greifer hat dich gepackt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.heavy(p, 0.3), hit: [[3.1, 1.6, 1], [3.8, 0.5, 2]] },
+    flieger: { build: () => L.buildFlieger(), anim: (r, s) => L.animBeast(r, s), spd: [7, 13, 16], hp: 300, r: 3, fly: true, metal: true, view: 520,
+      cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.rotor(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
+  };
   function spawnMonster(kind, x, z, variant, id) {
-    const rig = kind === 'viktor' ? L.buildViktor(variant) : L.buildDaniel();
+    const D = MK[kind] || MK.viktor;
+    const rig = D.build(variant);
     L.scene.add(rig.root);
     const m = {
-      kind, variant, rig, x, z, yaw: Math.random() * 6.28, hp: kind === 'viktor' ? (variant === 'lange' ? 150 : 110) : 280,
+      kind, variant, rig, x, z, yaw: Math.random() * 6.28, hp: kind === 'viktor' ? (variant === 'lange' ? 150 : 110) : D.hp, fly: !!D.fly,
       state: 'wander', tx: x, tz: z, home: { x, z }, timer: Math.random() * 5, phase: Math.random() * 10, atk: 0, hitDone: false,
       cd: 0, dead: false, deadT: 0, prey: null, anim: 'walk', stuckT: 0, detT: 0, lastX: x, lastZ: z, lod: 0, voice: 0
     };
-    m.spd = (variant === 'lange' ? MSPD.lange : MSPD[kind]).map((s) => s * L.md.speed);
+    m.spd = (kind === 'viktor' ? (variant === 'lange' ? MSPD.lange : MSPD.viktor) : D.spd).map((s) => s * L.md.speed);
     m.id = id || NID++; m.key = 'm' + m.id; L.byId.set(m.key, m);
     E.monsters.push(m);
     return m;
   }
   function monsterHear(m, x, z, inten, d, src) {
-    if (m.state === 'attack') return;
+    if (m.state === 'attack' || m.calmT > 0) return;
     const was = m.state;
     const off = d * 0.08;
     m.tx = x + L.rand(-off, off); m.tz = z + L.rand(-off, off);
@@ -1023,13 +1054,52 @@
     if (was === 'wander' || was === 'search' || was === 'listen') m.alertT = 0.6;
     if ((was === 'wander' || was === 'search' || was === 'listen') && m.voice <= 0) {
       m.voice = 4;
-      if (L.dist(P.x, P.z, m.x, m.z) < 120) { if (m.kind === 'viktor') L.snd.viktor({ x: m.x, y: 2.5, z: m.z }); else L.snd.daniel({ x: m.x, y: 2, z: m.z }); }
+      if (L.dist(P.x, P.z, m.x, m.z) < 120) MK[m.kind].voice({ x: m.x, y: 2.5, z: m.z });
     }
+    if (m.kind === 'rufer' && m.state === 'chase' && !(m.callCd > 0)) ruferCall(m);
   }
+  // Der Rufer ruft alle Monster in der Nähe zu dir
+  function ruferCall(m) {
+    m.callCd = 25;
+    L.snd.horn({ x: m.x, y: 9, z: m.z });
+    for (const o of E.monsters) if (o !== m && !o.dead && o.state !== 'chase' && o.state !== 'attack' && L.dist(o.x, o.z, m.x, m.z) < 260) {
+      o.state = 'investigate'; o.tx = m.tx + L.rand(-10, 10); o.tz = m.tz + L.rand(-10, 10); o.timer = 20;
+    }
+    if (L.dist(P.x, P.z, m.x, m.z) < 350) L.msg('📯 Der Rufer ruft die anderen Monster herbei!', 4000);
+  }
+  // Ziel in der Raserei: nächster Spieler, der nicht im Turm ist
+  function frenzyTarget(m) {
+    let best = null, bd = 450;
+    for (const p of players()) {
+      if (L.towerSafe() && L.inTower(p.x, p.z)) continue;
+      const d = L.dist(p.x, p.z, m.x, m.z); if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+  // nach MAMA IVA: alle Monster rennen weg und beruhigen sich
+  function calmMonsters() {
+    if (!L.frenzy) return;
+    L.frenzy = false;
+    for (const m of E.monsters) {
+      if (m.dead) continue;
+      const [p] = nearestPlayer(m.x, m.z);
+      const a = p ? Math.atan2(m.x - p.x, m.z - p.z) : Math.random() * 6.28;
+      m.state = 'investigate'; m.alertT = 0; m.prey = null; m.timer = 25; m.calmT = 25;
+      m.tx = L.clamp(m.x + Math.sin(a) * 220, -1480, 1480); m.tz = L.clamp(m.z + Math.cos(a) * 220, -1480, 1480);
+    }
+    L.msg('😮‍💨 MAMA IVA ist weg – die Monster laufen davon.', 6000);
+  }
+  // Monster bleiben draußen vor dem Turm
+  function keepOutOfTower(e) {
+    if (!L.towerSafe() || !L.inTower(e.x, e.z, 1.5)) return;
+    const T0 = L.TOWER, dx = e.x - T0.x, dz = e.z - T0.z, lim = T0.half + 1.5;
+    if (Math.abs(dx) > Math.abs(dz)) e.x = T0.x + Math.sign(dx || 1) * lim; else e.z = T0.z + Math.sign(dz || 1) * lim;
+  }
+  const safeIn = (x, z) => L.towerSafe() && L.inTower(x, z);
   function monsterVictims(m) {
     const list = [];
-    if (P.alive && !P.gone) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
-    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
+    if (P.alive && !P.gone && !safeIn(P.x, P.z)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
+    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z)) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
     for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
     return list;
   }
@@ -1046,26 +1116,49 @@
     if (spd > 0.5 && moved < spd * dt * 0.3 && e.stuckT <= 0) { e.stuckT = 1.5; e.detour = (Math.random() < 0.5 ? -1 : 1) * L.rand(1, 1.8); }
   }
   function updateMonster(m, dt) {
+    if (m.fly) return updateFlier(m, dt);
+    const D = MK[m.kind];
     const dP = L.dist(P.x, P.z, m.x, m.z), rig = m.rig, dN = nearDist(m.x, m.z, dP);
-    rig.root.visible = dP < (m.variant === 'lange' ? 300 : 260);
+    rig.root.visible = dP < (m.variant === 'lange' ? 300 : D.view);
     if (m.dead) {
       m.deadT += dt;
-      if (m.kind === 'viktor') L.animViktor(rig, { mode: 'dead' }); else L.animDaniel(rig, { mode: 'dead' });
+      D.anim(rig, { mode: 'dead' });
       rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
       return m.deadT < 45;
     }
     // weit weg: grob und selten rechnen
-    if (dN > 450) {
+    if (dN > 450 && !L.frenzy) {
       m.lod += dt; if (m.lod < 0.5) return true; dt = m.lod; m.lod = 0;
     }
+    m.calmT = (m.calmT || 0) - dt; m.callCd = (m.callCd || 0) - dt;
+    // Raserei, solange MAMA IVA da ist: alle stürmen auf den nächsten Spieler zu
+    if (L.frenzy && m.state !== 'attack') {
+      m.frT = (m.frT || 0) - dt;
+      if (m.frT <= 0) {
+        m.frT = 0.5;
+        const t = frenzyTarget(m);
+        if (t) { if (m.state !== 'chase' && dP < 120 && m.voice <= 0) { m.voice = 5; D.voice({ x: m.x, y: 2.5, z: m.z }); } m.state = 'chase'; m.tx = t.x; m.tz = t.z; m.prey = t; m.timer = 5; m.alertT = 0; }
+        else if (m.state === 'chase') { m.state = 'search'; m.timer = 3; }
+      }
+    }
+    // Der Gesichtslose springt beim Jagen ein Stück nach vorne (mit Rauschen)
+    if (m.kind === 'langer' && m.state === 'chase' && !(m.alertT > 0)) {
+      m.blinkT = (m.blinkT === undefined ? 3 : m.blinkT) - dt;
+      const dT = L.dist(m.x, m.z, m.tx, m.tz);
+      if (m.blinkT <= 0 && dT > 14) {
+        m.blinkT = L.rand(2.5, 4.5);
+        const k = Math.min(10, dT - 6) / dT, nx = m.x + (m.tx - m.x) * k, nz = m.z + (m.tz - m.z) * k;
+        if (!L.queryBoxes(nx, nz, 0.6).length && !safeIn(nx, nz)) { m.x = nx; m.z = nz; if (dP < 90) L.snd.radio({ x: m.x, y: 2, z: m.z }); }
+      }
+    }
     m.cd -= dt; m.voice -= dt; m.phase += dt * (m.state === 'chase' ? 9 : m.state === 'investigate' ? 6 : 3.2);
-    const r = m.kind === 'daniel' ? 0.8 : 0.45;
+    const r = D.r;
     if (m.state === 'attack') {
-      m.atk += dt / (m.kind === 'daniel' ? 1.1 : 0.85);
-      const wind = m.kind === 'daniel' ? 0.55 : 0.4;
+      m.atk += dt / D.atk;
+      const wind = D.wind;
       if (m.atk >= wind && !m.hitDone) {
         m.hitDone = true;
-        const v = m.victim, reach = m.kind === 'daniel' ? 3.2 : 2.9;
+        const v = m.victim, reach = D.reach;
         if (v && L.dist(v.x, v.z, m.x, m.z) < reach) monsterStrike(m, v);
       }
       if (m.atk >= 1) { m.state = 'listen'; m.timer = 3.5; }
@@ -1077,7 +1170,7 @@
         // kurz zusammenzucken und zum Geräusch drehen, dann losrennen
         m.alertT -= dt;
         m.yaw += L.angDiff(m.yaw, Math.atan2(m.tx - m.x, m.tz - m.z)) * Math.min(1, dt * 8);
-      } else moveToward(m, m.tx, m.tz, m.state === 'chase' ? m.spd[2] : m.spd[1], dt, r);
+      } else moveToward(m, m.tx, m.tz, (m.state === 'chase' ? m.spd[2] : m.spd[1]) * (L.frenzy && m.state === 'chase' ? 2.3 : 1), dt, r);
       m.timer -= dt;
       if (L.dist(m.x, m.z, m.tx, m.tz) < 1.6 || m.timer <= 0) { m.state = 'search'; m.timer = L.rand(4, 7); }
     } else {
@@ -1093,6 +1186,7 @@
       }
       if (m.state === 'wander') moveToward(m, m.tx, m.tz, m.spd[0], dt, r);
     }
+    keepOutOfTower(m);
     // Opfer ertasten
     if (m.state !== 'attack' && m.cd <= 0 && dN < 30) {
       for (const v of monsterVictims(m)) {
@@ -1100,44 +1194,108 @@
         const touch = v.sneaking ? 1.1 : 1.7;
         const hunting = m.state === 'chase' || m.state === 'investigate';
         // direkt angestoßen (unter 0,8 m) spürt er dich immer – auch wenn du still liegst
-        if ((d < touch && (v.moving || hunting)) || d < 0.8 || (hunting && d < (m.kind === 'daniel' ? 2.6 : 2.4) && L.dist(v.x, v.z, m.tx, m.tz) < 4)) {
+        if ((d < touch && (v.moving || hunting)) || d < 0.8 || (hunting && d < D.grab && L.dist(v.x, v.z, m.tx, m.tz) < 4)) {
           m.state = 'attack'; m.atk = 0; m.hitDone = false; m.victim = v.e; m.cd = 2.5;
           m.yaw = Math.atan2(v.x - m.x, v.z - m.z);
-          if (dP < 60) { if (m.kind === 'viktor') L.snd.viktor({ x: m.x, y: 2.5, z: m.z }); else L.snd.daniel({ x: m.x, y: 2, z: m.z }); }
+          if (dP < 60) D.voice({ x: m.x, y: 2.5, z: m.z });
           break;
         }
       }
     }
     // Klick-Geräusche in der Nähe (damit man sie hört)
-    if (dP < 45 && Math.random() < dt * 0.35) { if (m.kind === 'viktor') L.snd.click({ x: m.x, y: 2.6, z: m.z }); else L.snd.heavy({ x: m.x, y: 0, z: m.z }, 0.2); }
+    if (dP < 45 && Math.random() < dt * 0.35) D.idle({ x: m.x, y: 2.6, z: m.z });
     if (!rig.root.visible) return true;
-    const anim = m.state === 'attack' ? 'attack' : m.alertT > 0 ? 'alert' : m.state === 'chase' ? (m.kind === 'viktor' ? 'crawl' : 'run') : m.state === 'investigate' ? 'run' : m.state === 'wander' ? 'walk' : 'search';
+    const anim = m.state === 'attack' ? 'attack' : m.alertT > 0 ? 'alert' : m.state === 'chase' ? (D.chase || 'run') : m.state === 'investigate' ? 'run' : m.state === 'wander' ? 'walk' : 'search';
     m.anim = anim;
-    if (m.kind === 'viktor') L.animViktor(rig, { mode: anim, phase: m.phase, atk: m.atk }); else L.animDaniel(rig, { mode: anim, phase: m.phase, atk: m.atk });
+    D.anim(rig, { mode: anim, phase: m.phase, atk: m.atk });
     rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
     return true;
+  }
+  // ---------- Flugmaschine: fliegt mit Suchlicht, verrät dich an die anderen und wirft schwarzen Rauch ----------
+  function updateFlier(m, dt) {
+    const D = MK.flieger, dP = L.dist(P.x, P.z, m.x, m.z), rig = m.rig;
+    rig.root.visible = dP < D.view;
+    if (m.dead) { m.deadT += dt; D.anim(rig, { mode: 'dead' }); rig.root.position.set(m.x, 0, m.z); return m.deadT < 45; }
+    m.phase += dt; m.cd -= dt; m.calmT = (m.calmT || 0) - dt; m.alertT = 0;
+    if (L.frenzy) { m.frT = (m.frT || 0) - dt; if (m.frT <= 0) { m.frT = 0.5; const t = frenzyTarget(m); if (t) { m.state = 'chase'; m.tx = t.x; m.tz = t.z; m.prey = t; m.timer = 5; } } }
+    if (m.state === 'chase' || m.state === 'investigate') {
+      m.timer -= dt;
+      if (L.dist(m.x, m.z, m.tx, m.tz) < 4 || m.timer <= 0) { m.state = 'search'; m.timer = L.rand(4, 8); }
+    } else {
+      m.timer -= dt;
+      if (m.timer <= 0) { const p = L.pick(L.POIS); m.state = 'wander'; m.tx = L.clamp(p.x + L.rand(-p.r, p.r), -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r), -1480, 1480); m.timer = L.rand(40, 90); }
+    }
+    const spd = (m.state === 'chase' ? m.spd[2] * (L.frenzy ? 1.6 : 1) : m.state === 'investigate' ? m.spd[1] : m.state === 'wander' ? m.spd[0] : 0);
+    if (spd > 0) {
+      m.yaw += L.angDiff(m.yaw, Math.atan2(m.tx - m.x, m.tz - m.z)) * Math.min(1, dt * 1.5);
+      m.x += Math.sin(m.yaw) * spd * dt; m.z += Math.cos(m.yaw) * spd * dt; L.clampWorld(m);
+    } else m.yaw += dt * 0.4;
+    // Suchlicht: wer darunter steht und nicht schleicht, wird verraten
+    m.scanT = (m.scanT || 0) - dt;
+    if (m.scanT <= 0) {
+      m.scanT = 0.4;
+      for (const p of players()) {
+        if (L.dist(p.x, p.z, m.x, m.z) > 9 || safeIn(p.x, p.z)) continue;
+        const sneak = p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh);
+        const moving = p === P ? Math.hypot(P.vx, P.vz) > 0.4 || !!P.vehicle : p.moving;
+        if (sneak && !moving) continue;
+        if (m.state !== 'chase' && dP < 150) { L.snd.alarm({ x: m.x, y: 16, z: m.z }); if (p === P) L.msg('🛸 Die Flugmaschine hat dich im Licht entdeckt!', 3500); }
+        m.state = 'chase'; m.tx = p.x; m.tz = p.z; m.prey = p; m.timer = 10;
+        L.makeNoise(p.x, p.z, 60, null);
+        break;
+      }
+    }
+    if (m.state === 'chase' && m.cd <= 0 && m.prey && validTarget(m.prey) && L.dist(m.x, m.z, m.prey.x, m.prey.z) < 14 && !safeIn(m.prey.x, m.prey.z)) { m.cd = 7; L.dropSmoke(m.prey.x, m.prey.z, true); }
+    if (dP < 60 && Math.random() < dt * 0.5) D.idle({ x: m.x, y: 16, z: m.z });
+    m.anim = m.state === 'chase' ? 'run' : 'walk';
+    if (!rig.root.visible) return true;
+    D.anim(rig, { mode: 'fly', phase: m.phase });
+    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+    return true;
+  }
+  // schwarzer Rauch: schadet allen, die drinstehen (im Auto ist man geschützt)
+  const smokes = [];
+  L.dropSmoke = function (x, z, send) {
+    smokes.push({ x, z, t: 8, coughT: 0 });
+    L.snd.explosion({ x, y: 2, z });
+    if (send && isHost()) L.mp.send({ t: 'smoke', x, z });
+  };
+  function updateSmoke(dt) {
+    for (let i = smokes.length - 1; i >= 0; i--) {
+      const s = smokes[i]; s.t -= dt;
+      if (s.t <= 0) { smokes.splice(i, 1); continue; }
+      if (Math.random() < dt * 30) L.fx(Math.random() < 0.5 ? '#111111' : '#262626', s.x + L.rand(-6, 6), L.rand(0.3, 3), s.z + L.rand(-6, 6), 2, 1.5, { size: 1.6, life: 2.5, g: -0.3, grow: 1.2 });
+      const inCar = P.vehicle && P.vehicle.t.kind === 'car';
+      if (P.alive && !P.gone && !inCar && L.dist(P.x, P.z, s.x, s.z) < 7) {
+        P.hp -= 9 * dt * L.md.dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dt);
+        s.coughT -= dt; if (s.coughT <= 0) { s.coughT = 0.9; L.snd.hurt(); L.msg('😷 Schwarzer Rauch! Raus hier!', 1500); }
+        if (P.hp <= 0) { P.hp = 0; killPlayer(MK.flieger.cause); }
+      }
+    }
   }
   function monsterStrike(m, v) {
     const dmul = L.md.dmg;
     const dx = (v === P ? P.x : v.x) - m.x, dz = (v === P ? P.z : v.z) - m.z, d = Math.hypot(dx, dz) || 1;
     if (v === P) {
       const sneaking = P.stance !== 'stand' && !P.vehicle;
-      let dmg = sneaking ? (m.kind === 'daniel' ? 45 : 35) * dmul : 999;
-      if (P.vehicle) dmg = (m.kind === 'daniel' ? 50 : 35) * dmul;
-      const k = m.kind === 'daniel' ? 15 : 10;
+      const D = MK[m.kind];
+      let dmg = sneaking ? D.dmg * dmul : 999;
+      if (P.vehicle) dmg = D.veh * dmul;
+      const k = D.knock;
       L.blood(P.x, 1.3, P.z, 25, true);
       L.snd.splat({ x: P.x, y: 1, z: P.z });
-      L.hurtPlayer(dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : `Viktor (${({ grey: 'mit Hut', red: 'mit Schal', blue: 'mit schiefem Kopf', lange: 'der Lange' })[m.variant]}) hat dich erwischt`);
+      L.hurtPlayer(dmg, m.kind === 'viktor' ? `Viktor (${({ grey: 'mit Hut', red: 'mit Schal', blue: 'mit schiefem Kopf', lange: 'der Lange' })[m.variant]}) hat dich erwischt` : D.cause);
       if (P.alive && !P.vehicle) {
-        P.vx = dx / d * k; P.vz = dz / d * k; P.vy = m.kind === 'daniel' ? 6 : 4.5; P.air = true; P.tumble = 0.01; P.knockT = 1.2;
+        P.vx = dx / d * k; P.vz = dz / d * k; P.vy = D.up; P.air = true; P.tumble = 0.01; P.knockT = 1.2;
         L.msg('😱 Getroffen und weggeschleudert! Bleib leise ...');
       }
     } else if (isRemote(v)) {
       const sneaking = v.stance !== 'stand' && !v.inVeh;
-      let dmg = sneaking ? (m.kind === 'daniel' ? 45 : 35) * dmul : 999;
-      if (v.inVeh) dmg = (m.kind === 'daniel' ? 50 : 35) * dmul;
-      const k = m.kind === 'daniel' ? 15 : 10;
-      hurtRemote(v, dmg, m.kind === 'daniel' ? 'Daniel hat dich zerquetscht' : 'Viktor hat dich erwischt', dx / d * k, dz / d * k, m.kind === 'daniel' ? 6 : 4.5, sneaking);
+      const D = MK[m.kind];
+      let dmg = sneaking ? D.dmg * dmul : 999;
+      if (v.inVeh) dmg = D.veh * dmul;
+      const k = D.knock;
+      hurtRemote(v, dmg, m.kind === 'viktor' ? 'Viktor hat dich erwischt' : D.cause, dx / d * k, dz / d * k, D.up, sneaking);
       L.blood(v.x, 1.3, v.z, 20, true); L.snd.splat({ x: v.x, y: 1, z: v.z });
     } else {
       L.damageEnt(v, 120, m.x, m.z, m);
@@ -1297,11 +1455,12 @@
     }
     const how = fromMountain ? "berg" : "boden";
     const b = { kind: "boss", rig, x, z, yaw: 0, hy: 30, hp: 8000, t: 0, life: stay, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: true, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3,
-      how, emerge: 0, emergeDur: fromMountain ? 9 : 8, rootY: fromMountain ? -50 : -62, startY: fromMountain ? -50 : -62, sinking: 0 };
+      how, emerge: -L.FUSION_T, emergeDur: fromMountain ? 9 : 8, rootY: fromMountain ? -50 : -62, startY: fromMountain ? -50 : -62, sinking: 0 };
     b.yaw = Math.atan2(P.x - b.x, P.z - b.z);
     initGait(b, rig);
     rig.root.position.y = b.rootY;
     L.boss = b;
+    L.frenzy = true;
     if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how });
     L.bossAppear(b);
   }
@@ -1355,12 +1514,15 @@
 
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {
-    L.snd.bossRoar({ x: b.x, y: 40, z: b.z });
+    // erst verschmelzen alle Monster zu MAMA IVA, dann steigt sie auf
+    L.towerRestore();
+    L.fusionStart(b.x, b.z);
     if (b.how === "boden") {
       L.decal(b.x, b.z, 30, "#1a120c");
       L.fx("#5a4630", b.x, 1, b.z, 40, 14, { size: 0.9, life: 2.5 });
-      L.banner("MAMA IVA BRICHT AUS DEM BODEN", "Die Erde reißt auf … Versteck dich!");
-    } else L.banner("MAMA IVA ERSCHEINT", "Hinter dem Berg erhebt sich etwas Riesiges … Versteck dich!");
+    }
+    L.banner("MAMA IVA ENTSTEHT", "Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte (Karte: M)");
+    L.msg('🗼 Nur im Turm bist du vor den Monstern sicher – aber sei dort leise, sonst reißt MAMA IVA ihn ein!', 9000);
     if (L.cineBossAppear) L.cineBossAppear(b);
   };
   // Aufsteigen / Versinken: gemeinsame Optik für Host und Mitspieler
@@ -1388,9 +1550,9 @@
     if (b.emerge < b.emergeDur) {
       // langsam aus dem Boden / hinter dem Berg hervor
       b.emerge += dt;
-      const k = Math.min(1, b.emerge / b.emergeDur), ease = 1 - Math.pow(1 - k, 3);
+      const k = L.clamp(b.emerge / b.emergeDur, 0, 1), ease = 1 - Math.pow(1 - k, 3);
       b.rootY = b.startY * (1 - ease);
-      L.bossRise(b, dt);
+      if (b.emerge > 0) L.bossRise(b, dt);
       if (k >= 1) { b.rootY = 0; b.leaving = false; L.msg('👹 MAMA IVA ist da – ' + Math.round(b.life / 60) + ' Minuten lang!'); }
     } else if (!b.sinking) {
       b.life -= dt;
@@ -1403,23 +1565,43 @@
       b.sinking += dt;
       // GIGA-CAPY zieht MAMA IVA in den Boden
       b.rootY = -72 * L.capyUpdate(b, dt);
-      if (b.sinking >= L.CAPY_TOTAL) { L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + L.S().bossMin + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
+      if (b.sinking >= L.CAPY_TOTAL) { calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + L.S().bossMin + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
     }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
-    if (!b.leaving) for (const t of players()) {
-      const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
-      if (loud && L.dist(t.x, t.z, b.x, b.z) < 140) { b.tx = t.x; b.tz = t.z; break; }
+    // MAMA IVA hört jeden, der nicht schleicht – egal wie weit weg. Nur im Turm ist man sicher, solange man leise ist
+    const TW = L.TOWER;
+    if (b.towerAtk && !L.towerSafe()) b.towerAtk = false;
+    if (b.towerAtk) { b.tx = TW.x; b.tz = TW.z; }
+    else if (!b.leaving) {
+      let best = null, bd = 1e9;
+      for (const t of players()) {
+        const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
+        if (!loud || safeIn(t.x, t.z)) continue;
+        const d = L.dist(t.x, t.z, b.x, b.z); if (d < bd) { bd = d; best = t; }
+      }
+      if (best) { b.tx = best.x; b.tz = best.z; }
     }
     const [nearP, dNear] = nearestPlayer(b.x, b.z);
     const dT = L.dist(b.x, b.z, b.tx, b.tz);
     let speed = 0;
-    if (!b.leaving && b.stompT <= 0 && dT > 12) {
-      speed = 7.5;
+    if (!b.leaving && b.stompT <= 0 && dT > (b.towerAtk ? 34 : 12)) {
+      speed = b.towerAtk ? 11 : 7.5;
       const want = Math.atan2(b.tx - b.x, b.tz - b.z);
       b.yaw += L.clamp(L.angDiff(b.yaw, want), -0.45 * dt, 0.45 * dt);
       b.x += Math.sin(b.yaw) * speed * dt; b.z += Math.cos(b.yaw) * speed * dt;
       L.clampWorld(b);
-    } else if (!b.leaving && dT <= 12 && b.stompT <= 0) { b.tx = P.x + L.rand(-200, 200); b.tz = P.z + L.rand(-200, 200); }
+    } else if (!b.leaving && !b.towerAtk && dT <= 12 && b.stompT <= 0) { b.tx = P.x + L.rand(-200, 200); b.tz = P.z + L.rand(-200, 200); }
+    // Turm einreißen: ausholen, zuschlagen
+    if (b.towerAtk && !b.leaving && dT <= 35 && b.stompT <= 0) {
+      b.smashT += dt;
+      b.yaw += L.clamp(L.angDiff(b.yaw, Math.atan2(TW.x - b.x, TW.z - b.z)), -dt, dt);
+      if (b.smashT > 1.6 && !b.smashed) {
+        b.smashed = true; L.towerDestroy();
+        if (NET() !== 'solo') L.mp.send({ t: 'tower', down: 1 });
+        for (const rp of RPs()) if (L.inTower(rp.x, rp.z, 1)) hurtRemote(rp, 45 * L.md.dmg, 'Vom einstürzenden Turm erschlagen');
+      }
+      if (b.smashT > 3.2) { b.towerAtk = false; b.smashT = 0; b.smashed = false; }
+    }
     // Stampfen
     if (!b.leaving && nearP && dNear < 24 && b.stompCd <= 0 && b.stompT <= 0) { b.stompT = 1.4; }
     if (b.stompT > 0) {
@@ -1470,7 +1652,8 @@
     rig.hull.position.set(b.x, b.hy, b.z); rig.hull.rotation.set(0, b.yaw, Math.sin(b.t * 0.9) * 0.04);
     rig.root.position.y = b.rootY + L.mountainH(b.x, b.z);
     const sw = Math.sin(b.t * 1.4);
-    rig.arms[0].arm.rotation.set(-sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - (b.stompT > 0 ? 1.5 : 0), 0, -0.3);
+    const sm = b.smashT > 0 ? (b.smashT < 1.3 ? -2.9 * (b.smashT / 1.3) : b.smashT < 1.65 ? -2.9 + (b.smashT - 1.3) / 0.35 * 3.8 : 0.9 * Math.max(0, 1 - (b.smashT - 1.65))) : 0;
+    rig.arms[0].arm.rotation.set(-sw * 0.3 - (b.stompT > 0 ? 1.5 : 0) + sm, 0, 0.3); rig.arms[1].arm.rotation.set(sw * 0.3 - (b.stompT > 0 ? 1.5 : 0) + sm, 0, -0.3);
     rig.thin[0].arm.rotation.set(-1.2 + Math.sin(b.t * 2.1) * 0.4, 0, 0.6); rig.thin[1].arm.rotation.set(-1.2 + Math.cos(b.t * 1.9) * 0.4, 0, -0.6);
     rig.thin[0].elbow.rotation.x = -0.8 + Math.sin(b.t * 2.6) * 0.3; rig.thin[1].elbow.rotation.x = -0.8 + Math.cos(b.t * 2.3) * 0.3;
     rig.neck.rotation.set(0.15, Math.sin(b.t * 0.5) * 0.5, Math.sin(b.t * 0.7) * 0.25);
@@ -1671,12 +1854,21 @@
         if (Math.random() < 0.6) { const p = L.pick(L.POIS); x = p.x + L.rand(-p.r, p.r) * 0.85; z = p.z + L.rand(-p.r, p.r) * 0.85; }
         else { x = L.rand(-1450, 1450); z = L.rand(-1450, 1450); }
         if (L.dist(x, z, P.x, P.z) < 120 || L.queryBoxes(x, z, 1.2).length) continue;
+        if (L.inTower(x, z, 4)) continue;
         spawnMonster(kind, x, z, kind === 'viktor' ? randVariant() : undefined);
+        if (kind === 'blockling') for (let k = 0; k < 2; k++) spawnMonster(kind, x + L.rand(-4, 4), z + L.rand(-4, 4));
         made++;
       }
     };
-    place('viktor', Math.round(135 * cm));
-    place('daniel', Math.round(45 * cm));
+    place('viktor', Math.round(115 * cm));
+    place('daniel', Math.round(38 * cm));
+    place('langer', Math.round(12 * cm));
+    place('rufer', Math.round(6 * cm));
+    place('blockling', Math.round(9 * cm)); // je 3 zusammen
+    place('schwelle', Math.round(18 * cm));
+    place('greifer', Math.round(10 * cm));
+    place('flieger', Math.round(6 * cm));
+    L.frenzy = false; smokes.length = 0; L.towerRestore();
     for (let i = 0; i < Math.max(3, Math.round(8 * L.md.count)); i++) { const [x, z] = farSpot(400); spawnWalker(x, z); }
     for (let i = 0; i < S.npcCount; i++) {
       const [x, z] = farSpot(80);
@@ -1747,6 +1939,9 @@
     if (!isClient()) updateHeli(dt);
     updateEscapes(dt);
     updateFx(dt);
+    updateSmoke(dt);
+    L.updateFusion(dt);
+    L.updateTower(dt);
     // Musik je nach Lage
     let danger = 0;
     for (const m of E.monsters) {

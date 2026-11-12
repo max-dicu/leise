@@ -87,12 +87,19 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
   // MAMA IVA erscheint
   L.cineBossAppear = function (b) {
     const a0 = Math.atan2(P.x - b.x, P.z - b.z), berg = b.how === 'berg';
-    const peak = groundY(b.x, b.z);
-    L.startCine(berg ? 'MAMA IVA ERSCHEINT' : 'MAMA IVA BRICHT AUS DEM BODEN', 7, (t) => {
+    const peak = groundY(b.x, b.z), FT = L.FUSION_T || 0;
+    L.startCine('DIE MONSTER VERSCHMELZEN …', FT + 6.5, (t0) => {
       const B = L.boss; if (!B) return null;
+      if (t0 < FT) {
+        // Fusion von schräg unten
+        const a = a0 + 0.3 + t0 * 0.08, d = 125 - t0 * 6, x = B.x + Math.sin(a) * d, z = B.z + Math.cos(a) * d;
+        if (t0 > FT - 0.6) L.$('cineT').textContent = 'MAMA IVA';
+        return { x, y: Math.max(groundY(x, z) + 30, peak + 45), z, lx: B.x, ly: peak + 30, lz: B.z };
+      }
+      const t = t0 - FT;
       const a = a0 + 0.45 - t * 0.06, d = (berg ? 105 : 95) - t * 4;
       const x = B.x + Math.sin(a) * d, z = B.z + Math.cos(a) * d;
-      const y = Math.max(groundY(x, z) + 16, berg ? peak + 28 : 16 + t * 1.5);
+      const y = Math.max(groundY(x, z) + 16, berg ? peak + 28 : 34 + t * 1.5);
       return { x, y, z, lx: B.x, ly: groundY(B.x, B.z) + (B.rootY || 0) + 40, lz: B.z };
     });
   };
@@ -107,7 +114,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       const B = L.boss, c = B && B.capy; if (!c) return null;
       const mx = (c.x + B.x) / 2, mz = (c.z + B.z) / 2, a = side + 0.25 - t * 0.035, d = 125 - t * 2.5;
       const x = mx + Math.sin(a) * d, z = mz + Math.cos(a) * d;
-      const y = Math.max(groundY(x, z) + 14, groundY(mx, mz) + 24 - Math.max(0, t - 9) * 2);
+      const y = Math.max(groundY(x, z) + 14, groundY(mx, mz) + 34 - Math.max(0, t - 9) * 2);
       const ly = groundY(mx, mz) + (t < 9.5 ? 34 : 34 - (t - 9.5) * 5);
       return { x, y, z, lx: mx, ly, lz: mz };
     });
