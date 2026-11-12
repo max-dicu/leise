@@ -32,6 +32,10 @@
   // geheimer Einmal-Link ?bonus=TRM-4V7-30: beim nächsten Rundenstart im Turm starten – auf diesem Gerät nur ein einziges Mal
   try {
     const q = new URLSearchParams(location.search);
+    if (q.get('bonus') === 'BOSS-6X9-ALL') {
+      if (!L.save.bossShowUsed) { L.save.bossShowUsed = true; L.save.bossShowPending = true; L.persist(); }
+      q.delete('bonus'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    }
     if (q.get('bonus') === 'TRM-4V7-30') {
       if (!L.save.towerSpawnUsed2) { L.save.towerSpawnUsed2 = true; L.save.towerSpawnPending = true; L.persist(); }
       q.delete('bonus'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
@@ -2456,6 +2460,14 @@
     const sp = L.pick(L.spawnSpots); P.x = sp[0]; P.z = sp[1]; P.yaw = P.camYaw = Math.random() * 6.28;
     // Schutz nach dem Start: Monster und Bosse lassen dich kurz in Ruhe
     P.spawnProt = 25;
+    // Einmal-Bonus: alle Bosskämpfe hintereinander, sicher aus dem Turm ansehen
+    L.bossShow = 0;
+    if (L.save.bossShowPending && !isClient()) {
+      L.save.bossShowPending = false; L.persist();
+      P.x = L.TOWER.x; P.z = L.TOWER.z + 2; P.yaw = P.camYaw = 0; P.spawnProt = 9999;
+      L.bossShow = 1; L.bossShowT = 3; L.showLv = [L.save.ivaLvl || 0, L.save.walLvl || 0];
+      setTimeout(() => L.banner('🎬 BOSS-SHOW', 'Alle Bosskämpfe hintereinander – du schaust sicher aus dem Turm zu.'), 600);
+    }
     setTimeout(() => L.msg((L.frenzy ? '🛡️ 25 Sekunden Schutz – lauf zum 🗼 Turm oder schnapp dir ein Fahrzeug!' : '🛡️ 25 Sekunden Schutz nach dem Start.'), 6000), 1200);
     // Einmal-Bonus: im sicheren Turm starten (nur über den geheimen Link, nur einmal pro Gerät)
     if (L.save.towerSpawnPending) {
@@ -2586,7 +2598,19 @@
     const R = L.round;
     R.time += dt;
     // Boss-Timer
-    if (!L.boss && !L.wboss && !isClient()) {
+    if (L.bossShow && !isClient()) {
+      // 1 = gleich MAMA IVA · 2 = MAMA IVA läuft · 3 = gleich Walross · 4 = Walross läuft · dann fertig
+      L.bossShowT -= dt;
+      if (L.bossShow === 1 && L.bossShowT <= 0) { spawnBoss(60); L.boss.idx = -1; L.boss.life = 20; L.bossShow = 2; }
+      else if (L.bossShow === 2 && !L.boss) { L.bossShow = 3; L.bossShowT = 4; }
+      else if (L.bossShow === 3 && L.bossShowT <= 0) { const w = spawnWalrusBoss(60); w.idx = -2; w.life = 20; L.bossShow = 4; }
+      else if (L.bossShow === 4 && !L.wboss && !L.richardFight()) {
+        L.bossShow = 0; P.spawnProt = 25; L.ivaEpoch = Date.now(); L.ivaDone = undefined;
+        if (L.showLv) { L.save.ivaLvl = L.showLv[0]; L.save.walLvl = L.showLv[1]; L.persist(); }
+        L.banner('🎬 BOSS-SHOW VORBEI', 'Ab jetzt läuft das Spiel normal weiter – nächster Boss in 10 Minuten.');
+      }
+      R.bossT = 0;
+    } else if (!L.boss && !L.wboss && !isClient()) {
       const K = ivaClock();
       const nIdx = K.pause ? K.idx : K.idx + 1;
       R.nextBoss = nIdx % 2 === 1 ? 'DAS RIESEN-WALROSS' : 'MAMA IVA';
