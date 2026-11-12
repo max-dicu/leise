@@ -601,7 +601,13 @@
     { const d = document.createElement('div'); d.className = 'opt'; d.innerHTML = '<label>⭐ Exklusive Skins</label>';
       const ch = document.createElement('div'); ch.className = 'choices';
       for (const [k, nm] of L.SKINS) { if (k === 'waechter' && !L.waechterToken()) continue; const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
-      d.appendChild(ch); box.appendChild(d); }
+      d.appendChild(ch); box.appendChild(d);
+      // Geheimcode für exklusive Skins
+      const cd = document.createElement('div'); cd.className = 'opt'; cd.innerHTML = '<label>🔑 Geheimcode</label>';
+      const ci = document.createElement('input'); ci.type = 'text'; ci.maxLength = 20; ci.placeholder = 'Code eingeben';
+      const cb = document.createElement('button'); cb.textContent = 'Freischalten';
+      cb.onclick = () => { const k = ci.value.trim().toUpperCase(); if (L.hash53(L.hash53(k)) === 'ofaw0xb94x') { L.save.skinKey = k; charApp.special = 'waechter'; charApp.wk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); } else { ci.value = ''; ci.placeholder = '❌ falscher Code'; } };
+      cd.appendChild(ci); cd.appendChild(cb); box.appendChild(cd); }
     for (const key in L.CHAR_OPTS) {
       const d = document.createElement('div'); d.className = 'opt';
       d.innerHTML = `<label>${CHAR_LABELS[key] || key}</label>`;
