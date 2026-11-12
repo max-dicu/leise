@@ -89,7 +89,6 @@
 
   // ---------- Inventar ----------
   let invSel = null;
-  const HOTNAMES = { hammer: 'Hammer', waffe: 'Waffe', granate: 'Granate', essen: 'Essen', trinken: 'Trinken' };
   function slotEl(it, opts) {
     const d = document.createElement('div');
     d.className = 'slot' + (it ? '' : ' empty') + (opts && opts.sel ? ' sel' : '') + (opts && opts.on ? ' on' : '');
@@ -105,11 +104,19 @@
   function renderInv() {
     const hot = $('invHot'), bag = $('invBag'), safe = $('invSafe');
     hot.innerHTML = ''; bag.innerHTML = ''; safe.innerHTML = '';
-    L.HOT.forEach((s, i) => {
-      const it = s === 'hammer' ? { type: 'hammer', count: 1 } : P.hot[s];
-      hot.appendChild(slotEl(it, { key: i + 1, label: HOTNAMES[s], sel: invSel && invSel.where === 'hot' && invSel.key === s, onclick: () => { if (s !== 'hammer' && it) { invSel = { where: 'hot', key: s }; renderInv(); } } }));
-    });
-    P.bag.forEach((it, i) => bag.appendChild(slotEl(it, { sel: invSel && invSel.where === 'bag' && invSel.key === i, onclick: () => { if (it) { invSel = { where: 'bag', key: i }; renderInv(); } } })));
+    // Klick auf Gegenstand = auswählen, danach Klick auf einen anderen Platz = dorthin legen (tauschen / stapeln)
+    const clickSlot = (where, i) => {
+      const arr = where === 'hot' ? P.hot : P.bag, it = arr[i];
+      if (invSel && invSel.where !== 'safe' && !(invSel.where === where && invSel.key === i)) {
+        const from = invSel.where === 'hot' ? P.hot : P.bag, a = from[invSel.key], d = L.ITEMS[a.type];
+        if (it && it.type === a.type && d.stack && it.count < d.stack) { const k = Math.min(d.stack - it.count, a.count); it.count += k; a.count -= k; if (a.count <= 0) from[invSel.key] = null; }
+        else { from[invSel.key] = it || null; arr[i] = a; }
+        invSel = null; L.snd.key(); renderInv(); return;
+      }
+      invSel = it && !(invSel && invSel.where === where && invSel.key === i) ? { where, key: i } : null; renderInv();
+    };
+    P.hot.forEach((it, i) => hot.appendChild(slotEl(it, { key: i + 1, label: ' ', sel: invSel && invSel.where === 'hot' && invSel.key === i, onclick: () => clickSlot('hot', i) })));
+    P.bag.forEach((it, i) => bag.appendChild(slotEl(it, { label: ' ', sel: invSel && invSel.where === 'bag' && invSel.key === i, onclick: () => clickSlot('bag', i) })));
     safe.appendChild(slotEl(P.safe, { label: 'Tresor', sel: invSel && invSel.where === 'safe', onclick: () => { if (P.safe) { invSel = { where: 'safe' }; renderInv(); } } }));
     renderInvActions();
   }
@@ -127,13 +134,13 @@
   function renderInvActions() {
     const box = $('invActions'); box.innerHTML = '';
     const it = getSel();
-    if (!it) { box.innerHTML = '<span class="small">Klick auf einen Gegenstand. Essen, Trinken, Waffen und Granaten werden beim Aufheben automatisch ausgerüstet, wenn der Platz frei ist.</span>'; return; }
+    if (!it) { box.innerHTML = '<span class="small">Klick auf einen Gegenstand und dann auf einen anderen Platz, um ihn dorthin zu legen. In die Schnellleiste (1–5) passt alles. Neue Sachen landen im Rucksack.</span>'; return; }
     const d = L.ITEMS[it.type];
     const btn = (label, fn) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.onclick = () => { fn(); renderInv(); }; box.appendChild(b); };
     const info = document.createElement('span'); info.className = 'small';
     info.textContent = d.icon + ' ' + d.name + (d.slot === 'waffe' ? ` · Magazin ${it.mag}/${d.mag} · ${L.countBag(d.ammo)} Schuss im Rucksack` : '') + (d.food ? ` · +${d.food} Hunger` : '') + (d.water ? ` · +${d.water} Durst` : '') + (d.heal ? ` · +${d.heal} Leben` : '');
     box.appendChild(info);
-    if (invSel.where === 'bag' && ['waffe', 'granate', 'essen', 'trinken'].includes(d.slot)) btn('Ausrüsten', () => { const old = P.hot[d.slot]; P.hot[d.slot] = it; P.bag[invSel.key] = old || null; invSel = null; });
+    if (invSel.where === 'safe' || invSel.where === 'bag') btn('In die Schnellleiste', () => { const i = P.hot.findIndex((x) => !x); if (i < 0) { L.msg('Schnellleiste voll – klick auf einen Platz dort, um zu tauschen.'); return; } P.hot[i] = it; setSel(null); if (invSel.where === 'safe') { L.save.safe = null; L.persist(); } invSel = null; });
     if (d.food || d.water || d.heal) btn('Benutzen', () => { L.useConsumable(it); if (it.count <= 0) { setSel(null); invSel = null; } });
     if (invSel.where === 'hot') btn('In den Rucksack', () => { const i = P.bag.findIndex((x) => !x); if (i < 0) { L.msg('🎒 Rucksack voll!'); return; } P.bag[i] = it; setSel(null); invSel = null; });
     if (invSel.where !== 'safe') btn('🔒 In den Tresor', () => { const old = P.safe; P.safe = it; setSel(old || null); invSel = null; L.save.safe = Object.assign({}, P.safe); L.persist(); L.msg('🔒 ' + d.name + ' ist jetzt sicher – auch wenn du stirbst.'); });
@@ -240,16 +247,12 @@
     $('noiseTxt').textContent = nz < 1 ? 'lautlos – niemand hört dich' : nz < 10 ? 'leise – nur ganz nah hörbar' : nz < 30 ? 'hörbar' : nz < 80 ? 'LAUT!' : 'SEHR LAUT!!';
     // Ausrüstungsleiste
     const hb = $('hotbar'); hb.innerHTML = '';
-    L.HOT.forEach((s, i) => {
-      const it = s === 'hammer' ? { type: 'hammer', count: 1 } : P.hot[s];
-      hb.appendChild(slotEl(it, { key: i + 1, sel: P.sel === i, label: HOTNAMES[s], name: false }));
-    });
-    const w = P.hot.waffe;
-    if (L.HOT[P.sel] === 'waffe' && w) {
-      const d = L.ITEMS[w.type];
-      $('ammo').innerHTML = `${P.reloadT >= 0 ? 'lädt …' : w.mag + ' / ' + L.countBag(d.ammo)}<small>${d.name}</small>`;
-    } else if (L.HOT[P.sel] === 'granate' && P.hot.granate) $('ammo').innerHTML = `💣 ${P.hot.granate.count}<small>Granaten</small>`;
-    else $('ammo').innerHTML = '';
+    P.hot.forEach((it, i) => hb.appendChild(slotEl(it, { key: i + 1, sel: P.sel === i, label: ' ', name: false })));
+    const w = P.sel >= 0 ? P.hot[P.sel] : null, wd = w && L.ITEMS[w.type];
+    if (wd && wd.slot === 'waffe') $('ammo').innerHTML = `${P.reloadT >= 0 ? 'lädt …' : w.mag + ' / ' + L.countBag(wd.ammo)}<small>${wd.name}</small>`;
+    else if (wd && w.count > 1) $('ammo').innerHTML = `${wd.icon} ${w.count}<small>${wd.name}</small>`;
+    else if (wd) $('ammo').innerHTML = `<small>${wd.name}</small>`;
+    else $('ammo').innerHTML = '<small>✋ Hand leer</small>';
     // Fahrzeug
     const v = P.vehicle;
     $('vehHud').hidden = !v;

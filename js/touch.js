@@ -22,7 +22,7 @@
       <button data-k="ShiftLeft" data-toggle="1" id="tRun" title="Rennen">🏃</button><button data-k="KeyC" title="Schleichen">🧎</button>
       <button data-k="KeyX" title="Kriechen">🐛</button><button data-k="KeyR" title="Nachladen">🔄</button>
       <button data-k="KeyG" title="Granate werfen">💣</button><button data-k="KeyQ" title="Verband">🩹</button>
-      <button data-k="KeyL" title="Taschenlampe">🔦</button><button data-wheel="1" title="Nächste Ausrüstung">⏭️</button><button data-act="zoom" title="Kamera: Ego-Sicht / nah / weit">🎥</button>
+      <button data-k="KeyL" title="Taschenlampe">🔦</button><button data-wheel="1" title="Nächster Platz (nach dem 5. = Hand leer)">⏭️</button><button data-act="zoom" title="Kamera: Ego-Sicht / nah / weit">🎥</button>
     </div>
     <div id="tAct">
       <button id="tFire" class="big" data-mouse="left" title="Benutzen / Angreifen">🔨</button>
@@ -52,7 +52,7 @@
     if (act === 'chat') { fireKey('Enter', 'Enter'); return null; }
     if (act === 'pause') { if (L.ui.pause) L.ui.pause(); return null; }
     if (act === 'zoom') { L.cycleZoom(); return null; }
-    if (b.dataset.wheel) { P.sel = (P.sel + 1) % 5; return null; }
+    if (b.dataset.wheel) { P.sel = P.sel >= 4 ? -1 : P.sel + 1; return null; }
     if (k === 'Tab' || k === 'KeyM') { fireKey(k); return null; }
     if (b.dataset.toggle) {
       if (k) { L.keys[k] = !L.keys[k]; b.classList.toggle('on', !!L.keys[k]); }
@@ -93,7 +93,7 @@
     const kids = hb.children;
     for (let i = 0; i < kids.length; i++) {
       const r = kids[i].getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) { P.sel = i; return true; }
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) { L.selectSlot(i); return true; }
     }
     return false;
   }
@@ -152,7 +152,7 @@
     $('tCar').hidden = !inV; $('tAct').hidden = inV; $('tFoot').hidden = inV;
     $('tBelt').hidden = !inV || P.vehicle.t.kind !== 'car';
     $('tChat').hidden = !(L.net && L.net.connected);
-    const sel = L.HOT[P.sel], it = sel === 'hammer' ? 'hammer' : (P.hot && P.hot[sel] && P.hot[sel].type);
+    const it = L.selType ? L.selType() : null;
     $('tFire').textContent = it ? L.ITEMS[it].icon : '✋';
     $('tAim').hidden = !(it && L.ITEMS[it].slot === 'waffe');
     if ($('tAim').hidden && L.mouse.right) { L.mouse.right = false; $('tAim').classList.remove('on'); }

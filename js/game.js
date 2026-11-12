@@ -28,7 +28,15 @@
     artefakt: { name: 'Alien-Artefakt', slot: 'bag', icon: '🔮', stack: 3 }
   };
   const ITEMS = L.ITEMS;
-  L.HOT = ['hammer', 'waffe', 'granate', 'essen', 'trinken'];
+  // Schnellleiste: 5 freie Plätze, jeder Gegenstand passt überall hin. P.sel = -1 heißt: nichts in der Hand
+  L.HOT_N = 5;
+  L.selectSlot = function (i) { P.sel = P.sel === i ? -1 : i; };
+  // findet in Schnellleiste und Rucksack den ersten passenden Gegenstand
+  function findItem(fn) {
+    for (let i = 0; i < P.hot.length; i++) if (P.hot[i] && fn(P.hot[i])) return { arr: P.hot, i };
+    for (let i = 0; i < P.bag.length; i++) if (P.bag[i] && fn(P.bag[i])) return { arr: P.bag, i };
+    return null;
+  }
   const MDIFF = { leicht: { hear: 0.7, speed: 0.85, count: 0.6, dmg: 0.7 }, normal: { hear: 1, speed: 1, count: 1, dmg: 1 }, schwer: { hear: 1.25, speed: 1.12, count: 1.35, dmg: 1.25 }, albtraum: { hear: 1.5, speed: 1.25, count: 1.8, dmg: 1.6 } };
   const NDIFF = { leicht: { acc: 0.45, dmg: 0.6 }, normal: { acc: 0.75, dmg: 0.85 }, schwer: { acc: 1, dmg: 1 }, albtraum: { acc: 1.25, dmg: 1.3 } };
   L.md = MDIFF.normal; L.nd = NDIFF.normal;
@@ -246,26 +254,17 @@
   L.giveItem = function (type, count, mag) {
     const d = ITEMS[type]; count = count || 1;
     if (!d) return count;
-    if (['waffe', 'granate', 'essen', 'trinken'].includes(d.slot)) {
-      const h = P.hot[d.slot];
-      if (!h) {
-        if (d.slot === 'waffe') { P.hot.waffe = { type, count: 1, mag: mag !== undefined ? mag : Math.floor(d.mag * 0.6) }; count--; }
-        else { const add = Math.min(d.stack || 1, count); P.hot[d.slot] = { type, count: add }; count -= add; }
-        if (count <= 0) return 0;
-      } else if (h.type === type && d.stack) {
-        const add = Math.min(d.stack - h.count, count); h.count += add; count -= add;
-        if (count <= 0) return 0;
-      }
-    }
-    if (d.stack) for (const it of P.bag) if (it && it.type === type && it.count < d.stack) {
+    // erst auf gleiche Stapel (Schnellleiste und Rucksack), sonst in einen freien Rucksack-Platz
+    if (d.stack) for (const it of P.hot.concat(P.bag)) if (it && it.type === type && it.count < d.stack) {
       const add = Math.min(d.stack - it.count, count); it.count += add; count -= add;
       if (count <= 0) return 0;
     }
     while (count > 0) {
-      const i = P.bag.findIndex((x) => !x);
+      let arr = P.bag, i = P.bag.findIndex((x) => !x);
+      if (i < 0) { arr = P.hot; i = P.hot.findIndex((x) => !x); }
       if (i < 0) return count;
       const add = d.stack ? Math.min(d.stack, count) : 1;
-      P.bag[i] = { type, count: add, mag: d.slot === 'waffe' ? (mag !== undefined ? mag : Math.floor(d.mag * 0.6)) : undefined };
+      arr[i] = { type, count: add, mag: d.slot === 'waffe' ? (mag !== undefined ? mag : Math.floor(d.mag * 0.6)) : undefined };
       count -= add;
     }
     return 0;
@@ -281,8 +280,8 @@
   }
   L.allPlayerItems = function () {
     const out = [];
-    for (const s of ['waffe', 'granate', 'essen', 'trinken']) if (P.hot[s]) out.push(Object.assign({}, P.hot[s]));
-    for (const it of P.bag) if (it) out.push(Object.assign({}, it));
+    for (const it of P.hot) if (it && it.type !== 'hammer') out.push(Object.assign({}, it));
+    for (const it of P.bag) if (it && it.type !== 'hammer') out.push(Object.assign({}, it));
     return out;
   };
   L.useConsumable = function (it) {
@@ -357,7 +356,7 @@
   function resetPlayer() {
     Object.assign(P, {
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, camYaw: 0, camPitch: 0.25, hp: 100, food: 100, water: 100, stam: 100,
-      stance: 'stand', mode: 'idle', alive: true, vehicle: null, belted: false, sel: 0, hot: {}, bag: new Array(15).fill(null),
+      stance: 'stand', mode: 'idle', alive: true, vehicle: null, belted: false, sel: 0, hot: [{ type: 'hammer', count: 1 }, null, null, null, null], bag: new Array(15).fill(null),
       safe: L.save.safe ? Object.assign({}, L.save.safe) : null, fireCd: 0, swing: -1, throwT: -1, eatT: -1, reloadT: -1,
       phase: 0, stepAcc: 0, noiseShow: 0, knockT: 0, air: false, tumble: 0, hurtFlash: 0, exhausted: false, flash: false,
       aiming: false, kills: 0, deathT: 0, cause: '', beltWarnT: 0, camDist: 4, freeLookT: 0, starve: 0, gone: false, seat: 0, animSt: { mode: 'walk' }
@@ -366,11 +365,9 @@
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
     L.scene.add(P.rig.root);
   }
-  function selType() {
-    const s = L.HOT[P.sel];
-    if (s === 'hammer') return 'hammer';
-    return P.hot[s] ? P.hot[s].type : null;
-  }
+  function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
+  function selType() { const it = selItem(); return it ? it.type : null; }
+  L.selType = selType;
   const SPEED = { crawl: 1.1, crouch: 2.1, walk: 4.0, run: 7.3, idle: 0 };
   const STEP = { crawl: [0.5, 0, 0.015], crouch: [0.6, 0, 0.03], walk: [0.75, 7, 0.1], run: [1.1, 24, 0.22] };
   function updatePlayer(dt) {
@@ -399,7 +396,7 @@
     if (!block) {
       if (L.hit('KeyC')) P.stance = P.stance === 'crouch' ? 'stand' : 'crouch';
       if (L.hit('KeyX')) P.stance = P.stance === 'crawl' ? 'crouch' : 'crawl';
-      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
     const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
@@ -489,7 +486,7 @@
     if (L.hit('KeyQ')) useHealing();
     if (L.hit('KeyG')) throwGrenade();
     if (L.hit('KeyR')) reload();
-    if (!st) { if (L.mouse.click) L.msg('Dieser Platz ist leer.'); return; }
+    if (!st) return; // leere Hand
     const d = ITEMS[st];
     if (st === 'hammer') { if (L.mouse.click && P.swing < 0) { P.swing = 0; P.hammerHit = false; L.snd.swing(); } return; }
     if (d.slot === 'waffe') {
@@ -498,8 +495,9 @@
       return;
     }
     if (d.slot === 'granate') { if (L.mouse.click) throwGrenade(); return; }
+    if (d.heal) { if (L.mouse.click) useHealing(selItem()); return; }
     if (d.slot === 'essen' || d.slot === 'trinken') {
-      if (L.mouse.click && P.eatT < 0) { P.eatT = 0; P.eatType = st; P.eatSlot = d.slot; }
+      if (L.mouse.click && P.eatT < 0) { P.eatT = 0; P.eatType = st; P.eatSlot = P.sel; }
     }
   }
   function updateActions(dt) {
@@ -513,7 +511,7 @@
       P.eatT += dt;
       if (P.eatT > 1.3) {
         const h = P.hot[P.eatSlot];
-        if (h) { L.useConsumable(h); if (h.count <= 0) P.hot[P.eatSlot] = null; }
+        if (h && h.type === P.eatType) { L.useConsumable(h); if (h.count <= 0) P.hot[P.eatSlot] = null; }
         P.eatT = -1;
       }
     }
@@ -521,21 +519,27 @@
       P.reloadT += dt;
       if (P.reloadT > 1.4) {
         P.reloadT = -1;
-        const w = P.hot.waffe;
+        const w = P.reloadW;
         if (w) { const d = ITEMS[w.type], need = d.mag - w.mag, have = L.countBag(d.ammo), n = Math.min(need, have); takeBag(d.ammo, n); w.mag += n; }
       }
     }
   }
-  function useHealing() {
-    const idx = P.bag.findIndex((it) => it && (it.type === 'medkit' || it.type === 'verband') && (P.hp < 60 || it.type === 'verband'));
-    const i2 = idx >= 0 ? idx : P.bag.findIndex((it) => it && (it.type === 'verband' || it.type === 'medkit'));
-    if (i2 < 0) { L.msg('Kein Verband oder Medikit im Rucksack.'); return; }
+  function useHealing(it) {
     if (P.hp >= 100) { L.msg('Du bist nicht verletzt.'); return; }
-    L.useConsumable(P.bag[i2]); if (P.bag[i2].count <= 0) P.bag[i2] = null;
+    let f = null;
+    if (it) f = { arr: P.hot, i: P.hot.indexOf(it) };
+    else f = findItem((x) => x.type === 'verband' && P.hp >= 60) || findItem((x) => x.type === 'medkit' || x.type === 'verband');
+    if (!f || f.i < 0) { L.msg('Kein Verband oder Medikit dabei.'); return; }
+    L.useConsumable(f.arr[f.i]); if (f.arr[f.i].count <= 0) f.arr[f.i] = null;
     L.msg('🩹 Verarztet');
   }
+  // die Waffe in der Hand – sonst die erste Waffe in der Schnellleiste
+  function curWeapon() {
+    const it = selItem(); if (it && ITEMS[it.type].slot === 'waffe') return it;
+    return P.hot.find((x) => x && ITEMS[x.type].slot === 'waffe') || null;
+  }
   function reload() {
-    const w = P.hot.waffe;
+    const w = curWeapon(); P.reloadW = w;
     if (!w || P.reloadT >= 0) return;
     const d = ITEMS[w.type];
     if (w.mag >= d.mag) return;
@@ -557,7 +561,7 @@
     if (hit) { L.snd.hammerHit({ x: P.x, y: 1, z: P.z }); L.makeNoise(P.x, P.z, 12, P); }
   }
   function fire() {
-    const w = P.hot.waffe, d = ITEMS[w.type];
+    const w = selItem(), d = ITEMS[w.type];
     if (w.mag <= 0) { L.snd.empty(); P.fireCd = 0.3; if (L.countBag(d.ammo) > 0) reload(); else L.msg('Keine Munition!'); return; }
     w.mag--; P.fireCd = d.rate;
     const cam = L.camera, o = cam.position, dir = V1;
@@ -581,10 +585,11 @@
     P.camPitch -= d.pellets ? 0.05 : 0.012; L.shake = Math.max(L.shake, d.pellets ? 0.25 : 0.06);
   }
   function throwGrenade() {
-    const g = P.hot.granate;
-    if (!g || g.count <= 0) { L.msg('Keine Granate ausgerüstet.'); return; }
+    const f = findItem((x) => x.type === 'granate');
+    if (!f) { L.msg('Keine Granate dabei.'); return; }
     if (P.throwT >= 0) return;
-    g.count--; if (g.count <= 0) P.hot.granate = null;
+    const g = f.arr[f.i];
+    g.count--; if (g.count <= 0) f.arr[f.i] = null;
     P.throwT = 0;
     const dir = V1; L.camera.getWorldDirection(dir);
     const m = L.buildItem('granate'); m.scale.setScalar(1.4);
@@ -823,7 +828,7 @@
         L.msg('🚗 Du sitzt jetzt am Steuer'); L.snd.key();
         return;
       }
-      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     P.x = v.x; P.z = v.z; P.y = 0;
     const rpm = Math.abs(v.speed) / (t.vmax / 3.6);
@@ -848,7 +853,7 @@
       if (L.hit('KeyF')) { leaveVehicle(false); return; }
       if (L.hit('KeyB') && t.kind === 'car') { P.belted = !P.belted; L.snd.belt(P.belted); L.msg(P.belted ? '✅ Angeschnallt' : '⚠️ Gurt gelöst'); }
       if (L.hit('KeyH')) { L.snd.hupe({ x: v.x, y: 1, z: v.z }); L.makeNoise(v.x, v.z, 150, P); }
-      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
+      for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
     if (!P.vehicle) return;
