@@ -282,10 +282,13 @@
     }
     // Bildrauschen (Der Gesichtslose)
     const sf = $('staticFx'), sa = L.staticAmt || 0;
-    sf.style.opacity = sa > 0.02 ? Math.min(0.85, sa).toFixed(2) : '0';
+    // nur leicht: etwas Flimmern, blassere Farben, dunkler Rand – man sieht immer noch genug, um zu fliehen
+    sf.style.opacity = sa > 0.02 ? Math.min(0.2, sa * 0.22).toFixed(3) : '0';
+    const cvs = L.renderer && L.renderer.domElement, fl = sa > 0.02 ? 'saturate(' + (1 - sa * 0.45).toFixed(2) + ') contrast(' + (1 + sa * 0.12).toFixed(2) + ')' : '';
+    if (cvs && cvs.style.filter !== fl) cvs.style.filter = fl;
     if (sa > 0.02) {
       const g = sf.getContext('2d'), img = g.createImageData(160, 90), d = img.data;
-      for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255, x = (i / 4) % 160 / 160 - 0.5, y = Math.floor(i / 640) / 90 - 0.5, edge = Math.min(1, (x * x + y * y) * 2.6); d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = Math.random() < 0.5 ? 0 : 90 + edge * 165; }
       g.putImageData(img, 0, 0);
     }
     const vig = $('dmgVig');

@@ -17,7 +17,7 @@
   if (!L.save.cust || typeof L.save.cust !== 'object') L.save.cust = {};
   const coinHud = document.createElement('div'); coinHud.id = 'coinHud'; coinHud.hidden = true; document.body.appendChild(coinHud);
   const st = document.createElement('style');
-  st.textContent = '#coinHud{position:fixed;right:10px;top:46px;background:rgba(0,0,0,.55);color:#ffd84a;font-weight:800;padding:4px 10px;border-radius:8px;z-index:6;pointer-events:none;font-size:15px;text-shadow:0 0 3px #000}'
+  st.textContent = '#coinHud{position:fixed;left:12px;top:124px;background:rgba(0,0,0,.55);color:#ffd84a;font-weight:800;padding:4px 10px;border-radius:8px;z-index:6;pointer-events:none;font-size:15px;text-shadow:0 0 3px #000}'
     + '#coinHud small{color:#fff;font-weight:600;opacity:.85}'
     + '#wsPanel{position:fixed;right:8px;top:8px;bottom:8px;width:min(470px,96vw);overflow:auto;background:rgba(14,16,22,.93);border:2px solid #39ff14;border-radius:12px;z-index:30;color:#fff;padding:10px 12px;font-family:inherit}'
     + '#wsPanel h2{margin:0 0 4px;font-size:20px}#wsPanel .coins{color:#ffd84a;font-weight:800}'
