@@ -426,6 +426,7 @@
     if (P.aiming && P.mode === 'walk') spd = 2.6;
     const weed = weeds.length && L.inWeed(P.x, P.z);
     if (weed) spd *= 0.6;
+    if (P.swim) { spd = Math.min(spd, 2.3); P.stance = 'stand'; }
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
     let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn;
     const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
@@ -435,16 +436,37 @@
     } else if (!P.air) { P.vx *= 1 - Math.min(1, dt * 5); P.vz *= 1 - Math.min(1, dt * 5); }
     P.knockT -= dt;
     if (sprint) P.stam = Math.max(0, P.stam - 16 * dt); else P.stam = Math.min(100, P.stam + (P.stance === 'stand' ? 11 : 15) * dt);
-    if (!block && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2; P.air = true; P.stam -= 8; P.stance = 'stand'; }
-    // Schwerkraft
-    if (P.air || P.y > 0) {
+    // Schwimmen kostet Kraft – ohne Kraft ertrinkt man
+    if (P.swim) {
+      P.stam = Math.max(0, P.stam - 18 * dt);
+      if (P.stam <= 0) {
+        P.hp -= 12 * dt; P.hurtFlash = Math.min(1, P.hurtFlash + dt);
+        if (!(P.drownT > 0)) { P.drownT = 3; L.msg('🌊 Keine Kraft mehr – du ertrinkst! Zurück an Land!', 2500); L.nz({ dur: 0.6, f: 500, type: 'bandpass', vol: 0.3 }); }
+        if (P.hp <= 0) { P.hp = 0; killPlayer('Ertrunken'); return; }
+      }
+      P.drownT = (P.drownT || 0) - dt;
+    }
+    // weit draußen zieht eine starke Strömung zurück zur Küste
+    if (Math.max(Math.abs(P.x), Math.abs(P.z)) > L.FAR - 150) {
+      const a = Math.atan2(-P.x, -P.z); P.x += Math.sin(a) * 4 * dt; P.z += Math.cos(a) * 4 * dt;
+      if (!(P.curT > 0)) { P.curT = 6; L.msg('🌊 Die Strömung ist zu stark – sie drückt dich zurück zur Küste.', 3000); }
+    }
+    P.curT = (P.curT || 0) - dt;
+    if (!block && !P.swim && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2; P.air = true; P.stam -= 8; P.stance = 'stand'; }
+    // Schwerkraft – Boden: an Land 0, am Strand der Sand, im tiefen Wasser schwimmt man oben
+    const sf = L.seaFloor(P.x, P.z), depth = L.WATER_Y - sf;
+    P.swim = depth > 1.35;
+    const gY = P.swim ? L.WATER_Y - 1.25 : sf;
+    if (!P.air && Math.abs(P.y - gY) < 0.8) P.y = gY;
+    if (P.air || P.y > gY) {
       P.vy -= 20 * dt; P.y += P.vy * dt;
-      if (P.y <= 0) {
-        const hs = Math.hypot(P.vx, P.vz), impact = -P.vy;
-        P.y = 0; P.vy = 0; P.air = false;
-        L.snd.land({ x: P.x, y: 0, z: P.z });
+      if (P.y <= gY) {
+        const hs = Math.hypot(P.vx, P.vz), impact = depth > 0.8 ? 0 : -P.vy;
+        P.y = gY; P.vy = 0; P.air = false;
+        if (depth > 0.3) L.nz({ dur: 0.5, f: 800, type: 'bandpass', vol: 0.3 }); else L.snd.land({ x: P.x, y: 0, z: P.z });
         L.makeNoise(P.x, P.z, P.tumble > 0 ? 20 : 9, P);
-        if (P.tumble > 0) {
+        if (P.tumble > 0 && depth > 0.8) { P.knockT = 0.5; P.tumble = 0; P.ejected = false; }
+        else if (P.tumble > 0) {
           const dmg = Math.max(0, (hs - 5) * 1.6) + Math.max(0, (impact - 8) * 2);
           if (dmg > 0) L.hurtPlayer(dmg, P.ejected ? 'Durch die Windschutzscheibe geflogen' : 'Hart aufgeschlagen');
           P.knockT = 0.9; P.tumble = 0; P.ejected = false;
@@ -463,7 +485,7 @@
         if (dd < min && dd > 0.001) { P.x = c[0] + (P.x - c[0]) / dd * min; P.z = c[1] + (P.z - c[1]) / dd * min; }
       }
     }
-    L.clampWorld(P);
+    L.clampWorld(P, true);
     // Richtung der Figur
     const hsp = Math.hypot(P.vx, P.vz);
     if (P.aiming || P.swing >= 0 || P.throwT >= 0) P.yaw += L.angDiff(P.yaw, P.camYaw) * Math.min(1, dt * 15);
@@ -474,7 +496,8 @@
       const st = STEP[P.mode];
       if (P.stepAcc > st[0]) {
         P.stepAcc = 0;
-        L.snd.step({ x: P.x, y: 0, z: P.z }, st[2], L.onRoad(P.x, P.z));
+        if (L.waterDepth(P.x, P.z) > 0.15) L.nz({ dur: 0.25, f: 900 + Math.random() * 300, type: 'bandpass', vol: 0.1 + st[2] });
+        else L.snd.step({ x: P.x, y: 0, z: P.z }, st[2], L.onRoad(P.x, P.z));
         L.makeNoise(P.x, P.z, st[1] * (weed ? 2 : 1) + (weed ? 4 : 0), P);
         if (weed) L.nz({ dur: 0.25, f: 2200, type: 'bandpass', vol: 0.15 });
       }
@@ -899,6 +922,7 @@
     if (v.hp <= 0 && Math.abs(v.speed) < 0.5 && !v.deadMsg) { v.deadMsg = true; L.msg('🔥 Das Fahrzeug ist kaputt. Steig aus!'); }
   }
   function driveVehicle(v, dt, thr, str, hb, isPlayer) {
+    const ox = v.x, oz = v.z;
     const t = v.t, onR = L.onRoad(v.x, v.z) || (v.alt || 0) > 0.5, vmax = t.vmax / 3.6 * (onR ? 1 : t.off) * (v.hp > 0 ? 1 : 0);
     if (v.hp <= 0) thr = 0;
     if (thr > 0) { if (v.speed < -0.5) v.speed += 16 * dt; else if (v.speed < vmax) v.speed = Math.min(vmax, v.speed + t.acc * dt * (1 - Math.max(0, v.speed) / (vmax * 1.15 + 0.01))); }
@@ -983,13 +1007,18 @@
       else { L.damageEnt(e, sp * 7, v.x, v.z, isPlayer ? P : null); v.speed *= 0.85; L.snd.splat({ x: e.x, y: 1, z: e.z }); }
       e.x += fx * 3; e.z += fz * 3;
     }
-    L.clampWorld(v);
+    L.clampWorld(v, true);
+    if (!t.fly && L.waterDepth(v.x, v.z) > 0.9) {
+      v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0;
+      if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('🌊 Zu tief für das Fahrzeug – nur der fliegende JOYOR T10 kommt übers Meer.', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
+    }
+    v.waterMsgT = (v.waterMsgT || 0) - dt;
     // Optik
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
     v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
-    v.rig.root.position.set(v.x, alt, v.z);
+    v.rig.root.position.set(v.x, alt > 0 ? alt : Math.max(L.WATER_Y + 0.5, L.seaFloor(v.x, v.z)), v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     if (alt > 0.5 && v.vy) v.rig.root.rotateX(-L.clamp(v.vy / 40, -0.3, 0.3));
@@ -2017,7 +2046,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls();
+    clearCyls(); if (L.clearNature) L.clearNature();
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
     for (const n of E.npcs) L.scene.remove(n.rig.root);
@@ -2113,7 +2142,7 @@
     place('schwelle', Math.round(18 * cm));
     place('greifer', Math.round(10 * cm));
     place('flieger', Math.round(6 * cm));
-    L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.round.cylT = L.rand(60, 90);
+    L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.clearNature(); L.round.cylT = L.rand(60, 90);
     for (let i = 0; i < Math.max(6, Math.round(20 * L.md.count)); i++) {
       const [x, z] = farSpot(400); spawnWalker(x, z);
       // um jeden Stelzer kriechen Marsianer herum
@@ -2160,7 +2189,7 @@
       I.gate.gate.position.x = (1 - R.gateT / 30) * 15;
       if (R.gateT <= 0) { R.gate = 'open'; I.gate.gbox.on = false; L.gateOpen = true; L.banner('SCHRANKE OFFEN', 'Raus aus der Sperrzone – nach Norden!'); }
     }
-    if (R.gate === 'open' && P.alive && P.z < -1500) L.endRound('escape', 'Autobahnsperre');
+    if (R.gate === 'open' && P.alive && P.z < -1500 && Math.abs(P.x) < 30) L.endRound('escape', 'Autobahnsperre');
   }
 
   // ---------- Hauptupdate ----------
@@ -2194,6 +2223,7 @@
     updateFx(dt);
     updateSmoke(dt);
     updateCyls(dt);
+    L.updateNature(dt);
     L.updateFusion(dt);
     L.updateTower(dt);
     // Musik je nach Lage

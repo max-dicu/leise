@@ -317,6 +317,7 @@
         break;
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
       case 'tower': if (!host) { if (m.down) L.towerDestroy(); else L.towerRestore(); } break;
+      case 'tsu': if (!host) L.startTsunami(m.side, false); break;
       case 'cyl': if (!host) L.cylinderFall(m.x, m.z, false); break;
       case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;
       case 'towerWarn': if (!host) L.msg('⚠️ MAMA IVA hat jemanden im Turm gehört! Sie kommt, um ihn einzureißen …', 7000); break;
@@ -416,7 +417,7 @@
   function sendRound() {
     const R = L.round; if (!R || !mp.anyInRound()) return;
     const H = L.heli;
-    mp.send({ t: 'rs', bossT: Math.round(R.bossT), radio: R.radio, radioT: r1(R.radioT || 0), gate: R.gate, gateT: r1(R.gateT || 0), bunker: !!R.bunkerOpen, found: R.found, heli: H ? [r1(H.x), r1(H.y), r1(H.z), H.state, r1(H.t)] : null, time: r2(L.env.time), weather: L.env.weather });
+    mp.send({ t: 'rs', bossT: Math.round(R.bossT), radio: R.radio, radioT: r1(R.radioT || 0), gate: R.gate, gateT: r1(R.gateT || 0), bunker: !!R.bunkerOpen, found: R.found, heli: H ? [r1(H.x), r1(H.y), r1(H.z), H.state, r1(H.t)] : null, time: r2(L.env.time), weather: L.env.weather, tor: L.natureState() });
   }
 
   // ---------- Runde starten (Host schickt allen die ganze Welt) ----------
@@ -523,6 +524,7 @@
     if (N.role !== 'client' || !L.round || L.round.over || L.state !== 'game') return;
     const R = L.round, I = L.interact;
     if (R.bossT > 30 && m.bossT <= 30 && !L.boss) L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.');
+    L.applyNature(m.tor);
     R.bossT = m.bossT;
     if (m.radio === 'calling' && R.radio === 'idle') L.banner('HUBSCHRAUBER GERUFEN', 'Überlebt 90 Sekunden!');
     R.radio = m.radio; R.radioT = m.radioT;

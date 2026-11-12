@@ -174,6 +174,8 @@
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
     if (L.TOWER) { const big = L.boss && !L.boss.dead, [x, y] = toM(L.clamp(L.TOWER.x, P.x - 200, P.x + 200), L.clamp(L.TOWER.z, P.z - 200, P.z + 200)); g.font = (big ? 22 + Math.sin(performance.now() / 200) * 4 : 14) + 'px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
+    for (const t of L.tornados || []) { const [x, y] = toM(L.clamp(t.x, P.x - 200, P.x + 200), L.clamp(t.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('🌪️', x, y); }
+    drawTsu(g, toM);
     for (const fr of L.remotes.values()) {
       if (!fr.inRound || fr.gone) continue;
       const [fx, fy] = toM(L.clamp(fr.x, P.x - 200, P.x + 200), L.clamp(fr.z, P.z - 200, P.z + 200));
@@ -182,6 +184,13 @@
     arrow(g, S / 2, S / 2, P.vehicle ? P.vehicle.yaw : P.camYaw, 9, '#ffe080');
     g.restore();
     g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.fillText('N', S / 2, 9);
+  }
+  // Tsunami-Front als blaue Linie
+  function drawTsu(g, toM) {
+    const S = L.tsunamiInfo && L.tsunamiInfo(); if (!S || S.frontNow === undefined) return;
+    const f = S.frontNow, a = S.side === 0 ? [[-f, -3000], [-f, 3000]] : S.side === 1 ? [[f, -3000], [f, 3000]] : [[-3000, f], [3000, f]];
+    const p1 = toM(a[0][0], a[0][1]), p2 = toM(a[1][0], a[1][1]);
+    g.save(); g.strokeStyle = 'rgba(60,160,255,0.9)'; g.lineWidth = 4; g.setLineDash([8, 6]); g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke(); g.restore();
   }
   function drawBigMap() {
     const c = $('bigmap'), g = c.getContext('2d'), S = c.width, k = S / (L.HALF * 2);
@@ -196,6 +205,8 @@
     g.fillStyle = '#ccc';
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.boss.x, L.boss.z); g.font = '26px sans-serif'; g.fillText('👹', x, y); }
+    for (const t of L.tornados || []) { const [x, y] = toM(t.x, t.z); g.font = '26px sans-serif'; g.fillText('🌪️', x, y); }
+    drawTsu(g, toM);
     if (L.TOWER) { const [x, y] = toM(L.TOWER.x, L.TOWER.z); g.font = '28px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); g.font = 'bold 13px sans-serif'; g.fillStyle = L.towerSafe() ? '#7cf' : '#f66'; g.fillText(L.towerSafe() ? 'SICHERER TURM' : 'TURM ZERSTÖRT', x, y + 22); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '20px sans-serif'; g.fillText('🚁', x, y); }
     for (const fr of L.remotes.values()) {

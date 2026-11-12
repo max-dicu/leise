@@ -41,3 +41,6 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 - **Zylinder vom Mars** stürzen alle paar Minuten glühend vom Himmel. Nach dem Abkühlen schraubt sich der Deckel auf und Marsianer kriechen heraus.
 - **Rotes Kraut** wächst um die Absturzstellen: darin bist du langsamer und es raschelt laut.
 - Manche **Stelzer** werfen Kanister mit **schwarzem Rauch** statt mit dem Hitzestrahl zu schießen.
+- **Meer statt Kartenrand:** Im Westen, Osten und Süden geht es über einen Strand ins Meer mit Wellen. Man kann schwimmen (kostet Kraft – ohne Kraft ertrinkt man). Autos kommen nicht ins tiefe Wasser, der fliegende JOYOR T10 schon. Im Norden bleibt die Sperrzone.
+- **Tornados** ziehen über die Karte (bei Gewitter öfter), ziehen dich an und reißen dich hoch.
+- **Tsunamis** rollen nach einer Warnung vom Meer aufs Land. Rette dich ins Landesinnere, in den Turm oder hoch hinaus.

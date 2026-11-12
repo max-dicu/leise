@@ -102,11 +102,28 @@
     return true;
   };
   L.gateOpen = false;
-  L.clampWorld = function (o) {
+  // Hinter Westen, Osten und Süden geht es über einen Strand ins Meer. Im Norden bleibt die Sperrzone.
+  L.FAR = 2400; L.WATER_Y = -0.6;
+  L.seaFloor = function (x, z) {
+    const o = Math.max(Math.abs(x), z) - HALF;
+    return o <= 0 ? 0 : -Math.min(9, o * 0.06);
+  };
+  L.waterDepth = (x, z) => L.WATER_Y - L.seaFloor(x, z);
+  L.clampWorld = function (o, far) {
     const lim = HALF - 3;
-    o.x = L.clamp(o.x, -lim, lim);
-    if (L.gateOpen && Math.abs(o.x) < 7) o.z = L.clamp(o.z, -HALF - 30, lim);
-    else o.z = L.clamp(o.z, -lim, lim);
+    if (far) {
+      o.x = L.clamp(o.x, -L.FAR, L.FAR); o.z = L.clamp(o.z, -L.FAR, L.FAR);
+      if (o.z < -lim && !(L.gateOpen && Math.abs(o.x) < 7)) {
+        // nördlich vom Zaun ist Sperrgebiet: vom Land aus der Zaun, vom Meer aus die Küste
+        if (Math.abs(o.x) <= HALF) { if (Math.abs(o.x) > HALF - 40) o.x = Math.sign(o.x) * (HALF + 0.5); else o.z = -lim; }
+      }
+      if (L.gateOpen && Math.abs(o.x) < 7) o.z = Math.max(o.z, -HALF - 30);
+      return;
+    }
+    const sea = HALF + 12;
+    o.x = L.clamp(o.x, -sea, sea);
+    if (L.gateOpen && Math.abs(o.x) < 7) o.z = L.clamp(o.z, -HALF - 30, sea);
+    else o.z = L.clamp(o.z, Math.abs(o.x) > HALF ? -sea : -lim, sea);
   };
 
   // ---------- Straßen ----------
@@ -605,7 +622,6 @@
   function perimeter() {
     const e = HALF - 1.5;
     fenceLine(-HALF, -e, -8, -e); fenceLine(8, -e, HALF, -e);
-    fenceLine(-HALF, e, HALF, e); fenceLine(-e, -HALF, -e, HALF); fenceLine(e, -HALF, e, HALF);
   }
   function wreck(x, z, ry) {
     ry = ry === undefined ? (R() < 0.5 ? 0 : Math.PI / 2) + rr(-0.15, 0.15) : ry;
@@ -719,6 +735,47 @@
     if (x > lk.x1 - 25 && x < lk.x2 + 25 && z > lk.z1 - 25 && z < lk.z2 + 25) mix(0.72, 0.66, 0.46, 1);
     out.r = r; out.g = g; out.b = b;
     return out;
+  };
+  function buildSea() {
+    const S2 = L.FAR + 300, seg = 280, geo = new T.PlaneGeometry(S2 * 2, S2 * 2, seg, seg);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i), h = Math.min(-0.06, L.seaFloor(x, z));
+      pos.setY(i, h);
+      const k = L.clamp(-h / 9, 0, 1);
+      const north = z < -HALF && Math.abs(x) <= HALF + 40;
+      if (north) { cols[i * 3] = 0.42; cols[i * 3 + 1] = 0.5; cols[i * 3 + 2] = 0.3; }
+      else { cols[i * 3] = L.lerp(0.86, 0.35, k); cols[i * 3 + 1] = L.lerp(0.78, 0.36, k); cols[i * 3 + 2] = L.lerp(0.56, 0.3, k); }
+    }
+    geo.setAttribute('color', new T.BufferAttribute(cols, 3));
+    geo.computeVertexNormals();
+    const bed = new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true }));
+    bed.receiveShadow = true; L.scene.add(bed);
+    // Wasser: folgt der Kamera, Wellen laufen auf den Strand zu
+    const N = 70, W = 1500, wg = new T.PlaneGeometry(W, W, N, N); wg.rotateX(-Math.PI / 2);
+    const wm = new T.Mesh(wg, new T.MeshPhongMaterial({ color: 0x2a6a8a, transparent: true, opacity: 0.86, shininess: 60, specular: 0x6688aa, flatShading: true }));
+    wm.frustumCulled = false; L.scene.add(wm);
+    const base = Float32Array.from(wg.attributes.position.array);
+    // weiße Schaumkronen-Linie am Strand
+    L.ocean = { mesh: wm, geo: wg, base, W };
+  }
+  L.waveH = function (x, z, t) {
+    return Math.sin(x * 0.035 + t * 1.3) * 0.22 + Math.sin(z * 0.03 - t * 1.1) * 0.22 + Math.sin((x + z) * 0.08 + t * 2.2) * 0.1;
+  };
+  L.updateOcean = function (cam, t) {
+    const O = L.ocean; if (!O) return;
+    const near = Math.max(Math.abs(cam.position.x), Math.abs(cam.position.z)) > HALF - 1000;
+    O.mesh.visible = near;
+    if (!near) return;
+    const cx = Math.round(cam.position.x / 20) * 20, cz = Math.round(cam.position.z / 20) * 20;
+    O.mesh.position.set(cx, L.WATER_Y, cz);
+    const p = O.geo.attributes.position, b = O.base;
+    for (let i = 0; i < p.count; i++) {
+      const x = b[i * 3] + cx, z = b[i * 3 + 2] + cz;
+      p.array[i * 3 + 1] = (L.seaFloor(x, z) < L.WATER_Y + 0.4 ? L.waveH(x, z, t) : -3);
+    }
+    p.needsUpdate = true;
   };
   function buildGround() {
     const seg = 200, geo = new T.PlaneGeometry(HALF * 2, HALF * 2, seg, seg);
@@ -843,7 +900,7 @@
 
   L.buildWorld = function (scene) {
     L.scene = scene;
-    buildGround(); buildRoads();
+    buildGround(); buildSea(); buildRoads();
     buildCity(); buildVillage(); buildFarm(); buildMilitary();
     buildGas(700, -35, true, 'tanke1'); buildGas(-35, 800, false, 'tanke2');
     buildBunker(); buildRadio(); buildCrater(); buildCamping(); buildWindpark(); buildSperre(); buildMountains();
@@ -913,7 +970,7 @@
     const r = Math.random();
     L.setWeather(r < 0.35 ? 'klar' : r < 0.6 ? 'wolkig' : r < 0.8 ? 'regen' : r < 0.9 ? 'nebel' : 'gewitter');
   };
-  const cSky = new T.Color(), cTmp = new T.Color(), cNight = new T.Color(0.015, 0.02, 0.05), cDay = new T.Color(0.52, 0.68, 0.86), cDusk = new T.Color(0.85, 0.5, 0.32), cGrey = new T.Color(0.46, 0.48, 0.52);
+  const cSky = new T.Color(), cTmp = new T.Color(), cNight = new T.Color(0.05, 0.065, 0.12), cDay = new T.Color(0.52, 0.68, 0.86), cDusk = new T.Color(0.85, 0.5, 0.32), cGrey = new T.Color(0.46, 0.48, 0.52);
   L.updateEnv = function (dt, cam, focus, paused) {
     const E = L.env, S = L.S();
     if (!paused) {
@@ -938,16 +995,16 @@
     if (E.bolt > 0) cSky.lerp(cTmp.setRGB(0.8, 0.82, 0.95), E.bolt * 0.7);
     L.scene.background.copy(cSky);
     L.scene.fog.color.copy(cSky);
-    const far = S.view * (1 - E.fog * 0.82) * (1 - E.rain * 0.25) * (0.55 + day * 0.45);
+    const far = S.view * (1 - E.fog * 0.82) * (1 - E.rain * 0.25) * (0.75 + day * 0.25);
     L.scene.fog.far = Math.max(60, far); L.scene.fog.near = Math.max(10, far * 0.15);
     // Licht
     const sd = new T.Vector3(Math.cos(a) * 0.8, el, 0.35).normalize();
     const nightAmt = 1 - day;
     E.sun.position.set(focus.x + (el > 0 ? sd.x : -sd.x) * 200, (el > 0 ? Math.max(sd.y, 0.15) : Math.max(-sd.y, 0.3)) * 200, focus.z + sd.z * 200);
     E.sun.target.position.set(focus.x, 0, focus.z);
-    E.sun.intensity = day * 1.05 * (1 - E.cloud * 0.6) + nightAmt * 0.21;
+    E.sun.intensity = day * 1.05 * (1 - E.cloud * 0.6) + nightAmt * 0.32;
     E.sun.color.setRGB(1, 0.92 + day * 0.05 - dusk * 0.2, 0.85 - dusk * 0.35).lerp(cTmp.setRGB(0.6, 0.7, 1), nightAmt);
-    E.hemi.intensity = 0.145 + day * 0.455 * (1 - E.cloud * 0.3) + E.bolt * 1.6;
+    E.hemi.intensity = 0.3 + day * 0.3 * (1 - E.cloud * 0.3) + E.bolt * 1.6;
     E.hemi.color.copy(cSky).lerp(cTmp.setRGB(1, 1, 1), 0.4);
     E.stars.position.copy(cam.position);
     E.stars.material.opacity = nightAmt * (1 - E.cloud * 0.9);
@@ -959,6 +1016,7 @@
     if (L.lampMat) L.lampMat.color.setRGB(0.4 + nightAmt * 0.6, 0.38 + nightAmt * 0.5, 0.3 + nightAmt * 0.3);
     E.glow.intensity = 0.6 + nightAmt * 1.6;
     E.campfire.intensity = (0.5 + nightAmt * 1.5) * (0.85 + Math.random() * 0.3);
+    L.updateOcean(cam, performance.now() / 1000);
     // Regen
     E.rainMesh.visible = E.rain > 0.02;
     if (E.rainMesh.visible) {
