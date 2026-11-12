@@ -20,20 +20,51 @@
   const bar = document.createElement('div'); bar.id = 'revBar'; bar.hidden = true; bar.innerHTML = '<i></i>'; document.body.appendChild(bar);
   let specIdx = 0, lastHtml = '';
   function nextSpec() { const f = aliveFriends(); if (!f.length) return; specIdx = (specIdx + 1) % f.length; L.spectate = f[specIdx]; }
-  box.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') nextSpec(); });
+  let giveUp = false, unlocked = false;
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.self) selfRevive(b.dataset.self);
+    else if (b.dataset.give) giveUp = true;
+    else nextSpec();
+  });
+  // Heilzeug, mit dem man sich selbst wiederbeleben kann (schwächstes zuerst)
+  function selfItems() { const have = healItems(); return ORDER.filter((t) => have[t]).map((t) => [t, have[t]]); }
+  function selfRevive(type) {
+    if (P.alive || !takeOne(type)) return;
+    const hp = REV[type];
+    P.alive = true; P.hp = hp; P.deathT = 0; P.spawnProt = Math.max(P.spawnProt || 0, 5); P.stance = 'crouch'; P.vx = P.vz = 0;
+    L.spectate = null; box.hidden = true; lastHtml = ''; giveUp = false; unlocked = false;
+    if (L.music && L.music.set) L.music.set('calm');
+    L.msg('💚 Du hast dich selbst verarztet! ' + L.ITEMS[type].icon + ' ' + L.ITEMS[type].name + ': ' + hp + ' Leben – 5 Sekunden Schutz, verschwinde!', 6000);
+    if (L.snd.heal) L.snd.heal();
+    if (L.state === 'game' && L.lock && !L.uiBlock) L.lock();
+  }
+  L.selfRevive = selfRevive;
+  const esc = (x) => String(x).replace(/[<>&"]/g, '');
 
-  // vom Tod-Zweig in updatePlayer aufgerufen: true = liegen bleiben und zuschauen, false = Runde für mich vorbei
+  // vom Tod-Zweig in updatePlayer aufgerufen: true = liegen bleiben (zuschauen / selbst wiederbeleben), false = Runde für mich vorbei
   L.updateDown = function (dt) {
-    if (!online()) { box.hidden = true; return false; }
-    const f = aliveFriends();
-    if (!f.length) { box.hidden = true; L.spectate = null; return false; }
-    if (P.deathT < 2.5) return true; // erst kurz die eigene Leiche sehen
-    if (!L.spectate || !f.includes(L.spectate)) { specIdx = Math.min(specIdx, f.length - 1); L.spectate = f[specIdx]; }
-    if (!L.uiBlock && (L.hit('Space') || L.hit('ArrowRight') || L.hit('KeyE') || L.mouse.click)) nextSpec();
+    const f = online() ? aliveFriends() : [], own = selfItems();
+    if (giveUp || (!f.length && !own.length)) { box.hidden = true; L.spectate = null; giveUp = false; unlocked = false; return false; }
+    if (P.deathT < 2) return true; // erst kurz die eigene Leiche sehen
+    if (f.length) { if (!L.spectate || !f.includes(L.spectate)) { specIdx = Math.min(specIdx, f.length - 1); L.spectate = f[specIdx]; } }
+    else { L.spectate = null; if (!unlocked && L.unlock) { L.unlock(); unlocked = true; } }
+    if (!L.uiBlock) {
+      if (f.length && (L.hit('Space') || L.hit('ArrowRight') || L.mouse.click)) nextSpec();
+      if (own.length && L.hit('KeyE')) { selfRevive(own[own.length - 1][0]); return true; }
+      if (own.length && L.hit('KeyQ')) { selfRevive(own[0][0]); return true; }
+      if (L.hit('Enter') || L.hit('NumpadEnter')) { giveUp = true; return true; }
+    }
     // umschauen mit der Maus
     const sens = 0.0022 * L.S().sens;
     P.camYaw -= L.mouse.dx * sens; P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.2, 1.1);
-    const html = `💀 <b>Du bist gefallen.</b> Ein Freund kann dich wiederbeleben:<br>🧻 Bandage / 🩹 Verband = halbes Leben · 🧰 Medkit = volles Leben<br>👀 Du schaust <b style="color:#7dff7d">${String(L.spectate.name).replace(/[<>&"]/g, '')}</b> zu (${f.length} lebt noch)<br><button>Nächster Freund (Leertaste)</button>`;
+    let html = '💀 <b>Du bist gefallen.</b>';
+    if (own.length) {
+      html += '<br>Verarzte dich selbst: ' + own.map(([t, n]) => '<button data-self="' + t + '">' + L.ITEMS[t].icon + ' ' + L.ITEMS[t].name + ' ×' + n + ' → ' + (REV[t] >= 100 ? 'volles Leben' : REV[t] + ' Leben') + '</button>').join(' ');
+      html += '<br><small>E = stärkstes (' + L.ITEMS[own[own.length - 1][0]].name + ') · Q = schwächstes (' + L.ITEMS[own[0][0]].name + ')</small>';
+    }
+    if (f.length) html += '<br>Oder ein Freund belebt dich wieder. 👀 Du schaust <b style="color:#7dff7d">' + esc(L.spectate.name) + '</b> zu (' + f.length + ' lebt noch) <button>Nächster (Leertaste)</button>';
+    html += '<br><button data-give="1">Aufgeben (Enter)</button>';
     if (html !== lastHtml) { box.innerHTML = html; lastHtml = html; }
     box.hidden = false;
     return true;
