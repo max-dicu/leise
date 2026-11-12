@@ -553,7 +553,7 @@
     if (L.boss) L.scene.remove(L.boss.rig.root);
     const rig = L.buildKoloss(); L.scene.add(rig.root);
     const how = m.how || 'boden', start = how === 'berg' ? -50 : -62;
-    const b = { kind: 'boss', key: 'boss', rig, x: m.x, z: m.z, nx: m.x, nz: m.z, yaw: m.yaw, nyaw: m.yaw, hy: 30, hp: 8000, t: 0, dead: false, deadT: 0, roarT: 3, beamOn: false, aimX: 0, aimZ: 0, stompT: 0, how, rootY: start, life: 0, lvl: m.lvl || 0 };
+    const b = { kind: 'boss', key: 'boss', rig, x: m.x, z: m.z, nx: m.x, nz: m.z, yaw: m.yaw, nyaw: m.yaw, hy: 30, hp: 8000, t: 0, dead: false, deadT: 0, roarT: 3, beamOn: false, aimX: 0, aimZ: 0, stompT: 0, how, rootY: m.instant ? 0 : start, life: 0, lvl: m.lvl || 0, instant: !!m.instant };
     G().initGait(b, rig);
     rig.root.position.y = start;
     L.boss = b;

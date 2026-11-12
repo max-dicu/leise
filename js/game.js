@@ -29,11 +29,11 @@
   };
   const ITEMS = L.ITEMS;
   // Schnellleiste: 5 freie Plätze, jeder Gegenstand passt überall hin. P.sel = -1 heißt: nichts in der Hand
-  // geheimer Einmal-Link ?bonus=TRM-8K2-1X: beim nächsten Rundenstart im Turm starten – auf diesem Gerät nur ein einziges Mal
+  // geheimer Einmal-Link ?bonus=TRM-4V7-30: beim nächsten Rundenstart im Turm starten – auf diesem Gerät nur ein einziges Mal
   try {
     const q = new URLSearchParams(location.search);
-    if (q.get('bonus') === 'TRM-8K2-1X') {
-      if (!L.save.towerSpawnUsed) { L.save.towerSpawnUsed = true; L.save.towerSpawnPending = true; L.persist(); }
+    if (q.get('bonus') === 'TRM-4V7-30') {
+      if (!L.save.towerSpawnUsed2) { L.save.towerSpawnUsed2 = true; L.save.towerSpawnPending = true; L.persist(); }
       q.delete('bonus'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
     }
   } catch (e) { /* egal */ }
@@ -1730,10 +1730,11 @@
     L.save.ivaLvl = lvl + 1; L.persist();
     b.lvl = lvl; b.spdMul = 1 + lvl * 0.15; b.dmgMul = 1 + lvl * 0.25; b.hp *= 1 + lvl * 0.3;
     initGait(b, rig);
+    if (L.ivaInstant) { L.ivaInstant = false; b.instant = true; b.emerge = b.emergeDur; b.rootY = 0; b.leaving = false; b.life = 30; }
     rig.root.position.y = b.rootY;
     L.boss = b;
     L.frenzy = true;
-    if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how, lvl: b.lvl });
+    if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how, lvl: b.lvl, instant: !!b.instant });
     L.bossAppear(b);
   }
   // ---------- GIGA-CAPY gegen MAMA IVA: Aufstieg, Brüllen, ein Kampf (jedes Mal anders), dann zieht es sie in die Tiefe ----------
@@ -1964,8 +1965,9 @@
 
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {
-    // erst verschmelzen alle Monster zu MAMA IVA, dann steigt sie auf
     L.towerRestore();
+    if (b.instant) { L.banner("MAMA IVA IST DA", "Nur noch 30 Sekunden – bleib leise im Turm!"); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); return; }
+    // erst verschmelzen alle Monster zu MAMA IVA, dann steigt sie auf
     L.fusionStart(b.x, b.z);
     if (b.how === "boden") {
       L.decal(b.x, b.z, 30, "#1a120c");
@@ -2271,7 +2273,9 @@
     if (L.save.towerSpawnPending) {
       L.save.towerSpawnPending = false; L.persist();
       P.x = L.TOWER.x; P.z = L.TOWER.z + 2; P.yaw = P.camYaw = 0;
-      setTimeout(() => L.msg('🗼 Bonus: Du startest einmalig sicher im Turm!', 7000), 500);
+      // MAMA IVA ist schon da – aber nur noch 30 Sekunden
+      const C0 = L.S().bossMin * 60; L.ivaEpoch = Date.now() - (2 * C0 - 31) * 1000; L.ivaDone = undefined; L.ivaInstant = true;
+      setTimeout(() => L.msg('🗼 Bonus: Du startest einmalig sicher im Turm – MAMA IVA ist nur noch 30 Sekunden da!', 7000), 500);
     }
     L.round = {
       over: false, time: 0, code: [0, 1, 2, 3].map(() => L.randi(0, 9)), found: [false, false, false, false],
