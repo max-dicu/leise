@@ -1089,7 +1089,7 @@
     langer: { build: () => L.buildLanger(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 5.5, 9.5], hp: 140, r: 0.4, reach: 3.4, grab: 2.8, atk: 0.9, wind: 0.45, dmg: 40, veh: 35, knock: 11, up: 5, view: 300,
       cause: 'Der Gesichtslose hat dich geholt', voice: (p) => L.snd.langer(p), idle: (p) => L.snd.langerIdle(p), hit: [[1.4, 0.3, 1], [2.3, 0.3, 1], [3.1, 0.2, 2]] },
     rufer: { build: () => L.buildRufer(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 4.5, 8], hp: 650, r: 1.1, reach: 6.5, grab: 5.5, atk: 1.5, wind: 0.6, dmg: 60, veh: 70, knock: 18, up: 8, heavy: true, view: 480,
-      cause: 'Der Rufer hat dich zertreten', voice: (p) => L.snd.rufer(p), idle: (p) => { L.snd.ruferStep(p); if (Math.random() < 0.4) L.snd.ruferIdle(p); }, hit: [[3.5, 0.9, 1], [6, 1, 1], [9, 1.1, 2]] },
+      cause: 'Der Rufer hat dich zertreten', voice: (p) => L.snd.ruferStep(p), idle: (p) => L.snd.ruferStep(p), hit: [[3.5, 0.9, 1], [6, 1, 1], [9, 1.1, 2]] },
     blockling: { build: () => L.buildBlockling(), anim: (r, s) => L.animBeast(r, s), spd: [2.2, 7, 10.5], hp: 55, r: 0.4, reach: 2.2, grab: 2, atk: 0.6, wind: 0.3, dmg: 25, veh: 25, knock: 8, up: 4, view: 220,
       cause: 'Ein Blockling hat dich erwischt', voice: (p) => L.snd.blockling(p), idle: (p) => L.snd.blocklingIdle(p), hit: [[0.9, 0.3, 1], [1.6, 0.3, 2]] },
     schwelle: { build: () => L.buildSchwelle(), anim: (r, s) => L.animBeast(r, s), spd: [1.4, 6, 12.5], hp: 90, r: 0.5, reach: 2.6, grab: 2.4, atk: 0.7, wind: 0.35, dmg: 40, veh: 35, knock: 10, up: 4.5, hear: 0.6, view: 240,
@@ -1142,7 +1142,6 @@
   // Der Rufer ruft alle Monster in der Nähe zu dir
   function ruferCall(m) {
     m.callCd = 25; m.sirenT = 10;
-    L.snd.rufer({ x: m.x, y: 9, z: m.z });
     for (const o of E.monsters) if (o !== m && !o.dead && o.state !== 'chase' && o.state !== 'attack' && L.dist(o.x, o.z, m.x, m.z) < 260) {
       o.state = 'investigate'; o.tx = m.tx + L.rand(-10, 10); o.tz = m.tz + L.rand(-10, 10); o.timer = 20;
     }
@@ -1237,7 +1236,7 @@
     // Der Rufer heult immer wieder seine Sirene – weit über die Karte zu hören
     if (m.kind === 'rufer') {
       m.sirenT = (m.sirenT === undefined ? L.rand(5, 25) : m.sirenT) - dt;
-      if (m.sirenT <= 0) { m.sirenT = m.state === 'chase' ? L.rand(8, 12) : L.rand(25, 45); if (dP < 700) D.voice({ x: m.x, y: 9, z: m.z }); }
+      if (m.sirenT <= 0) m.sirenT = 30; // keine Sirene mehr
     }
     // Der Gesichtslose springt beim Jagen ein Stück nach vorne (mit Rauschen)
     if (m.kind === 'langer' && m.state === 'chase' && !(m.alertT > 0)) {
