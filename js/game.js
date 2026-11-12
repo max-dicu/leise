@@ -427,6 +427,8 @@
       P.deathT += dt;
       P.animSt = { mode: 'dead' };
       L.animHuman(P.rig, P.animSt);
+      // Mehrspieler: liegen bleiben, Freunden zuschauen und auf Wiederbelebung warten – bis alle tot sind
+      if (!L.round.over && L.updateDown && L.updateDown(dt)) return;
       if (P.deathT > 3.5 && !L.round.over) L.endRound('death', P.cause);
       return;
     }
@@ -754,6 +756,7 @@
     if (it) return it.note !== undefined ? 'E: Zettel lesen' : `E: ${ITEMS[it.type].name}${it.count > 1 ? ' ×' + it.count : ''} aufheben`;
     const ch = L.cruiseHint && L.cruiseHint(); if (ch) return ch;
     const wh = L.wsHint && L.wsHint(); if (wh) return wh;
+    const rh = L.reviveHint && L.reviveHint(); if (rh) return rh;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) return 'E: ' + L.containerName(cont) + ' öffnen';
     const v = nearestVehicle();
@@ -787,6 +790,7 @@
       if (left > 0) { it.count = left; L.msg('🎒 Rucksack voll – Rest liegt noch da.'); } else removeItem(it);
       return;
     }
+    if (L.reviveInteract && L.reviveInteract()) return;
     if (L.cruiseInteract && L.cruiseInteract()) return;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) { L.openContainer(cont); return; }
@@ -2556,7 +2560,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2815,6 +2819,7 @@
     L.updateInteriors(dt);
     L.updateExtras(dt);
     if (L.updateWorkshop) L.updateWorkshop(dt);
+    if (L.updateRevive) L.updateRevive(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);

@@ -343,6 +343,7 @@
         L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);
         addChat('System', m.result === 'escape' ? nameOf(from) + ' ist entkommen' : nameOf(from) + ' ist gestorben', true);
         renderLobby(); break;
+      case 'revive': if (L.gotRevive) L.gotRevive(m.hp, m.it, nameOf(from)); break;
       case 'coins': if (L.gotCoins) L.gotCoins(m.n, nameOf(from)); break;
       case 'vcust': { const v = L.byId.get('v' + m.id); if (v && L.applyCustom) L.applyCustom(v, m.c, false); if (host) forward(from, m); break; }
       case 'gift': {

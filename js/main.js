@@ -172,7 +172,11 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       fp = P.alive && P.zoom < 0.5;
       dist = fp ? 0 : P.aiming ? Math.min(2.1, P.zoom) : P.zoom;
       if (fp) piv.y += 0.12;
-      if (!P.alive) { dist = 6 + Math.min(4, P.deathT * 2); py = 1.0; }
+      if (!P.alive) {
+        const S2 = L.spectate;
+        if (S2) { piv.set(S2.x, (S2.y || 0) + 1.6, S2.z); dist = 6.5 * L.clamp(P.zoom / 4, 0.6, 2.5); py = P.camPitch; }
+        else { dist = 6 + Math.min(4, P.deathT * 2); py = 1.0; }
+      }
     }
     // drinnen: Kamera näher dran und unter der Decke
     if (L.indoor && !v) dist = Math.min(dist, 2.4);
