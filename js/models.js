@@ -298,7 +298,13 @@
     if (sp === 'waechter' && !force && !L.waechterOk(app)) return L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter') {
       const r = L.buildHuman(Object.assign({}, L.GUARD_APP, { name: app.name }));
-      const cape = new T.Mesh(G().box, L.mat('#5a0a14')); cape.scale.set(0.62, 1.25, 0.05); cape.position.set(0, -0.68, -0.17); r.torso.add(cape); r.cape = cape;
+      // kompletter Umhang: hängt an den Schultern und reicht bis zu den Knöcheln
+      const cape = grp(r.torso, 0, 0.6, -0.2), cc = '#5a0a14', ci = '#3a0610';
+      part(G().box, cc, 0.6, 0.75, 0.03, 0, -0.375, 0, cape); part(G().box, ci, 0.58, 0.73, 0.01, 0, -0.375, 0.02, cape, { noShadow: true });
+      part(G().box, cc, 0.72, 0.72, 0.03, 0, -1.1, -0.01, cape); part(G().box, ci, 0.7, 0.7, 0.01, 0, -1.1, 0.01, cape, { noShadow: true });
+      for (let k = -2; k <= 2; k++) part(G().box, '#4a0812', 0.025, 1.4, 0.035, k * 0.13, -0.75, -0.012, cape, { noShadow: true });
+      for (const s2 of [-1, 1]) { part(G().box, cc, 0.16, 0.06, 0.3, s2 * 0.25, 0.01, 0.12, cape); part(G().sph, '#ffd040', 0.04, 0.04, 0.02, s2 * 0.2, -0.02, 0.27, cape, { noShadow: true }); }
+      r.torso.add(cape); r.cape = cape;
       const em = new T.Mesh(new T.CircleGeometry(0.1, 16), new T.MeshBasicMaterial({ color: 0xffd040 })); em.position.set(0, 0.45, 0.14); r.torso.add(em);
       r.app = Object.assign({}, r.app, { special: 'waechter' }); return r;
     }
@@ -642,6 +648,7 @@
     const legs = r.legs, arms = r.arms, ph = s.phase || 0, sp = s.speed || 0;
     r.body.rotation.set(0, 0, 0); r.body.position.set(0, 0, 0);
     const HY = (r.hipY || 0.95) - 0.95;
+    if (r.cape) r.cape.rotation.x = 0.06 + (s.mode === 'run' ? 0.55 : s.mode === 'walk' ? 0.18 : 0.1) * Math.min(1, sp + 0.05) + Math.sin(ph * 2) * 0.04 * sp;
     r.hips.position.y = 0.95 + HY; r.torso.rotation.set(0, 0, 0); r.neck.rotation.set(0, 0, 0);
     for (const l of legs) { l.leg.rotation.set(0, 0, 0); l.knee.rotation.set(0, 0, 0); }
     for (const a of arms) { a.arm.rotation.set(0, 0, 0); a.elbow.rotation.set(0, 0, 0); }
