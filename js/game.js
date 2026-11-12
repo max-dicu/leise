@@ -29,6 +29,14 @@
   };
   const ITEMS = L.ITEMS;
   // Schnellleiste: 5 freie Plätze, jeder Gegenstand passt überall hin. P.sel = -1 heißt: nichts in der Hand
+  // geheimer Einmal-Link ?bonus=TRM-8K2-1X: beim nächsten Rundenstart im Turm starten – auf diesem Gerät nur ein einziges Mal
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('bonus') === 'TRM-8K2-1X') {
+      if (!L.save.towerSpawnUsed) { L.save.towerSpawnUsed = true; L.save.towerSpawnPending = true; L.persist(); }
+      q.delete('bonus'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    }
+  } catch (e) { /* egal */ }
   L.HOT_N = 5;
   L.selectSlot = function (i) { P.sel = P.sel === i ? -1 : i; };
   // findet in Schnellleiste und Rucksack den ersten passenden Gegenstand
@@ -2259,6 +2267,12 @@
       if (left > 0) L.save.stash.push(Object.assign({}, it, { count: left }));
     }
     const sp = L.pick(L.spawnSpots); P.x = sp[0]; P.z = sp[1]; P.yaw = P.camYaw = Math.random() * 6.28;
+    // Einmal-Bonus: im sicheren Turm starten (nur über den geheimen Link, nur einmal pro Gerät)
+    if (L.save.towerSpawnPending) {
+      L.save.towerSpawnPending = false; L.persist();
+      P.x = L.TOWER.x; P.z = L.TOWER.z + 2; P.yaw = P.camYaw = 0;
+      setTimeout(() => L.msg('🗼 Bonus: Du startest einmalig sicher im Turm!', 7000), 500);
+    }
     L.round = {
       over: false, time: 0, code: [0, 1, 2, 3].map(() => L.randi(0, 9)), found: [false, false, false, false],
       bunkerOpen: false, doorT: 0, radio: 'idle', radioT: 0, gate: 'closed', gateT: 0, alarmT: 0, bossT: S.bossMin * 60, warned: false
