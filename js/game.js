@@ -2018,7 +2018,10 @@
       b.sinking += dt;
       // GIGA-CAPY zieht MAMA IVA in den Boden
       b.rootY = -72 * L.capyUpdate(b, dt);
-      if (b.sinking >= L.CAPY_TOTAL) { L.ivaDone = b.idx; calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = ivaClock().left; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + Math.max(1, Math.round(ivaClock().left / 60)) + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
+      if (b.sinking >= L.CAPY_TOTAL) {
+        // danach: Bosskampf-Kurzfilm Richard gegen das Riesen-Walross
+        if (b.capy) { const rs = Math.floor(Math.random() * 1e9); L.startRichard(b.capy.x, b.capy.z, rs); if (NET() !== 'solo') L.mp.send({ t: 'richard', x: b.capy.x, z: b.capy.z, seed: rs }); }
+        L.ivaDone = b.idx; calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = ivaClock().left; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + Math.max(1, Math.round(ivaClock().left / 60)) + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
     }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
     // MAMA IVA hört jeden, der nicht schleicht – egal wie weit weg. Nur im Turm ist man sicher, solange man leise ist
@@ -2236,7 +2239,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearNature) L.clearNature();
+    clearCyls(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard();
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
     for (const n of E.npcs) L.scene.remove(n.rig.root);
@@ -2422,6 +2425,7 @@
     updateSmoke(dt);
     updateCyls(dt);
     L.updateNature(dt);
+    L.updateRichard(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(L.boss && !L.boss.dead && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);

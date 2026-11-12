@@ -317,6 +317,7 @@
         break;
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
       case 'tower': if (!host) { if (m.down) L.towerDestroy(); else L.towerRestore(); } break;
+      case 'richard': if (!host) L.startRichard(m.x, m.z, m.seed); break;
       case 'tsu': if (!host) L.startTsunami(m.side, false); break;
       case 'cyl': if (!host) L.cylinderFall(m.x, m.z, false); break;
       case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;

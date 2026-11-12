@@ -44,3 +44,4 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 - **Meer statt Kartenrand:** Im Westen, Osten und Süden geht es über einen Strand ins Meer mit Wellen. Man kann schwimmen (kostet Kraft – ohne Kraft ertrinkt man). Autos kommen nicht ins tiefe Wasser, der fliegende JOYOR T10 schon. Im Norden bleibt die Sperrzone.
 - **Tornados** ziehen über die Karte (bei Gewitter öfter), ziehen dich an und reißen dich hoch.
 - **Tsunamis** rollen nach einer Warnung vom Meer aufs Land. Rette dich ins Landesinnere, in den Turm oder hoch hinaus.
+- Nach dem GIGA-CAPY-Kampf folgt ein Bosskampf-Kurzfilm: **Richard** (eigener Charakter) gegen ein **Riesen-Walross** – jedes Mal mit anderen Größen, Aktionen und Ende.
