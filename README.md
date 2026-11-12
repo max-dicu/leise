@@ -38,3 +38,6 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 - Hintergrundmusik wechselt alle 30 Sekunden (die Bosskampf-Musik kommt nur bei MAMA IVA).
 - **Die Starrende**: Porzellan-Gesicht mit riesigen Augen. Schaust du sie an, erstarrt sie – schaust du weg, kommt sie näher.
 - Beim **Gesichtslosen** rauscht das Bild, wenn er nah ist.
+- **Zylinder vom Mars** stürzen alle paar Minuten glühend vom Himmel. Nach dem Abkühlen schraubt sich der Deckel auf und Marsianer kriechen heraus.
+- **Rotes Kraut** wächst um die Absturzstellen: darin bist du langsamer und es raschelt laut.
+- Manche **Stelzer** werfen Kanister mit **schwarzem Rauch** statt mit dem Hitzestrahl zu schießen.

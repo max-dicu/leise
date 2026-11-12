@@ -317,6 +317,7 @@
         break;
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
       case 'tower': if (!host) { if (m.down) L.towerDestroy(); else L.towerRestore(); } break;
+      case 'cyl': if (!host) L.cylinderFall(m.x, m.z, false); break;
       case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;
       case 'towerWarn': if (!host) L.msg('⚠️ MAMA IVA hat jemanden im Turm gehört! Sie kommt, um ihn einzureißen …', 7000); break;
       case 'bossGone': if (!host && L.boss) { L.capyRemove(L.boss); L.scene.remove(L.boss.rig.root); L.boss = null; } break;
@@ -396,7 +397,7 @@
     const M = [], W = [], NN = [], V = [];
     for (const m of E.monsters) {
       if (L.dist(m.x, m.z, R.x, R.z) > 330) continue;
-      M.push([m.id, r1(m.x), r1(m.z), r2(m.yaw), STATES.indexOf(m.state), ANIMS.indexOf(m.anim), m.dead ? 1 : 0, m.prey === R ? 1 : 0, r2(m.atk || 0)]);
+      M.push([m.id, r1(m.x), r1(m.z), r2(m.yaw), STATES.indexOf(m.state), ANIMS.indexOf(m.anim), m.dead ? 1 : 0, m.prey === R ? 1 : 0, r2(m.atk || 0), m.kind]);
     }
     for (const w of E.walkers) W.push([w.id, r1(w.x), r1(w.z), r2(w.yaw), r1(w.hy), WSTATES.indexOf(w.state), w.rig.beam.g.visible ? 1 : 0, r1(w.aimX), r1(w.aimZ), w.dead ? 1 : 0, w.chargeT > 0 ? 1 : 0, r2(w.sweep || 0)]);
     for (const n of E.npcs) {
@@ -483,7 +484,8 @@
     if (N.role !== 'client' || !L.round || L.state !== 'game') return;
     const now = performance.now();
     for (const a of s.M) {
-      const m = L.byId.get('m' + a[0]); if (!m) continue;
+      let m = L.byId.get('m' + a[0]);
+      if (!m) { if (!a[9] || !L.MK[a[9]]) continue; m = G().spawnMonster(a[9], a[1], a[2], undefined, a[0]); m.rig.root.visible = false; }
       if (m.nx === undefined) { m.x = a[1]; m.z = a[2]; m.yaw = a[3]; }
       m.nx = a[1]; m.nz = a[2]; m.nyaw = a[3];
       m.state = STATES[a[4]] || 'wander'; m.anim = ANIMS[a[5]] || 'walk';

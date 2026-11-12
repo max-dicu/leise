@@ -424,6 +424,8 @@
     P.mode = !moving ? (P.stance === 'stand' ? 'idle' : P.stance) : P.stance === 'crawl' ? 'crawl' : P.stance === 'crouch' ? 'crouch' : sprint ? 'run' : 'walk';
     let spd = SPEED[P.mode] || 0;
     if (P.aiming && P.mode === 'walk') spd = 2.6;
+    const weed = weeds.length && L.inWeed(P.x, P.z);
+    if (weed) spd *= 0.6;
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
     let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn;
     const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
@@ -473,7 +475,8 @@
       if (P.stepAcc > st[0]) {
         P.stepAcc = 0;
         L.snd.step({ x: P.x, y: 0, z: P.z }, st[2], L.onRoad(P.x, P.z));
-        L.makeNoise(P.x, P.z, st[1], P);
+        L.makeNoise(P.x, P.z, st[1] * (weed ? 2 : 1) + (weed ? 4 : 0), P);
+        if (weed) L.nz({ dur: 0.25, f: 2200, type: 'bandpass', vol: 0.15 });
       }
     }
     P.phase += dt * (P.mode === 'run' ? 11 : P.mode === 'walk' ? 7.5 : P.mode === 'crouch' ? 5.5 : 4) * (hsp > 0.3 ? 1 : 0.15);
@@ -1401,10 +1404,125 @@
     }
   }
 
+
+  // ---------- Aus dem Buch „Krieg der Welten“: Zylinder vom Mars, Rotes Kraut, Rauch-Kanister ----------
+  // Ein Zylinder stürzt glühend vom Himmel, kühlt ab, der Deckel schraubt sich auf und Marsianer kriechen heraus.
+  // Um die Absturzstelle wächst Rotes Kraut: darin bist du langsamer und es raschelt laut.
+  const cyls = [], weeds = [], cans = [];
+  L.weeds = weeds; L._cyls = cyls;
+  const CYL_FALL = 2.6, CYL_OPEN = 22;
+  L.cylinderFall = function (x, z, send) {
+    const g = new T.Group(); L.scene.add(g);
+    const yaw = Math.random() * 6.28, body = new T.Group(); g.add(body);
+    const met = L.mat('#8f8272', { metal: 0.3, rough: 0.6 });
+    const tube = new T.Mesh(new T.CylinderGeometry(1.7, 1.7, 9, 18), met); tube.rotation.z = Math.PI / 2; tube.castShadow = true; body.add(tube);
+    for (const s of [-3, 0, 3]) { const ring = new T.Mesh(new T.CylinderGeometry(1.78, 1.78, 0.3, 18), L.mat('#5a5048', { metal: 0.3, rough: 0.6 })); ring.rotation.z = Math.PI / 2; ring.position.x = s; body.add(ring); }
+    const lid = new T.Group(); lid.position.x = 4.55; body.add(lid);
+    const lm = new T.Mesh(new T.CylinderGeometry(1.6, 1.6, 0.3, 18), L.mat('#a09282', { metal: 0.3, rough: 0.5 })); lm.rotation.z = Math.PI / 2; lid.add(lm);
+    for (let i = 0; i < 6; i++) { const b = new T.Mesh(L.GEO.box, L.mat('#2a2420')); b.scale.set(0.35, 0.25, 0.25); const a = i / 6 * Math.PI * 2; b.position.set(0.2, Math.sin(a) * 1.2, Math.cos(a) * 1.2); lid.add(b); }
+    const glowM = new T.MeshBasicMaterial({ color: 0xff6a20, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false });
+    const glowS = new T.Mesh(new T.CylinderGeometry(1.75, 1.75, 9.1, 18), glowM); glowS.rotation.z = Math.PI / 2; body.add(glowS);
+    body.rotation.set(0, yaw, 0.35); body.scale.setScalar(2.3);
+    const c = { x, z, yaw, g, body, lid, glowM, t: 0, landed: false, opened: false, spawned: false, sx: x - Math.sin(yaw) * 380, sz: z - Math.cos(yaw) * 380 };
+    g.position.set(c.sx, 420, c.sz); c.g.position.y = 420;
+    cyls.push(c);
+    if (cyls.length > 8) { const o = cyls.shift(); L.scene.remove(o.g); if (o.box) o.box.on = false; }
+    L.snd.charge({ x, y: 200, z });
+    const d = L.dist(L.player.x, L.player.z, x, z);
+    L.msg(d < 700 ? '☄️ Ein glühender Zylinder stürzt vom Himmel – ganz in deiner Nähe!' : '☄️ In der Ferne stürzt etwas vom Himmel …', 6000);
+    if (send && isHost()) L.mp.send({ t: 'cyl', x, z, yaw });
+    return c;
+  };
+  function updateCyls(dt) {
+    for (const c of cyls) {
+      c.t += dt;
+      if (!c.landed) {
+        const k = Math.min(1, c.t / CYL_FALL), e = k * k;
+        c.g.position.set(L.lerp(c.sx, c.x, k), L.lerp(420, 0.6, e), L.lerp(c.sz, c.z, k));
+        if (Math.random() < dt * 40) L.fx(Math.random() < 0.5 ? '#ff8030' : '#555', c.g.position.x, c.g.position.y, c.g.position.z, 2, 2, { basic: Math.random() < 0.5, size: 1.2, life: 1.5 });
+        if (k >= 1) {
+          c.landed = true;
+          L.explode ? L.fx('#ffb040', c.x, 2, c.z, 60, 18, { basic: true, size: 0.6, life: 1.2 }) : 0;
+          L.fx('#5a4630', c.x, 1, c.z, 60, 14, { size: 1.2, life: 3 });
+          L.decal(c.x, c.z, 11, '#1a120c'); L.decal(c.x, c.z, 6, '#2a1a10');
+          L.snd.explosion({ x: c.x, y: 2, z: c.z }); L.snd.stomp({ x: c.x, y: 0, z: c.z });
+          L.env.boom.position.set(c.x, 6, c.z); L.env.boom.intensity = 8;
+          const d = L.dist(L.player.x, L.player.z, c.x, c.z); L.shake = Math.max(L.shake, L.clamp((300 - d) / 300, 0, 1.2));
+          if (!isClient()) { L.makeNoise(c.x, c.z, 250, null); if (d < 14 && L.player.alive) L.hurtPlayer(80, 'Vom Zylinder erschlagen'); }
+          c.box = L.addBox(c.x - 6, c.z - 6, c.x + 6, c.z + 6, 5, 'prop');
+          // Rotes Kraut um den Krater
+          const wg = new T.Group(); L.scene.add(wg); c.weed = wg;
+          for (let i = 0; i < 70; i++) {
+            const a = Math.random() * 6.28, r = 5 + Math.random() * 16, h = 0.4 + Math.random() * 1.6;
+            const m = new T.Mesh(i % 3 ? L.GEO.cone : L.GEO.sph, L.mat(Math.random() < 0.5 ? '#9a1c14' : '#c0301c'));
+            m.scale.set(0.25 + Math.random() * 0.3, h, 0.25 + Math.random() * 0.3); m.position.set(c.x + Math.sin(a) * r, h / 2, c.z + Math.cos(a) * r);
+            m.rotation.set(L.rand(-0.4, 0.4), 0, L.rand(-0.4, 0.4)); wg.add(m);
+          }
+          L.decal(c.x, c.z, 20, '#5a1410');
+          weeds.push({ x: c.x, z: c.z, r: 21 });
+        }
+        continue;
+      }
+      // abkühlen
+      const since = c.t - CYL_FALL;
+      c.glowM.opacity = Math.max(0, 0.9 - since / 14);
+      // Deckel schraubt sich auf, fällt dann ab
+      if (since > CYL_OPEN - 6 && !c.opened) {
+        const k = Math.min(1, (since - (CYL_OPEN - 6)) / 6);
+        c.lid.rotation.x = k * 6 * Math.PI; c.lid.position.x = 4.55 + k * 0.5;
+        if (Math.random() < dt * 4) L.snd.screech({ x: c.x, y: 1, z: c.z }, 0.2);
+        if (k >= 1) { c.opened = true; c.lid.position.set(6.2, -1.2, 0.8); c.lid.rotation.set(0, 0, 1.3); L.snd.heavy({ x: c.x, y: 0, z: c.z }, 0.8); }
+      }
+      if (c.opened && !c.spawned) {
+        c.spawned = true;
+        if (L.dist(L.player.x, L.player.z, c.x, c.z) < 250) L.msg('🐙 Der Zylinder ist offen – Marsianer kriechen heraus!', 5000);
+        if (!isClient()) for (let i = 0; i < 3; i++) {
+          const a = c.yaw + L.rand(-0.5, 0.5), d = 13 + i * 1.5;
+          const m = spawnMonster('marsianer', L.clamp(c.x + Math.sin(a) * d, -1480, 1480), L.clamp(c.z + Math.cos(a) * d, -1480, 1480));
+          m.state = 'investigate'; m.tx = c.x + Math.sin(a) * 30; m.tz = c.z + Math.cos(a) * 30; m.timer = 10;
+          MK.marsianer.voice({ x: m.x, y: 1, z: m.z });
+        }
+      }
+    }
+    // Rauch-Kanister der Stelzer fliegen im Bogen
+    for (let i = cans.length - 1; i >= 0; i--) {
+      const k = cans[i]; k.t += dt; const p = Math.min(1, k.t / k.dur);
+      k.m.position.set(L.lerp(k.x0, k.x1, p), L.lerp(k.y0, 0.5, p) + Math.sin(p * Math.PI) * 25, L.lerp(k.z0, k.z1, p));
+      k.m.rotation.x += dt * 8;
+      if (Math.random() < dt * 20) L.fx('#222', k.m.position.x, k.m.position.y, k.m.position.z, 1, 0.5, { size: 0.6, life: 1.5, g: -0.2 });
+      if (p >= 1) { L.scene.remove(k.m); cans.splice(i, 1); L.dropSmoke(k.x1, k.z1, true); }
+    }
+    // nächster Zylinder
+    if (!isClient() && L.round && !L.round.over) {
+      L.round.cylT = (L.round.cylT === undefined ? L.rand(60, 90) : L.round.cylT) - dt;
+      if (L.round.cylT <= 0) {
+        L.round.cylT = L.rand(150, 240);
+        const ps = players(); const tp = ps.length ? L.pick(ps) : P;
+        for (let i = 0; i < 40; i++) {
+          const a = Math.random() * 6.28, d = L.rand(180, 420), x = tp.x + Math.sin(a) * d, z = tp.z + Math.cos(a) * d;
+          if (Math.abs(x) > 1440 || Math.abs(z) > 1440 || L.queryBoxes(x, z, 8).length || L.inTower(x, z, 15) || L.mountainH(x, z) > 0.2) continue;
+          L.cylinderFall(x, z, true); break;
+        }
+      }
+    }
+  }
+  L.inWeed = (x, z) => weeds.some((w) => L.dist(x, z, w.x, w.z) < w.r);
+  // Stelzer wirft einen Kanister mit schwarzem Rauch
+  function throwCanister(w, t) {
+    const m = new T.Mesh(L.GEO.cyl, L.mat('#1a1a1a', { metal: 0.6, rough: 0.4 })); m.scale.set(0.35, 1.2, 0.35); L.scene.add(m);
+    cans.push({ m, t: 0, dur: 2.2, x0: w.x, y0: w.hy, z0: w.z, x1: t.x + L.rand(-4, 4), z1: t.z + L.rand(-4, 4) });
+    L.snd.ray({ x: w.x, y: w.hy, z: w.z });
+  }
+  function clearCyls() {
+    for (const c of cyls) { L.scene.remove(c.g); if (c.weed) L.scene.remove(c.weed); if (c.box) c.box.on = false; }
+    for (const k of cans) L.scene.remove(k.m);
+    cyls.length = 0; weeds.length = 0; cans.length = 0;
+  }
+
   // ---------- Stelzer ----------
   function spawnWalker(x, z, id) {
     const rig = L.buildWalker(); L.scene.add(rig.root);
-    const w = { kind: 'walker', rig, x, z, yaw: Math.random() * 6.28, hy: 22, hp: 1600, state: 'patrol', tx: x, tz: z, t: Math.random() * 10, sweep: 0, fireT: 0, chargeT: 0, cool: 0, hornT: L.rand(20, 60), dead: false, deadT: 0, aimX: x, aimZ: z };
+    const w = { kind: 'walker', rig, x, z, yaw: Math.random() * 6.28, hy: 22, hp: 1600, state: 'patrol', smoker: Math.random() < 0.35, tx: x, tz: z, t: Math.random() * 10, sweep: 0, fireT: 0, chargeT: 0, cool: 0, hornT: L.rand(20, 60), dead: false, deadT: 0, aimX: x, aimZ: z };
     initGait(w, rig);
     w.id = id || NID++; w.key = 'w' + w.id; L.byId.set(w.key, w);
     E.walkers.push(w);
@@ -1491,6 +1609,12 @@
         const close = dT < 22 && t.stance === 'stand' && mv > 0.5;
         const flash = t.flash && night > 0.4 && dT < 120 && Math.abs(L.angDiff(w.yaw, Math.atan2(t.x - w.x, t.z - w.z))) < 1.2;
         if ((inSpot || close || flash) && canSee(w.x, w.hy - 2, w.z, 160, t)) {
+          if (w.smoker && !isClient()) {
+            throwCanister(w, t); w.cool = 9;
+            const txt = '⚠️ Ein Stelzer wirft schwarzen Rauch nach dir! Lauf aus der Wolke!';
+            if (t === P) L.msg(txt); else if (isRemote(t)) L.mp.sendTo(t.pid, { t: 'msg', text: txt });
+            break;
+          }
           w.state = 'fire'; w.chargeT = 1.3; w.fireT = 3; w.aimX = t.x; w.aimZ = t.z; w.target = t;
           L.snd.charge({ x: w.x, y: w.hy, z: w.z });
           const txt = '⚠️ Ein Stelzer hat dich entdeckt! Versteck dich hinter Gebäuden!';
@@ -1885,6 +2009,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
+    clearCyls();
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
     for (const n of E.npcs) L.scene.remove(n.rig.root);
@@ -1979,7 +2104,7 @@
     place('schwelle', Math.round(18 * cm));
     place('greifer', Math.round(10 * cm));
     place('flieger', Math.round(6 * cm));
-    L.frenzy = false; smokes.length = 0; L.towerRestore();
+    L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.round.cylT = L.rand(60, 90);
     for (let i = 0; i < Math.max(6, Math.round(20 * L.md.count)); i++) {
       const [x, z] = farSpot(400); spawnWalker(x, z);
       // um jeden Stelzer kriechen Marsianer herum
@@ -2055,6 +2180,7 @@
     updateEscapes(dt);
     updateFx(dt);
     updateSmoke(dt);
+    updateCyls(dt);
     L.updateFusion(dt);
     L.updateTower(dt);
     // Musik je nach Lage
