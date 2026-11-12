@@ -89,7 +89,7 @@
           if (d < 9) L.damageEnt(m, 40 * dt, t.x, t.z, null);
         }
         for (const n of L.ents.npcs) { if (n.dead) continue; const d = L.dist(n.x, n.z, t.x, t.z); if (d < 45) pushThing(n, t.x, t.z, dt, 1.2); if (d < 9) L.damageEnt(n, 40 * dt, t.x, t.z, null); }
-        for (const v of L.ents.vehicles) { if (v === P.vehicle || v.occupied) continue; const d = L.dist(v.x, v.z, t.x, t.z); if (d < 35) { pushThing(v, t.x, t.z, dt, 0.8); v.yaw += dt * 2; v.rig.root.position.set(v.x, v.rig.root.position.y, v.z); v.rig.root.rotation.y = v.yaw; } }
+        for (const v of L.ents.vehicles) { if (v === P.vehicle || v.occupied) continue; const d = L.dist(v.x, v.z, t.x, t.z); if (d < 35) { pushThing(v, t.x, t.z, dt, 0.8); v.yaw += dt * 2; v.rig.root.position.set(v.x, v.rig.root.position.y, v.z); v.rig.root.rotation.set(0, v.yaw, 0); } }
       }
     }
     // neuer Tornado: bei Gewitter öfter

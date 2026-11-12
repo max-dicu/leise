@@ -572,7 +572,7 @@
       rig.root.visible = dP < (m.variant === 'lange' ? 300 : D.view) && now - (m.seen || 0) < 2000;
       if (m.dead) {
         D.anim(rig, { mode: 'dead' });
-        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
         continue;
       }
       const k = Math.min(1, dt * 8);
@@ -585,20 +585,20 @@
       if ((m.anim === 'run' || m.anim === 'crawl') && dP < 110 && m.voiceT <= 0) { m.voiceT = L.rand(4, 7); D.voice({ x: m.x, y: 2.5, z: m.z }); }
       if (!rig.root.visible) continue;
       D.anim(rig, { mode: m.fly ? 'fly' : m.anim, phase: m.phase, atk: m.atk, fast: m.anim === 'run' });
-      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
     }
     for (const n of E.npcs) {
       const rig = n.rig;
       if (n.nx === undefined) { rig.root.visible = false; continue; }
       const dP = L.dist(P.x, P.z, n.x, n.z);
       rig.root.visible = dP < 220 && now - (n.seen || 0) < 2000;
-      if (n.dead) { L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw; continue; }
+      if (n.dead) { L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(n.x, 0, n.z); rig.root.rotation.set(0, n.yaw, 0); continue; }
       const k = Math.min(1, dt * 8);
       n.x += (n.nx - n.x) * k; n.z += (n.nz - n.z) * k; n.yaw += L.angDiff(n.yaw, n.nyaw) * k;
       n.phase += dt * (n.moving ? (n.mode === 'run' ? 11 : 7.5) : 0.75);
       if (!rig.root.visible) continue;
       L.animHuman(rig, { mode: n.mode === 'run' && n.moving ? 'run' : 'walk', phase: n.phase, speed: n.moving ? 1 : 0, aim: n.fight });
-      rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw;
+      rig.root.position.set(n.x, 0, n.z); rig.root.rotation.set(0, n.yaw, 0);
     }
     for (const w of E.walkers) puppetWalker(w, dt);
     if (L.boss) puppetBoss(L.boss, dt);

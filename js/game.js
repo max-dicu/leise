@@ -519,7 +519,7 @@
     updateActions(dt);
     // Animation
     const r = P.rig;
-    r.root.position.set(P.x, P.y, P.z); r.root.rotation.y = P.yaw;
+    r.root.position.set(P.x, P.y, P.z); r.root.rotation.set(0, P.yaw, 0);
     const st = selType();
     L.setHeld(r, P.eatT >= 0 ? P.eatType : st);
     P.animSt = {
@@ -1064,7 +1064,7 @@
   }
   // ---------- JOYOR T6E Pro: Teleport nach vorne, danach 5 Sekunden Pause ----------
   function spotFree(x, z, v) {
-    if (Math.abs(x) > 1480 || Math.abs(z) > 1480 || L.mountainH(x, z) > 0.3) return false;
+    if (Math.abs(x) > 1480 || Math.abs(z) > 1480 || L.mountainH(x, z) > 0.3 || L.waterDepth(x, z) > 0.3) return false;
     if (L.queryBoxes(x, z, 1.3).length) return false;
     for (const o of E.vehicles) if (o !== v && L.dist(o.x, o.z, x, z) < 3) return false;
     return true;
@@ -1248,7 +1248,7 @@
     if (m.dead) {
       m.deadT += dt;
       D.anim(rig, { mode: 'dead' });
-      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
       return m.deadT < 45;
     }
     // weit weg: grob und selten rechnen
@@ -1272,7 +1272,7 @@
       if (dS < 90 && P.alive && !P.gone && !safeIn(P.x, P.z) && m.state !== 'attack') { m.state = 'chase'; m.tx = P.x; m.tz = P.z; m.prey = P; m.timer = 5; m.alertT = 0; }
       if (dS < 90 && lookedAt(m)) {
         m.frozen = true; m.anim = 'search';
-        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
         return true;
       }
       if (m.frozen && dS < 40 && m.voice <= 0) { m.voice = 3; D.voice({ x: m.x, y: 2, z: m.z }); }
@@ -1351,7 +1351,7 @@
     const anim = m.state === 'attack' ? 'attack' : m.alertT > 0 ? 'alert' : m.state === 'chase' ? (D.chase || 'run') : m.state === 'investigate' ? 'run' : m.state === 'wander' ? 'walk' : 'search';
     m.anim = anim;
     D.anim(rig, { mode: anim, phase: m.phase, atk: m.atk });
-    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
     return true;
   }
   // ---------- Flugmaschine: fliegt mit Suchlicht, verrät dich an die anderen und wirft schwarzen Rauch ----------
@@ -1393,7 +1393,7 @@
     m.anim = m.state === 'chase' ? 'run' : 'walk';
     if (!rig.root.visible) return true;
     D.anim(rig, { mode: 'fly', phase: m.phase, fast: m.state === 'chase' });
-    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+    rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
     return true;
   }
   // schwarzer Rauch: schadet allen, die drinstehen (im Auto ist man geschützt)
@@ -1409,7 +1409,7 @@
       if (s.t <= 0) { smokes.splice(i, 1); continue; }
       if (Math.random() < dt * 30) L.fx(Math.random() < 0.5 ? '#111111' : '#262626', s.x + L.rand(-6, 6), L.rand(0.3, 3), s.z + L.rand(-6, 6), 2, 1.5, { size: 1.6, life: 2.5, g: -0.3, grow: 1.2 });
       const inCar = P.vehicle && P.vehicle.t.kind === 'car';
-      if (P.alive && !P.gone && !inCar && L.dist(P.x, P.z, s.x, s.z) < 7) {
+      if (P.alive && !P.gone && !inCar && !L.cine && L.dist(P.x, P.z, s.x, s.z) < 7) {
         P.hp -= 9 * dt * L.md.dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dt);
         s.coughT -= dt; if (s.coughT <= 0) { s.coughT = 0.9; L.snd.hurt(); L.msg('😷 Schwarzer Rauch! Raus hier!', 1500); }
         if (P.hp <= 0) { P.hp = 0; killPlayer(MK.flieger.cause); }
@@ -2318,7 +2318,7 @@
   function updateNpc(n, dt) {
     const dP = L.dist(P.x, P.z, n.x, n.z), rig = n.rig;
     rig.root.visible = dP < 220;
-    if (n.dead) { n.deadT += dt; L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw; return n.deadT < 60; }
+    if (n.dead) { n.deadT += dt; L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(n.x, 0, n.z); rig.root.rotation.set(0, n.yaw, 0); return n.deadT < 60; }
     if (nearDist(n.x, n.z, dP) > 400) { n.lod += dt; if (n.lod < 0.5) return true; dt = n.lod; n.lod = 0; }
     n.shootCd -= dt; n.alertT -= dt;
     // Bedrohung durch Monster
@@ -2355,7 +2355,7 @@
     n.phase += dt * (spd > 5 ? 11 : 7.5) * (n.moving ? 1 : 0.1);
     if (!rig.root.visible) return true;
     L.animHuman(rig, { mode: n.mode === 'run' && n.moving ? 'run' : 'walk', phase: n.phase, speed: n.moving ? 1 : 0, aim: n.state === 'fight' && n.weapon !== 'hammer' });
-    rig.root.position.set(n.x, 0, n.z); rig.root.rotation.y = n.yaw;
+    rig.root.position.set(n.x, 0, n.z); rig.root.rotation.set(0, n.yaw, 0);
     return true;
   }
   function npcShoot(n, target) {
