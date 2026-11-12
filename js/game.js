@@ -78,14 +78,19 @@
   function players() { const a = []; if (P.alive && !P.gone) a.push(P); for (const r of RPs()) a.push(r); return a; }
   // Boss-Zeit (MAMA IVA, Riesen-Boss oder Raserei): wer schleicht, ist unsichtbar und unhörbar.
   // Nur wer sich direkt neben einem Monster duckt, wird noch ganz kurz gesehen (unter 1 Sekunde).
-  const bossOn = () => !!((L.boss && !L.boss.dead) || L.wboss || L.frenzy);
-  L.bossOn = bossOn;
+  // Bosse gelten nur dort, wo sie sind: auf einer Insel zählt nur der Insel-Boss, daheim nur MAMA IVA & Co.
+  const homeBossOn = () => !!((L.boss && !L.boss.dead) || L.wboss || L.frenzy);
+  const onIsl = (x, z) => !!((L.islandAt && L.islandAt(x, z)) || L.inDim(x));
+  const bossAt = (x, z) => (onIsl(x, z) ? !!(L.islandBoss && L.islandBoss.active && !L.inDim(x)) : homeBossOn());
+  const bossOn = () => bossAt(P.x, P.z);
+  L.bossOn = bossOn; L.onIsl = onIsl;
   const isSneak = (p) => (p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh));
   function hiddenFrom(p, d, near) {
-    if (!bossOn() || !isSneak(p)) return false;
+    if (!bossAt(p.x, p.z) || !isSneak(p)) return false;
     const st = p === P ? (P.sneakT || 0) : (p.sneakT === undefined ? 9 : p.sneakT);
     return !(d < (near || 2.5) && st < 0.9);
   }
+  L.hiddenFrom = (p, d, near) => hiddenFrom(p, d, near);
   function nearestSeen(x, z, near) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (hiddenFrom(p, d, near)) continue; if (d < bd) { bd = d; best = p; } } return [best, bd]; }
   function nearestPlayer(x, z) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
   function hurtRemote(r, dmg, cause, kx, kz, ky, sneak) { L.mp.sendTo(r.pid, { t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
@@ -1313,6 +1318,7 @@
     let best = null, bd = 230;
     for (const p of players()) {
       if (L.towerSafe() && L.inTower(p.x, p.z)) continue;
+      if (onIsl(p.x, p.z)) continue;
       if (p === P && P.spawnProt > 0) continue;
       const d = L.dist(p.x, p.z, m.x, m.z);
       // wer schleicht und nicht ganz nah ist, verschwindet aus ihrem Blick
@@ -1338,11 +1344,12 @@
   // Monster bleiben draußen vor dem Turm
   function keepOutOfTower(e) {
     if (L.wsKeepOut) L.wsKeepOut(e);
+    if (L.islandKeepOut) L.islandKeepOut(e);
     if (!L.towerSafe() || !L.inTower(e.x, e.z, 1.5)) return;
     const T0 = L.TOWER, dx = e.x - T0.x, dz = e.z - T0.z, lim = T0.half + 1.5;
     if (Math.abs(dx) > Math.abs(dz)) e.x = T0.x + Math.sign(dx || 1) * lim; else e.z = T0.z + Math.sign(dz || 1) * lim;
   }
-  const safeIn = (x, z) => (L.towerSafe() && L.inTower(x, z)) || (L.wsSafe ? L.wsSafe(x, z) : false);
+  const safeIn = (x, z) => (L.towerSafe() && L.inTower(x, z)) || (L.wsSafe ? L.wsSafe(x, z) : false) || (L.islandSafe ? L.islandSafe(x, z) : false);
   function monsterVictims(m) {
     const list = [];
     if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5 && !(P.spawnProt > 0)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle, hidden: hiddenFrom(P, L.dist(P.x, P.z, m.x, m.z)) });
@@ -1379,7 +1386,7 @@
     }
     m.calmT = (m.calmT || 0) - dt; m.callCd = (m.callCd || 0) - dt;
     // Raserei, solange MAMA IVA da ist: alle stürmen auf den nächsten Spieler zu
-    if (L.frenzy && m.state !== 'attack') {
+    if (L.frenzy && !m.isl && m.state !== 'attack') {
       m.frT = (m.frT || 0) - dt;
       if (m.frT <= 0) {
         m.frT = 0.5;
@@ -2202,7 +2209,7 @@
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
         const d = L.dist(t.x, t.z, b.x, b.z);
-        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
+        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || onIsl(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
         if (d < bd) { bd = d; best = t; }
       }
       if (best) { b.tx = best.x; b.tz = best.z; }
@@ -2392,7 +2399,7 @@
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
         const d = L.dist(t.x, t.z, w.x, w.z);
-        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
+        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || onIsl(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
         if (d < bd) { bd = d; best = t; }
       }
       if (best) { w.tx = best.x; w.tz = best.z; }
@@ -2579,7 +2586,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2833,6 +2840,7 @@
     L.updateRichard(dt);
     L.updateDuel(dt);
     L.updateIslands(dt);
+    if (L.updateIslandBosses) L.updateIslandBosses(dt);
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);
@@ -2840,7 +2848,7 @@
     if (L.updateWorkshop) L.updateWorkshop(dt);
     if (L.updateRevive) L.updateRevive(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
-    L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
+    L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z) && !onIsl(P.x, P.z));
     L.setTowerGlow(L.towerCall);
     L.updateFusion(dt);
     L.updateTower(dt);
@@ -2864,7 +2872,7 @@
     L.staticAmt = stat;
     if (stat > 0.25 && Math.random() < dt * stat * 3) L.snd.langerIdle({ x: P.x, y: 1.5, z: P.z });
     if (!P.alive) L.music.set('night');
-    else if ((L.boss && !L.boss.dead) || L.wboss) { L.bossMusicLvl = (L.boss || L.wboss).lvl || 0; L.music.set('boss'); }
+    else if (onIsl(P.x, P.z) ? !!L.islandBoss : ((L.boss && !L.boss.dead) || L.wboss)) { L.bossMusicLvl = onIsl(P.x, P.z) ? 1 : (L.boss || L.wboss).lvl || 0; L.music.set('boss'); }
     else if (danger >= 3) L.music.set('chase');
     else if (danger >= 1) L.music.set('tension');
     else {

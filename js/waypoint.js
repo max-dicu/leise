@@ -98,6 +98,7 @@
     if (L.inDim(P.x)) { if (L.DIM_PORTAL) tgt(L.DIM_PORTAL.x, L.DIM_PORTAL.z, '🌀', 'Heimweg'); }
     else {
       for (const I of L.ISL || []) if (!I.dim && L.curIsland !== I) tgt(I.x, I.z, I.icon, I.name.replace('Götterinsel ', '').replace('insel', ''));
+      if (L.curIsland && L.curIsland.shelter) tgt(L.curIsland.shelter.x, L.curIsland.shelter.z, '🛡️', 'Zuflucht');
       if (Math.max(Math.abs(P.x), Math.abs(P.z)) > 1600) tgt(0, 0, '🏠', 'Heimat');
       else if (L.TOWER) tgt(L.TOWER.x, L.TOWER.z, '🗼', 'Turm');
       if (L.PORTAL) tgt(L.PORTAL.x, L.PORTAL.z, '🌀', 'Portal');

@@ -264,10 +264,10 @@
     hudT -= dt;
     // Wegweiser zum Turm, solange MAMA IVA da ist
     const tn = $('towerNav');
-    const inSub = P.vehicle && P.vehicle.t.sub, navT = L.towerCall ? L.TOWER : inSub ? L.PORTAL : null;
+    const inSub = P.vehicle && P.vehicle.t.sub, shelter = L.islandNav && L.islandNav(), navT = shelter || (L.towerCall ? L.TOWER : inSub ? L.PORTAL : null);
     tn.hidden = !navT;
     if (navT) {
-      tn.childNodes[1].textContent = L.towerCall ? ' 🗼 ' : ' 🌀 '; tn.querySelector('b').textContent = L.towerCall ? 'ZUM TURM' : 'ZUM PORTAL (Tiefe ' + Math.round(-L.PORTAL.y) + ' m)';
+      tn.childNodes[1].textContent = shelter ? ' 🛡️ ' : L.towerCall ? ' 🗼 ' : ' 🌀 '; tn.querySelector('b').textContent = shelter ? 'ZUR ZUFLUCHT' : L.towerCall ? 'ZUM TURM' : 'ZUM PORTAL (Tiefe ' + Math.round(-L.PORTAL.y) + ' m)';
       const dx = navT.x - P.x, dz = navT.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
       const fwd = dx * sy + dz * cy, right = dx * -cy + dz * sy;
       $('tnArrow').style.transform = 'rotate(' + Math.atan2(right, fwd).toFixed(2) + 'rad)';
@@ -305,7 +305,7 @@
     $('clock').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     $('weather').textContent = (E.day < 0.3 ? '🌙 Nacht · ' : '') + (E.label || '');
     const GW = L.wboss && L.GBT[L.wboss.type || 'walross'];
-    $('bossTimer').textContent = L.wboss ? (L.wboss.rootY < -0.5 ? GW.icon + ' ' + GW.short + ' erscheint …' : `${GW.icon} ${GW.short} (Stufe ${(L.wboss.lvl || 0) + 1}) ist da – noch ${L.fmt(Math.max(0, L.wboss.life))}`) : L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA (Stufe ${(L.boss.lvl || 0) + 1}) ist da – noch ${L.fmt(L.boss.life)}` : (L.boss.capy ? '🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!' : '👹 MAMA IVA versinkt …')) : `${(R.nextBoss || 'MAMA IVA') === 'MAMA IVA' ? '👹 MAMA IVA' : ((L.GBT[R.nextBossType] || {}).icon || '👹') + ' ' + R.nextBoss} in ${L.fmt(R.bossT)}`;
+    $('bossTimer').textContent = (L.onIsl && L.onIsl(P.x, P.z)) ? ((L.islandBossText && L.islandBossText()) || '') : (L.wboss ? (L.wboss.rootY < -0.5 ? GW.icon + ' ' + GW.short + ' erscheint …' : `${GW.icon} ${GW.short} (Stufe ${(L.wboss.lvl || 0) + 1}) ist da – noch ${L.fmt(Math.max(0, L.wboss.life))}`) : L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA (Stufe ${(L.boss.lvl || 0) + 1}) ist da – noch ${L.fmt(L.boss.life)}` : (L.boss.capy ? '🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!' : '👹 MAMA IVA versinkt …')) : `${(R.nextBoss || 'MAMA IVA') === 'MAMA IVA' ? '👹 MAMA IVA' : ((L.GBT[R.nextBossType] || {}).icon || '👹') + ' ' + R.nextBoss} in ${L.fmt(R.bossT)}`);
     const nf = R.found.filter(Boolean).length;
     $('codes').textContent = nf ? '🔒 Bunker-Code: ' + R.code.map((c, i) => (R.found[i] ? c : '_')).join(' ') : '';
     let obj = '';
