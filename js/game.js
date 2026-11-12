@@ -260,7 +260,7 @@
     }
     if (e.kind === 'npc') { L.blood(e.x, 1, e.z, 25, true); L.decal(e.x, e.z, 1.8); dropNpcLoot(e); }
     if (e.kind === 'walker') { L.explode(e.x, e.hy, e.z, 12, 0, null, true); L.msg('💥 Ein Stelzer ist zerstört!'); for (let i = 0; i < 2; i++) L.spawnItem('artefakt', e.x + L.rand(-6, 6), e.z + L.rand(-6, 6), 1); }
-    if (e.kind === 'boss') { calmMonsters(); L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('MAMA IVA IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
+    if (e.kind === 'boss') { L.ivaDone = e.idx; calmMonsters(); L.explode(e.x, e.hy, e.z, 20, 0, null, true); L.banner('MAMA IVA IST GEFALLEN', 'Unglaublich. Sammle seine Beute ein.'); for (let i = 0; i < 6; i++) L.spawnItem(i < 3 ? 'artefakt' : 'gold', e.x + L.rand(-10, 10), e.z + L.rand(-10, 10), 1); }
   }
 
   // ---------- Inventar ----------
@@ -1656,9 +1656,17 @@
 
   // ---------- MAMA IVA (der Riesen-Boss) ----------
   // Sie erscheint entweder hinter einem Berg oder bricht aus dem Boden, bleibt eine Weile und versinkt dann wieder.
-  function spawnBoss() {
+  // MAMA-IVA-Uhr nach der echten Uhrzeit: abwechselnd Pause und Auftritt (je eingestellte Minuten).
+  // Bei Tod oder neuer Runde läuft sie einfach weiter – und auf jedem Gerät gleich.
+  function ivaClock() {
+    const C = L.S().bossMin * 60, cyc = 2 * C, t = Date.now() / 1000, ph = ((t % cyc) + cyc) % cyc;
+    return { pause: ph < C, left: ph < C ? C - ph : cyc - ph, idx: Math.floor(t / cyc), C };
+  }
+  L.ivaClock = ivaClock;
+  function spawnBoss(left) {
     const rig = L.buildKoloss(); L.scene.add(rig.root);
-    const stay = L.S().bossMin * 60;
+    // bleibt bis zum Ende ihres Zeitfensters (Fusion und Aufsteigen abgezogen)
+    const stay = Math.max(30, (left || L.S().bossMin * 60) - L.FUSION_T - 9);
     const fromMountain = L.mountains && L.mountains.length && Math.random() < 0.5;
     let x, z;
     if (fromMountain) {
@@ -1792,7 +1800,7 @@
       b.sinking += dt;
       // GIGA-CAPY zieht MAMA IVA in den Boden
       b.rootY = -72 * L.capyUpdate(b, dt);
-      if (b.sinking >= L.CAPY_TOTAL) { calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = L.S().bossMin * 60; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + L.S().bossMin + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
+      if (b.sinking >= L.CAPY_TOTAL) { L.ivaDone = b.idx; calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = ivaClock().left; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + Math.max(1, Math.round(ivaClock().left / 60)) + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
     }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
     // MAMA IVA hört jeden, der nicht schleicht – egal wie weit weg. Nur im Turm ist man sicher, solange man leise ist
@@ -2016,7 +2024,8 @@
     for (const v of E.vehicles) L.scene.remove(v.rig.root);
     for (const it of E.items) L.scene.remove(it.mesh);
     for (const g of E.grenades) L.scene.remove(g.m);
-    if (L.boss) L.scene.remove(L.boss.rig.root);
+    if (L.boss) { L.capyRemove(L.boss); L.scene.remove(L.boss.rig.root); }
+    L.fusionEnd();
     if (L.heli) L.scene.remove(L.heli.rig.root);
     E.monsters = []; E.walkers = []; E.npcs = []; E.vehicles = []; E.items = []; E.grenades = [];
     L.boss = null; L.heli = null; L.respawnQueue = []; L.byId.clear();
@@ -2160,9 +2169,13 @@
     R.time += dt;
     // Boss-Timer
     if (!L.boss && !isClient()) {
-      R.bossT -= dt;
-      if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
-      if (R.bossT <= 0) { R.warned = false; spawnBoss(); }
+      const K = ivaClock();
+      if (K.pause) {
+        R.bossT = K.left;
+        if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
+      } else if (L.ivaDone !== K.idx && K.left > 25) { R.warned = false; spawnBoss(K.left); L.boss.idx = K.idx; }
+      else R.bossT = K.left + K.C; // diesmal ist sie schon weg – nächster Auftritt nach der Pause
+
     }
     if (!P.gone) updatePlayer(dt);
     if (isClient()) L.mp.puppets(dt);
