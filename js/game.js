@@ -17,8 +17,12 @@
     wasser: { name: 'Wasser', slot: 'trinken', icon: '💧', water: 40, stack: 8 },
     cola: { name: 'Cola', slot: 'trinken', icon: '🥤', water: 25, stam: 30, stack: 8 },
     saft: { name: 'Saft', slot: 'trinken', icon: '🧃', water: 30, food: 5, stack: 8 },
+    tabletten: { name: 'Schmerztabletten', slot: 'bag', icon: '💊', heal: 15, stack: 10 },
+    bandage: { name: 'Bandage', slot: 'bag', icon: '🧻', heal: 25, stack: 10 },
     verband: { name: 'Verband', slot: 'bag', icon: '🩹', heal: 35, stack: 6 },
-    medkit: { name: 'Medikit', slot: 'bag', icon: '💊', heal: 80, stack: 3 },
+    spritze: { name: 'Heilspritze', slot: 'bag', icon: '💉', heal: 50, stam: 100, stack: 4 },
+    medkit: { name: 'Medkit', slot: 'bag', icon: '🧰', heal: 80, stack: 3 },
+    erstehilfe: { name: 'Erste-Hilfe-Kasten', slot: 'bag', icon: '🚑', heal: 100, stack: 2 },
     '9mm': { name: '9mm-Munition', slot: 'bag', icon: '🟡', stack: 120, amount: 15 },
     schrot: { name: 'Schrotpatronen', slot: 'bag', icon: '🔴', stack: 48, amount: 8 },
     gewehrmuni: { name: 'Gewehrmunition', slot: 'bag', icon: '🟤', stack: 150, amount: 30 },
@@ -35,6 +39,11 @@
     if (q.get('bonus') === 'BOSS-6X9-ALL') {
       if (!L.save.bossShowUsed) { L.save.bossShowUsed = true; L.save.bossShowPending = true; L.persist(); }
       q.delete('bonus'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+    }
+    if (q.get('skin') && L.hash53(L.hash53(q.get('skin'))) === 'ofaw0xb94x') {
+      L.save.skinKey = q.get('skin'); L.save.char = Object.assign({}, L.save.char || L.DEFAULT_CHAR, { special: 'waechter', wk: L.hash53(q.get('skin')) }); L.persist();
+      q.delete('skin'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+      setTimeout(() => L.msg && L.msg('🛡️ Der Wächter-Skin ist freigeschaltet – nur auf diesem Gerät!', 6000), 1500);
     }
     if (q.get('bonus') === 'TRM-4V7-30') {
       if (!L.save.towerSpawnUsed2) { L.save.towerSpawnUsed2 = true; L.save.towerSpawnPending = true; L.persist(); }
@@ -355,11 +364,11 @@
     }
   }
   const LT = {
-    stadt: 'konserve:3 brot:2 apfel:2 riegel:2 wasser:3 cola:2 saft:2 verband:2 9mm:2 minipistole:1 granate:0.5 uhr:1 gold:0.4',
-    krankenhaus: 'verband:5 medkit:3 wasser:2 saft:1',
-    polizei: 'pistole:3 9mm:4 schrotflinte:1.5 schrot:2 granate:1.5 verband:1',
-    supermarkt: 'konserve:4 brot:3 apfel:3 riegel:3 wasser:4 cola:3 saft:3',
-    militaer: 'gewehr:2.5 gewehrmuni:4 granate:3 pistole:1.5 9mm:2 medkit:1.5 verband:1 riegel:1',
+    stadt: 'konserve:3 brot:2 apfel:2 riegel:2 wasser:3 cola:2 saft:2 verband:2 bandage:2 tabletten:1.5 medkit:0.6 9mm:2 minipistole:1 granate:0.5 uhr:1 gold:0.4',
+    krankenhaus: 'verband:5 bandage:5 tabletten:4 spritze:3 medkit:3 erstehilfe:1.5 wasser:2 saft:1',
+    polizei: 'pistole:3 9mm:4 schrotflinte:1.5 schrot:2 granate:1.5 verband:1 bandage:1.5 medkit:0.6',
+    supermarkt: 'konserve:4 brot:3 apfel:3 riegel:3 wasser:4 cola:3 saft:3 tabletten:1.5 bandage:1.5',
+    militaer: 'gewehr:2.5 gewehrmuni:4 granate:3 pistole:1.5 9mm:2 medkit:1.5 erstehilfe:0.6 spritze:1 verband:1 bandage:1 riegel:1',
     hof: 'schrotflinte:2 schrot:3 apfel:3 brot:2 wasser:2 saft:1',
     tanke1: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
     tanke2: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
@@ -371,7 +380,7 @@
     sperre: 'gewehrmuni:1 granate:1 verband:1',
     bunker: 'konserve:1 wasser:1',
     wald: 'apfel:2 wasser:1 9mm:0.5 verband:0.5',
-    land: 'apfel:2 wasser:2 brot:1 konserve:1 9mm:0.6 schrot:0.5 minipistole:0.3 uhr:0.3'
+    land: 'apfel:2 wasser:2 brot:1 konserve:1 9mm:0.6 schrot:0.5 minipistole:0.3 uhr:0.3 bandage:0.8 tabletten:0.5'
   };
   const LTP = {};
   for (const k in LT) LTP[k] = LT[k].split(' ').map((s) => { const [t, w] = s.split(':'); return [t, +w]; });
@@ -414,7 +423,7 @@
     P.food -= dt * 100 / 1500;
     P.water -= dt * 100 / 1100 * (P.mode === 'run' ? 2 : 1);
     if (P.food <= 0 || P.water <= 0) { P.food = Math.max(0, P.food); P.water = Math.max(0, P.water); P.hp -= 0.6 * dt; if (P.hp <= 0) { P.hp = 0; killPlayer(P.food <= 0 ? 'Verhungert' : 'Verdurstet'); return; } }
-    else if (P.food > 60 && P.water > 60 && P.hp < 100) P.hp = Math.min(100, P.hp + 0.25 * dt);
+    else if (P.food > 60 && P.water > 60 && P.hp < 100) P.hp = Math.min(100, P.hp + 0.5 * dt);
     P.noiseShow = Math.max(0, P.noiseShow - dt * 30);
     P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
     P.fireCd -= dt;
@@ -591,10 +600,16 @@
     if (P.hp >= 100) { L.msg('Du bist nicht verletzt.'); return; }
     let f = null;
     if (it) f = { arr: P.hot, i: P.hot.indexOf(it) };
-    else f = findItem((x) => x.type === 'verband' && P.hp >= 60) || findItem((x) => x.type === 'medkit' || x.type === 'verband');
-    if (!f || f.i < 0) { L.msg('Kein Verband oder Medikit dabei.'); return; }
+    else {
+      // das kleinste Heil-Item, das reicht – sonst das stärkste
+      const miss = 100 - P.hp, hs = ['tabletten', 'bandage', 'verband', 'spritze', 'medkit', 'erstehilfe'].filter((t) => findItem((x) => x.type === t));
+      const pickT = hs.find((t) => ITEMS[t].heal >= miss) || hs[hs.length - 1];
+      if (pickT) f = findItem((x) => x.type === pickT);
+    }
+    if (!f || f.i < 0) { L.msg('Nichts zum Heilen dabei (Bandagen, Verbände, Medkits suchen!)'); return; }
+    const nm = ITEMS[f.arr[f.i].type];
     L.useConsumable(f.arr[f.i]); if (f.arr[f.i].count <= 0) f.arr[f.i] = null;
-    L.msg('🩹 Verarztet');
+    L.msg(nm.icon + ' ' + nm.name + ' benutzt: +' + nm.heal + ' Leben');
   }
   // die Waffe in der Hand – sonst die erste Waffe in der Schnellleiste
   function curWeapon() {
@@ -2405,7 +2420,7 @@
   }
   function dropNpcLoot(n) {
     if (n.weapon !== 'hammer') L.spawnItem(n.weapon, n.x + 0.5, n.z, 1, Math.floor(ITEMS[n.weapon].mag * 0.5));
-    L.spawnItem(L.pick(['konserve', 'wasser', 'riegel', 'cola', 'verband', '9mm', 'schrot']), n.x - 0.5, n.z + 0.4);
+    for (let k = 0; k < 4; k++) L.spawnItem(L.pick(['konserve', 'wasser', 'riegel', 'cola', 'verband', 'bandage', 'tabletten', '9mm', 'schrot', 'medkit']), n.x - 0.5 + L.rand(-0.6, 0.6), n.z + 0.4 + L.rand(-0.6, 0.6));
     if (Math.random() < 0.3) L.spawnItem(L.pick(['gold', 'uhr', 'granate']), n.x, n.z - 0.6);
   }
   function updateNpc(n, dt) {
@@ -2578,9 +2593,10 @@
     const spots = L.lootSpots.slice().sort(() => Math.random() - 0.5);
     let n = 0;
     for (const s of spots) {
-      if (Math.random() > 0.22) continue;
-      L.spawnItem(rollLoot(s.poi), s.x, s.z);
-      n++;
+      // fünfmal so viel Beute wie früher (früher jeder ~5. Platz)
+      const k = Math.random() < 0.1 ? 2 : 1;
+      for (let j = 0; j < k; j++) L.spawnItem(rollLoot(s.poi), s.x + (j ? L.rand(-1.5, 1.5) : 0), s.z + (j ? L.rand(-1.5, 1.5) : 0));
+      n += k;
     }
     const mil = spots.filter((s) => s.poi === 'militaer');
     for (let i = 0; i < 2 && i < mil.length; i++) L.spawnItem('sicherung', mil[i].x + 0.6, mil[i].z, 1);

@@ -120,7 +120,7 @@
     if (R() < 0.45) box(x1 + R() * cw, z1 + R() * cd, 0.8 + R(), 0.01, 0.6 + R(), '#4a0a0a', R() * 3, 0, 0.012);
     if (R() < 0.5) { const s = wallSpot(Math.floor(R() * 4), R()); for (let k = 0; k < 3; k++) box(s[0], s[1], 1.6, 0.18, 0.06, '#6a4a2a', s[2], 0, 1.0 + k * 0.4); }
     // Beute auf dem Boden
-    if (R() < 0.55) I.loose.push({ x: x1 + 0.8 + R() * (cw - 1.6), z: z1 + 0.8 + R() * (cd - 1.6), y, key: I.B.id + ':f' + I.loose.length });
+    for (let k = 1 + Math.floor(R() * 4); k > 0; k--) I.loose.push({ x: x1 + 0.8 + R() * (cw - 1.6), z: z1 + 0.8 + R() * (cd - 1.6), y, key: I.B.id + ':f' + I.loose.length });
   }
 
   // ---------- Inneres eines Gebäudes erzeugen ----------
@@ -221,10 +221,10 @@
     const B = c.B; B.state.opened[c.key] = true; openLook(c);
     L.nz({ dur: 0.5, f: 500 + Math.random() * 300, type: 'bandpass', q: 3, vol: 0.25 });
     L.makeNoise(P.x, P.z, 6, P);
-    const R = Math.random(), n = R < 0.3 ? 0 : R < 0.8 ? 1 : 2;
+    const n = 2 + Math.floor(Math.random() * 5);
     const poi = c.type === 'medizin' ? 'krankenhaus' : c.type === 'spind' ? 'polizei' : c.type === 'kuehl' ? 'supermarkt' : B.poi;
     const fx = Math.sin(c.ry), fz = Math.cos(c.ry);
-    for (let k = 0; k < n; k++) { const it = L.spawnItem(L.rollLoot(poi), c.x + fx * (c.d / 2 + 0.6) + (k - 0.5) * 0.6, c.z + fz * (c.d / 2 + 0.6), undefined, undefined, undefined, undefined, c.y, true); B.int.items.push(it); }
+    for (let k = 0; k < n; k++) { const it = L.spawnItem(L.rollLoot(poi), c.x + fx * (c.d / 2 + 0.6) + ((k % 3) - 1) * 0.55, c.z + fz * (c.d / 2 + 0.6 + Math.floor(k / 3) * 0.55), undefined, undefined, undefined, undefined, c.y, true); B.int.items.push(it); }
     L.msg(n ? `🗄️ ${CNAME[c.type]} geöffnet – da ist etwas drin!` : `🗄️ ${CNAME[c.type]} ist leer.`, 1800);
   };
 

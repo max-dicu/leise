@@ -105,7 +105,7 @@
   // ---------- Der Wächter: steht auf dem Turmdach und passt auf dich auf ----------
   let guard = null, signal = null, greeted = false;
   function buildGuard() {
-    const rig = L.buildHuman({ name: 'Der Wächter', special: 'waechter' }), cape = rig.cape;
+    const rig = L.buildHuman({ name: 'Der Wächter', special: 'waechter' }, true), cape = rig.cape;
     rig.root.position.set(L.TOWER.x + 8, L.TOWER.h, L.TOWER.z + 8); rig.root.rotation.y = Math.PI / 4;
     L.scene.add(rig.root); guard = { rig, cape, ph: 0 };
     // Wappen-Signal: Lichtkegel vom Dach in den Himmel, Wappen auf den Wolken (eigener Entwurf: Turm im Schild)

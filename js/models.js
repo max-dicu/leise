@@ -287,9 +287,15 @@
   // Exklusive Skins: Der Wächter, Viktor, Daniel, Richard
   L.GUARD_APP = { name: 'Der Wächter', skin: '#c98e65', hair: 'kurz', hairColor: '#1a1a1a', top: 'anzug', topColor: '#1a1a24', pants: 'anzughose', pantsColor: '#1a1a24', shoeType: 'stiefel', shoes: '#1a1a1a', build: 'muskuloes', height: 'gross', glasses: 'skibrille', glassesColor: '#2a2a3a', hat: 'keine', beard: 'kein', mouth: 'ernst', brows: 'boese' };
   L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard']];
-  function buildSpecial(app) {
+  // Der Wächter-Skin ist gesperrt: nur wer den geheimen Freischalt-Link geöffnet hat, darf ihn tragen (auch online geprüft)
+  L.hash53 = function (str) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36); };
+  const WK = 'ofaw0xb94x';
+  L.waechterOk = (app) => !!(app && typeof app.wk === 'string' && L.hash53(app.wk) === WK);
+  L.waechterToken = () => { const k = L.save && L.save.skinKey; return k && L.hash53(L.hash53(k)) === WK ? L.hash53(k) : null; };
+  function buildSpecial(app, force) {
     const sp = app.special;
     if (sp === 'richard') { const r = L.buildHuman(Object.assign({}, L.RICHARD_APP || {}, { name: app.name })); r.app = Object.assign({}, r.app, { special: 'richard' }); return r; }
+    if (sp === 'waechter' && !force && !L.waechterOk(app)) return L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter') {
       const r = L.buildHuman(Object.assign({}, L.GUARD_APP, { name: app.name }));
       const cape = new T.Mesh(G().box, L.mat('#5a0a14')); cape.scale.set(0.62, 1.25, 0.05); cape.position.set(0, -0.68, -0.17); r.torso.add(cape); r.cape = cape;
@@ -310,8 +316,8 @@
     else { for (let k = 0; k < 4; k++) part(G().box, '#1a1a1a', w * 1.03, 0.012, d * 1.03, 0, y + (k / 3 - 0.5) * h * 0.85, 0, g, { noShadow: true }); for (const xx of [-0.3, 0.3]) part(G().box, '#1a1a1a', 0.012, h, d * 1.03, xx * w, y, 0, g, { noShadow: true }); }
     return pcs;
   }
-  L.buildHuman = function (app) {
-    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter')) return buildSpecial(app);
+  L.buildHuman = function (app, force) {
+    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter')) return buildSpecial(app, force);
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
     const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32, extrem: 1.8 }[A.build] || 1;
     const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
@@ -1384,6 +1390,10 @@
       case 'cola': part(cyl, '#c01010', 0.035, 0.12, 0.035, 0, 0, 0, g); break;
       case 'saft': part(box, '#e8a020', 0.06, 0.14, 0.04, 0, 0, 0, g); break;
       case 'verband': part(box, '#f0f0f0', 0.1, 0.06, 0.1, 0, 0, 0, g); break;
+      case 'bandage': part(box, '#f4efe0', 0.08, 0.05, 0.08, 0, 0, 0, g); part(cyl, '#e8e0cc', 0.05, 0.06, 0.05, 0, 0.0, 0, g).rotation.z = Math.PI / 2; break;
+      case 'tabletten': part(cyl, '#f2f2f2', 0.05, 0.1, 0.05, 0, 0, 0, g); part(cyl, '#2a8ae0', 0.052, 0.03, 0.052, 0, 0.06, 0, g); break;
+      case 'spritze': { const s = part(cyl, '#bfe3ff', 0.025, 0.16, 0.025, 0, 0, 0, g, { opacity: 0.7 }); s.rotation.z = Math.PI / 2; part(box, '#d02a2a', 0.1, 0.03, 0.03, 0, 0, 0, g); const n = part(cyl, '#c8c8c8', 0.006, 0.06, 0.006, 0.11, 0, 0, g); n.rotation.z = Math.PI / 2; break; }
+      case 'erstehilfe': part(box, '#2a8a3a', 0.26, 0.17, 0.12, 0, 0, 0, g); part(box, '#f2f2f2', 0.13, 0.035, 0.121, 0, 0, 0, g); part(box, '#f2f2f2', 0.035, 0.13, 0.121, 0, 0, 0, g); part(box, '#1a1a1a', 0.1, 0.02, 0.03, 0, 0.1, 0, g); break;
       case 'medkit': part(box, '#f0f0f0', 0.22, 0.14, 0.16, 0, 0, 0, g); part(box, '#c01010', 0.12, 0.03, 0.161, 0, 0, 0, g); part(box, '#c01010', 0.03, 0.12, 0.161, 0, 0, 0, g); break;
       case '9mm': part(box, '#c0a020', 0.12, 0.08, 0.08, 0, 0, 0, g); break;
       case 'schrot': part(box, '#c03020', 0.12, 0.08, 0.08, 0, 0, 0, g); break;

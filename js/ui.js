@@ -588,6 +588,7 @@
   function rebuildPreview() {
     if (!prev) return;
     if (prev.rig) prev.s.remove(prev.rig.root);
+    if (charApp.special === 'waechter' && L.waechterToken()) charApp.wk = L.waechterToken();
     prev.rig = L.buildHuman(charApp); prev.s.add(prev.rig.root);
   }
   function renderCharOpts() {
@@ -599,7 +600,7 @@
     nameD.appendChild(inp); box.appendChild(nameD);
     { const d = document.createElement('div'); d.className = 'opt'; d.innerHTML = '<label>⭐ Exklusive Skins</label>';
       const ch = document.createElement('div'); ch.className = 'choices';
-      for (const [k, nm] of L.SKINS) { const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
+      for (const [k, nm] of L.SKINS) { if (k === 'waechter' && !L.waechterToken()) continue; const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
       d.appendChild(ch); box.appendChild(d); }
     for (const key in L.CHAR_OPTS) {
       const d = document.createElement('div'); d.className = 'opt';
@@ -617,6 +618,6 @@
     }
   }
   $('charRandom').onclick = () => { const n = charApp.name; charApp = Object.assign(L.randomAppearance(), { name: n }); renderCharOpts(); rebuildPreview(); };
-  $('charSave').onclick = () => { L.save.char = Object.assign({}, charApp); L.persist(); toMenu(); L.msg && 0; };
+  $('charSave').onclick = () => { if (charApp.special === 'waechter') { const tk = L.waechterToken(); if (tk) charApp.wk = tk; else charApp.special = ''; } else delete charApp.wk; L.save.char = Object.assign({}, charApp); L.persist(); toMenu(); L.msg && 0; };
   $('charBack').onclick = toMenu;
 })();
