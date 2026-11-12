@@ -18,122 +18,407 @@
   }
 
   // ---------- Aussehen ----------
+  // Eine gemeinsame Farbpalette für alles Farbige (Haare, Augen, Kleidung, Hose, Schuhe, Kopfbedeckung, Brille)
+  const PALETTE = ['#1a1a1a', '#f2f2f2', '#7a7a7a', '#4a2f1c', '#8a5a2b', '#d8b46a', '#a83a1c', '#c02a2a',
+    '#e07020', '#e8c020', '#3a8a3a', '#2a6a6a', '#2a6ac0', '#1e2f5a', '#6a3a8a', '#d04a9a'];
+  L.PALETTE = PALETTE;
   L.CHAR_OPTS = {
-    skin: ['#f1d2b6', '#e3b48f', '#c98e65', '#a46a45', '#7a4a2e', '#4e2f1e'],
-    hair: ['kurz', 'lang', 'glatze', 'irokese', 'locken', 'zopf', 'seitenscheitel'],
-    hairColor: ['#1a1410', '#4a2f1c', '#8a5a2b', '#d8b46a', '#a83a1c', '#9a9a9a', '#2850c0', '#d04a9a'],
-    eyes: ['#5a3a1c', '#2a6ac0', '#3a8a4a', '#6a6a6a', '#1a1a1a'],
-    brows: ['normal', 'dick', 'boese', 'hoch'],
-    mouth: ['normal', 'laecheln', 'ernst', 'offen', 'grinsen'],
-    nose: ['klein', 'normal', 'gross', 'spitz'],
-    beard: ['kein', 'stoppel', 'vollbart', 'schnurrbart', 'kinnbart'],
-    glasses: ['keine', 'brille', 'sonnenbrille'],
-    hat: ['keine', 'muetze', 'cap', 'helm', 'stirnband'],
-    top: ['tshirt', 'jacke', 'hoodie', 'weste'],
-    topColor: ['#2a4a8a', '#8a2a2a', '#2a6a3a', '#2a2a2a', '#d8d0c0', '#c08a2a', '#6a3a8a', '#4a5a3a'],
-    pantsColor: ['#2a3550', '#1e1e22', '#5a4a32', '#4a5a3a', '#7a7a7a', '#6a2a2a'],
-    shoes: ['#1a1a1a', '#e8e8e8', '#6a4a2a', '#8a1a1a'],
-    build: ['schmal', 'normal', 'kraeftig'],
-    height: ['klein', 'mittel', 'gross'],
-    scar: ['keine', 'wange', 'auge']
+    skin: ['#f6dcc6', '#f1d2b6', '#e8c09c', '#e3b48f', '#d49e74', '#c98e65', '#b07a52', '#a46a45', '#7a4a2e', '#4e2f1e'],
+    hair: ['kurz', 'seitenscheitel', 'pony', 'buzz', 'stachel', 'undercut', 'irokese', 'locken', 'wellig', 'lang', 'bob', 'zopf', 'zoepfe', 'dutt', 'dreads', 'glatze'],
+    hairColor: PALETTE,
+    eyes: PALETTE,
+    brows: ['normal', 'duenn', 'dick', 'buschig', 'boese', 'hoch', 'traurig', 'gebogen'],
+    mouth: ['normal', 'laecheln', 'grinsen', 'zaehne', 'ernst', 'schmollen', 'schief', 'offen', 'ueberrascht', 'traurig'],
+    nose: ['klein', 'normal', 'gross', 'spitz', 'breit', 'stups', 'lang', 'knubbel'],
+    beard: ['kein', 'stoppel', 'vollbart', 'langbart', 'schnurrbart', 'henkelbart', 'kinnbart', 'ziegenbart', 'koteletten', 'kinnstreifen'],
+    glasses: ['keine', 'brille', 'rund', 'eckig', 'sonnenbrille', 'skibrille', 'monokel', 'augenklappe'],
+    glassesColor: PALETTE,
+    hat: ['keine', 'muetze', 'beanie', 'cap', 'cap_rueck', 'helm', 'stirnband', 'bandana', 'cowboy', 'zylinder', 'sonnenhut', 'krone'],
+    hatColor: PALETTE,
+    top: ['tshirt', 'tanktop', 'hemd', 'pullover', 'hoodie', 'jacke', 'lederjacke', 'regenjacke', 'weste', 'anzug', 'trikot', 'kittel'],
+    topColor: PALETTE,
+    pants: ['jeans', 'kurz', 'jogging', 'cargo', 'zerrissen', 'anzughose'],
+    pantsColor: PALETTE,
+    shoeType: ['sneaker', 'hightop', 'stiefel', 'sandale', 'lackschuh', 'barfuss'],
+    shoes: PALETTE,
+    build: ['duenn', 'schmal', 'normal', 'kraeftig', 'muskuloes'],
+    height: ['sehr_klein', 'klein', 'mittel', 'gross', 'sehr_gross'],
+    scar: ['keine', 'wange', 'auge', 'stirn', 'kinn', 'kreuz']
   };
-  L.DEFAULT_CHAR = { name: 'Überlebender', skin: '#e3b48f', hair: 'kurz', hairColor: '#4a2f1c', eyes: '#2a6ac0', brows: 'normal', mouth: 'normal', nose: 'normal', beard: 'kein', glasses: 'keine', hat: 'keine', top: 'jacke', topColor: '#2a4a8a', pantsColor: '#2a3550', shoes: '#1a1a1a', build: 'normal', height: 'mittel', scar: 'keine' };
+  L.DEFAULT_CHAR = {
+    name: 'Überlebender', skin: '#e3b48f', hair: 'kurz', hairColor: '#4a2f1c', eyes: '#2a6ac0', brows: 'normal', mouth: 'normal', nose: 'normal',
+    beard: 'kein', glasses: 'keine', glassesColor: '#1a1a1a', hat: 'keine', hatColor: '#c02a2a', top: 'jacke', topColor: '#1e2f5a',
+    pants: 'jeans', pantsColor: '#1e2f5a', shoeType: 'sneaker', shoes: '#1a1a1a', build: 'normal', height: 'mittel', scar: 'keine'
+  };
   L.randomAppearance = function () {
     const a = {}, O = L.CHAR_OPTS;
     for (const k in O) a[k] = L.pick(O[k]);
-    if (Math.random() < 0.6) a.hat = 'keine';
+    if (Math.random() < 0.55) a.hat = 'keine';
     if (Math.random() < 0.6) a.glasses = 'keine';
     if (Math.random() < 0.5) a.beard = 'kein';
-    a.scar = Math.random() < 0.85 ? 'keine' : a.scar;
+    if (Math.random() < 0.8) a.scar = 'keine';
+    // natürliche Haar- und Augenfarben bei NPCs bevorzugen
+    if (Math.random() < 0.75) a.hairColor = L.pick(['#1a1a1a', '#4a2f1c', '#8a5a2b', '#d8b46a', '#a83a1c', '#7a7a7a']);
+    if (Math.random() < 0.8) a.eyes = L.pick(['#4a2f1c', '#2a6ac0', '#3a8a3a', '#7a7a7a', '#1a1a1a']);
     return a;
   };
+
+  // Frisuren – liegen eng am Kopf; „covered“ = Kopfbedeckung verdeckt den Oberkopf
+  function buildHair(head, A, covered) {
+    const box = G().box, sph = G().sph, cone = G().cone, cyl = G().cyl, hc = A.hairColor, dk = shade(hc, 0.8);
+    const ns = { noShadow: true };
+    const top = (h) => { if (!covered) part(box, hc, 0.27, h || 0.06, 0.28, 0, 0.3 + (h || 0.06) / 2 - 0.01, -0.005, head); };
+    const back = (len) => part(box, hc, 0.27, len, 0.05, 0, 0.31 - len / 2, -0.125, head);
+    const sides = (len, depth) => { for (const s of [-1, 1]) part(box, hc, 0.03, len, depth || 0.2, s * 0.135, 0.31 - len / 2, -0.03, head); };
+    const fringe = (h, w) => part(box, hc, w || 0.26, h, 0.03, 0, 0.3 - h / 2, 0.125, head, ns);
+    // Kette aus kleinen Kugeln (für Locken, Zöpfe)
+    const chain = (x, y, z, n, r, dy, spiral, color) => {
+      for (let k = 0; k < n; k++) {
+        const a = k * 1.9, rr = r * (1 - k * 0.06);
+        part(sph, k % 2 ? (color || hc) : shade(color || hc, 0.85), rr, rr * 1.15, rr, x + Math.cos(a) * spiral, y - k * dy, z + Math.sin(a) * spiral, head);
+      }
+    };
+    switch (A.hair) {
+      case 'kurz':
+        top(0.06); back(0.13); sides(0.09); fringe(0.035);
+        break;
+      case 'buzz':
+        part(box, dk, 0.258, 0.05, 0.268, 0, 0.285, 0, head, ns);
+        part(box, dk, 0.258, 0.1, 0.02, 0, 0.24, -0.124, head, ns);
+        break;
+      case 'seitenscheitel': {
+        top(0.06); back(0.14); sides(0.1);
+        if (!covered) { const sw = part(box, hc, 0.18, 0.05, 0.28, 0.05, 0.345, 0, head); sw.rotation.z = -0.22; }
+        const f = part(box, hc, 0.17, 0.05, 0.03, 0.04, 0.275, 0.125, head, ns); f.rotation.z = -0.35;
+        break;
+      }
+      case 'pony':
+        top(0.06); back(0.16); sides(0.12);
+        part(box, hc, 0.27, 0.075, 0.035, 0, 0.255, 0.128, head, ns);
+        for (let k = -2; k <= 2; k++) part(box, dk, 0.012, 0.07, 0.036, k * 0.05, 0.257, 0.129, head, ns);
+        break;
+      case 'stachel':
+        back(0.1); sides(0.07);
+        if (!covered) {
+          part(box, hc, 0.26, 0.035, 0.27, 0, 0.305, 0, head);
+          for (let i = 0; i < 11; i++) {
+            const a = i * 2.4, r = 0.03 + (i % 3) * 0.035, x = Math.cos(a) * r, z = Math.sin(a) * r - 0.01;
+            const c = part(cone, hc, 0.035, 0.11, 0.035, x, 0.36, z, head);
+            c.rotation.set(z * 3, 0, -x * 3);
+          }
+        }
+        break;
+      case 'undercut':
+        part(box, dk, 0.258, 0.12, 0.268, 0, 0.23, 0, head, ns);
+        if (!covered) { const t = part(box, hc, 0.2, 0.08, 0.29, 0.01, 0.33, 0.01, head); t.rotation.z = -0.08; }
+        break;
+      case 'irokese':
+        part(box, dk, 0.258, 0.04, 0.268, 0, 0.29, 0, head, ns);
+        if (!covered) for (let i = 0; i < 6; i++) part(cone, hc, 0.03, 0.14 - Math.abs(i - 2.5) * 0.015, 0.05, 0, 0.36, 0.11 - i * 0.045, head);
+        else part(box, hc, 0.05, 0.12, 0.05, 0, 0.21, -0.14, head);
+        break;
+      case 'locken': {
+        // Ringellocken: dichte kleine Locken am Oberkopf und gedrehte Strähnen, die bis zum Kinn fallen (kein Afro)
+        if (!covered) {
+          for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+            if (Math.abs(i) + Math.abs(j) > 3) continue;
+            part(sph, (i + j) % 2 ? hc : dk, 0.042, 0.042, 0.042, i * 0.052, 0.31 + (2 - Math.abs(i)) * 0.006, j * 0.052 - 0.005, head);
+          }
+        }
+        // Locken über der Stirn
+        for (let k = -2; k <= 2; k++) part(sph, k % 2 ? hc : dk, 0.034, 0.038, 0.03, k * 0.05, 0.285, 0.12, head, ns);
+        // gedrehte Strähnen an den Seiten und hinten
+        for (let i = 0; i < 11; i++) {
+          const a = Math.PI * 0.42 + i * (Math.PI * 1.16 / 10);
+          const x = Math.sin(a) * 0.14, z = Math.cos(a) * 0.14 - 0.01;
+          chain(x, 0.27, z, 5, 0.034, 0.055, 0.012);
+        }
+        break;
+      }
+      case 'wellig':
+        top(0.06); fringe(0.03);
+        for (let k = 0; k < 6; k++) part(box, k % 2 ? hc : dk, 0.27, 0.07, 0.055, (k % 2 ? 1 : -1) * 0.012, 0.29 - k * 0.065, -0.128, head);
+        for (const s of [-1, 1]) for (let k = 0; k < 5; k++) part(box, k % 2 ? hc : dk, 0.035, 0.07, 0.19, s * (0.137 + (k % 2) * 0.01), 0.28 - k * 0.065, -0.03, head);
+        break;
+      case 'lang':
+        top(0.06); back(0.44); sides(0.32); fringe(0.03);
+        for (const s of [-1, 1]) part(box, hc, 0.05, 0.2, 0.05, s * 0.11, 0.0, 0.075, head);
+        break;
+      case 'bob':
+        top(0.065); back(0.24); sides(0.24, 0.22); fringe(0.06);
+        for (const s of [-1, 1]) part(box, dk, 0.034, 0.03, 0.22, s * 0.136, 0.08, -0.02, head, ns);
+        break;
+      case 'zopf':
+        top(0.06); back(0.13); sides(0.08); fringe(0.03);
+        part(sph, '#c02a2a', 0.03, 0.03, 0.03, 0, 0.23, -0.16, head, ns);
+        chain(0, 0.19, -0.175, 6, 0.042, 0.05, 0.006);
+        break;
+      case 'zoepfe':
+        top(0.06); back(0.12); fringe(0.035);
+        for (const s of [-1, 1]) {
+          chain(s * 0.14, 0.2, 0.0, 7, 0.03, 0.045, 0.008);
+          part(sph, '#c02a2a', 0.022, 0.022, 0.022, s * 0.14, 0.2 - 7 * 0.045, 0.0, head, ns);
+        }
+        break;
+      case 'dutt':
+        top(0.06); back(0.12); sides(0.08); fringe(0.03);
+        part(sph, hc, 0.075, 0.07, 0.075, 0, covered ? 0.2 : 0.33, covered ? -0.17 : -0.11, head);
+        part(cyl, dk, 0.06, 0.02, 0.06, 0, covered ? 0.24 : 0.29, covered ? -0.15 : -0.11, head, ns);
+        break;
+      case 'dreads':
+        top(0.05);
+        for (let i = 0; i < 13; i++) {
+          const a = Math.PI * 0.4 + i * (Math.PI * 1.2 / 12);
+          const x = Math.sin(a) * 0.14, z = Math.cos(a) * 0.14 - 0.01;
+          const d = part(cyl, i % 2 ? hc : dk, 0.02, 0.32, 0.02, x * 1.05, 0.13, z * 1.05, head);
+          d.rotation.set(-z * 0.6, 0, x * 0.6);
+        }
+        break;
+      default: // Glatze: nur ein kleiner Glanzpunkt
+        part(box, shade(A.skin, 1.12), 0.06, 0.004, 0.06, -0.03, 0.296, 0.02, head, ns);
+    }
+  }
 
   // ---------- Mensch (Spieler und NPCs) ----------
   L.buildHuman = function (app) {
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
-    const bw = { schmal: 0.85, normal: 1, kraeftig: 1.25 }[A.build] || 1;
-    const hs = { klein: 0.92, mittel: 1, gross: 1.08 }[A.height] || 1;
+    const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32 }[A.build] || 1;
+    const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
     const root = new T.Group(), body = grp(root), hips = grp(body, 0, 0.95, 0);
-    const box = G().box, skin = A.skin, hc = A.hairColor;
-    const sleeve = A.top === 'tshirt' || A.top === 'weste' ? skin : A.topColor;
+    const box = G().box, sph = G().sph, cyl = G().cyl, cone = G().cone;
+    const skin = A.skin, hc = A.hairColor, tc = A.topColor, pc = A.pantsColor, sc = A.shoes, ns = { noShadow: true };
     const legs = [], arms = [];
+
+    // ---- Beine, Hose, Schuhe ----
     for (const s of [-1, 1]) {
       const leg = grp(hips, s * 0.11 * bw, 0, 0);
-      part(box, A.pantsColor, 0.16 * bw, 0.46, 0.17 * bw, 0, -0.23, 0, leg);
+      part(box, pc, 0.16 * bw, 0.46, 0.17 * bw, 0, -0.23, 0, leg);
+      if (A.pants === 'cargo') part(box, shade(pc, 0.72), 0.03, 0.12, 0.1, s * 0.085 * bw, -0.26, 0, leg);
+      if (A.pants === 'jogging') part(box, '#f2f2f2', 0.012, 0.46, 0.02, s * 0.081 * bw, -0.23, 0, leg, ns);
+      if (A.pants === 'anzughose') part(box, shade(pc, 0.7), 0.008, 0.46, 0.005, 0, -0.23, 0.086 * bw, leg, ns);
       const knee = grp(leg, 0, -0.46, 0);
-      part(box, A.pantsColor, 0.14 * bw, 0.44, 0.15 * bw, 0, -0.22, 0, knee);
-      part(box, A.shoes, 0.15 * bw, 0.1, 0.27, 0, -0.47, 0.05, knee);
+      part(box, A.pants === 'kurz' ? skin : pc, 0.14 * bw, 0.44, 0.15 * bw, 0, -0.22, 0, knee);
+      if (A.pants === 'kurz') part(box, pc, 0.15 * bw, 0.06, 0.16 * bw, 0, -0.01, 0, knee);
+      if (A.pants === 'jogging') { part(box, shade(pc, 0.8), 0.15 * bw, 0.05, 0.16 * bw, 0, -0.41, 0, knee); part(box, '#f2f2f2', 0.012, 0.36, 0.02, s * 0.071 * bw, -0.2, 0, knee, ns); }
+      if (A.pants === 'cargo') part(box, shade(pc, 0.72), 0.03, 0.1, 0.09, s * 0.075 * bw, -0.15, 0, knee);
+      if (A.pants === 'zerrissen') { part(box, skin, 0.08, 0.05, 0.01, 0.01, -0.03, 0.077 * bw, knee, ns); part(box, skin, 0.05, 0.03, 0.01, -0.02, 0.18, 0.086 * bw, leg, ns); }
+      const st = A.shoeType;
+      if (st === 'barfuss') part(box, skin, 0.13 * bw, 0.07, 0.24, 0, -0.475, 0.05, knee);
+      else if (st === 'sandale') { part(box, skin, 0.13 * bw, 0.06, 0.23, 0, -0.47, 0.05, knee); part(box, sc, 0.15 * bw, 0.025, 0.26, 0, -0.505, 0.05, knee); part(box, sc, 0.14 * bw, 0.02, 0.03, 0, -0.455, 0.09, knee, ns); }
+      else if (st === 'stiefel') { part(box, sc, 0.155 * bw, 0.2, 0.17 * bw, 0, -0.39, 0, knee); part(box, sc, 0.15 * bw, 0.1, 0.28, 0, -0.47, 0.05, knee); part(box, shade(sc, 0.6), 0.16 * bw, 0.03, 0.29, 0, -0.51, 0.05, knee); }
+      else if (st === 'hightop') { part(box, sc, 0.155 * bw, 0.16, 0.18 * bw, 0, -0.41, 0.01, knee); part(box, sc, 0.15 * bw, 0.1, 0.27, 0, -0.47, 0.05, knee); part(box, '#f2f2f2', 0.16 * bw, 0.03, 0.28, 0, -0.51, 0.05, knee); }
+      else if (st === 'lackschuh') { part(box, sc, 0.14 * bw, 0.08, 0.27, 0, -0.48, 0.05, knee); part(box, '#ffffff', 0.05, 0.01, 0.06, 0.02, -0.438, 0.12, knee, { basic: true, noShadow: true, opacity: 0.35 }); }
+      else { part(box, sc, 0.15 * bw, 0.1, 0.27, 0, -0.47, 0.05, knee); part(box, '#f2f2f2', 0.16 * bw, 0.03, 0.28, 0, -0.51, 0.05, knee); }
       legs.push({ leg, knee });
     }
+
+    // ---- Oberkörper ----
     const torso = grp(hips);
-    part(box, A.topColor, 0.44 * bw, 0.6, 0.25 * bw, 0, 0.31, 0, torso);
+    const TP = A.top, fz = 0.126 * bw;
+    const coat = TP === 'lederjacke' ? shade(tc, 0.85) : tc;
+    const shirtUnder = '#e8e2d4';
+    part(box, TP === 'weste' ? shirtUnder : coat, 0.44 * bw, 0.6, 0.25 * bw, 0, 0.31, 0, torso);
     part(box, '#1c1c1c', 0.45 * bw, 0.06, 0.26 * bw, 0, 0.03, 0, torso);
-    if (A.top === 'jacke') { part(box, shade(A.topColor, 0.6), 0.02, 0.56, 0.01, 0, 0.32, 0.127 * bw, torso); part(box, shade(A.topColor, 0.8), 0.46 * bw, 0.07, 0.27 * bw, 0, 0.6, 0, torso); }
-    if (A.top === 'hoodie') { part(box, shade(A.topColor, 0.85), 0.3, 0.2, 0.12, 0, 0.62, -0.16 * bw, torso); part(box, shade(A.topColor, 0.7), 0.24 * bw, 0.14, 0.02, 0, 0.18, 0.128 * bw, torso); }
-    if (A.top === 'weste') { part(box, shade(A.topColor, 0.55), 0.46 * bw, 0.5, 0.27 * bw, 0, 0.33, 0, torso); part(box, '#d8d0c0', 0.14 * bw, 0.45, 0.01, 0, 0.35, 0.137 * bw, torso); }
+    if (A.build === 'muskuloes' && (TP === 'tanktop' || TP === 'tshirt' || TP === 'trikot')) for (const s of [-1, 1]) part(box, shade(coat, 0.85), 0.17 * bw, 0.1, 0.01, s * 0.1 * bw, 0.47, fz + 0.002, torso, ns);
+    switch (TP) {
+      case 'tshirt': part(box, shade(tc, 0.8), 0.14, 0.03, 0.01, 0, 0.59, fz + 0.002, torso, ns); break;
+      case 'tanktop':
+        for (const s of [-1, 1]) part(box, skin, 0.1 * bw, 0.09, 0.26 * bw, s * 0.17 * bw, 0.565, 0, torso);
+        part(box, skin, 0.12, 0.08, 0.01, 0, 0.56, fz + 0.002, torso, ns);
+        break;
+      case 'hemd':
+        for (const s of [-1, 1]) { const c = part(box, shade(tc, 1.15), 0.08, 0.05, 0.02, s * 0.04, 0.58, fz + 0.005, torso, ns); c.rotation.z = s * 0.5; }
+        for (let k = 0; k < 4; k++) part(box, '#f2f2f2', 0.015, 0.015, 0.01, 0, 0.5 - k * 0.11, fz + 0.004, torso, ns);
+        part(box, shade(tc, 0.75), 0.008, 0.52, 0.006, 0, 0.32, fz + 0.002, torso, ns);
+        break;
+      case 'pullover':
+        part(box, shade(tc, 0.75), 0.16, 0.035, 0.01, 0, 0.6, fz + 0.002, torso, ns);
+        part(box, shade(tc, 0.75), 0.45 * bw, 0.06, 0.26 * bw, 0, 0.06, 0, torso);
+        for (let k = -2; k <= 2; k++) part(box, shade(tc, 0.88), 0.012, 0.4, 0.004, k * 0.06 * bw, 0.33, fz + 0.002, torso, ns);
+        break;
+      case 'hoodie':
+        part(box, shade(tc, 0.85), 0.3, 0.2, 0.12, 0, 0.62, -0.16 * bw, torso);
+        part(box, shade(tc, 0.7), 0.24 * bw, 0.14, 0.02, 0, 0.18, fz + 0.002, torso);
+        for (const s of [-1, 1]) part(box, '#f2f2f2', 0.008, 0.1, 0.008, s * 0.04, 0.52, fz + 0.006, torso, ns);
+        break;
+      case 'jacke':
+        part(box, shade(tc, 0.6), 0.02, 0.56, 0.01, 0, 0.32, fz + 0.002, torso, ns);
+        part(box, shade(tc, 0.8), 0.46 * bw, 0.07, 0.27 * bw, 0, 0.6, 0, torso);
+        for (const s of [-1, 1]) part(box, shade(tc, 0.7), 0.08, 0.06, 0.01, s * 0.12 * bw, 0.2, fz + 0.003, torso, ns);
+        break;
+      case 'lederjacke':
+        for (const s of [-1, 1]) { const l = part(box, shade(coat, 0.7), 0.1, 0.22, 0.015, s * 0.07, 0.5, fz + 0.004, torso, ns); l.rotation.z = s * 0.35; }
+        { const z = part(box, '#c8c8c8', 0.01, 0.45, 0.008, 0.03, 0.3, fz + 0.006, torso, ns); z.rotation.z = 0.12; }
+        break;
+      case 'regenjacke':
+        part(box, shade(tc, 0.85), 0.3, 0.1, 0.28 * bw, 0, 0.62, 0, torso);
+        part(box, shade(tc, 0.6), 0.02, 0.5, 0.01, 0, 0.34, fz + 0.002, torso, ns);
+        for (const s of [-1, 1]) { part(box, shade(tc, 0.75), 0.1, 0.08, 0.012, s * 0.12 * bw, 0.18, fz + 0.004, torso, ns); part(box, '#f2f2f2', 0.008, 0.1, 0.008, s * 0.04, 0.55, fz + 0.008, torso, ns); }
+        break;
+      case 'weste':
+        for (const s of [-1, 1]) part(box, tc, 0.19 * bw, 0.55, 0.27 * bw, s * 0.125 * bw, 0.32, 0, torso);
+        part(box, tc, 0.44 * bw, 0.55, 0.02, 0, 0.32, -0.125 * bw, torso);
+        for (let k = 0; k < 3; k++) part(box, '#d8b46a', 0.015, 0.015, 0.01, 0.035, 0.42 - k * 0.1, fz + 0.012, torso, ns);
+        break;
+      case 'anzug':
+        part(box, shirtUnder, 0.12, 0.3, 0.01, 0, 0.45, fz + 0.002, torso, ns);
+        part(box, '#8a1a1a', 0.04, 0.28, 0.012, 0, 0.44, fz + 0.006, torso, ns);
+        for (const s of [-1, 1]) { const l = part(box, shade(tc, 0.75), 0.06, 0.26, 0.012, s * 0.08, 0.46, fz + 0.005, torso, ns); l.rotation.z = s * 0.3; }
+        for (let k = 0; k < 2; k++) part(box, '#1a1a1a', 0.015, 0.015, 0.01, 0.03, 0.22 - k * 0.08, fz + 0.004, torso, ns);
+        break;
+      case 'trikot':
+        for (const s of [-1, 1]) part(box, '#f2f2f2', 0.035, 0.6, 0.256 * bw, s * 0.16 * bw, 0.31, 0, torso, ns);
+        part(box, '#f2f2f2', 0.06, 0.12, 0.01, -0.035, 0.38, fz + 0.003, torso, ns);
+        part(box, '#f2f2f2', 0.06, 0.12, 0.01, 0.045, 0.38, fz + 0.003, torso, ns);
+        part(box, tc, 0.025, 0.08, 0.012, 0.045, 0.38, fz + 0.006, torso, ns);
+        break;
+      case 'kittel':
+        part(box, tc, 0.46 * bw, 0.3, 0.27 * bw, 0, -0.13, 0, hips);
+        part(box, shade(tc, 0.8), 0.015, 0.8, 0.006, 0, 0.17, fz + 0.004, torso, ns);
+        for (let k = 0; k < 4; k++) part(box, shade(tc, 0.6), 0.016, 0.016, 0.01, 0.025, 0.5 - k * 0.14, fz + 0.006, torso, ns);
+        for (const s of [-1, 1]) part(box, shade(tc, 0.85), 0.09, 0.07, 0.01, s * 0.12 * bw, 0.15, fz + 0.004, torso, ns);
+        break;
+    }
+
+    // ---- Arme mit passenden Ärmeln ----
+    const sleeve = { tshirt: 'short', trikot: 'short', tanktop: 'none', weste: 'short' }[TP] || 'long';
+    const slc = TP === 'weste' ? shirtUnder : coat;
+    let hand = null;
+    for (const s of [-1, 1]) {
+      const arm = grp(torso, s * (0.22 * bw + 0.06), 0.55, 0);
+      if (sleeve === 'long') part(box, slc, 0.12 * bw, 0.32, 0.13 * bw, 0, -0.16, 0, arm);
+      else if (sleeve === 'short') { part(box, slc, 0.125 * bw, 0.15, 0.135 * bw, 0, -0.075, 0, arm); part(box, skin, 0.105 * bw, 0.18, 0.115 * bw, 0, -0.23, 0, arm); }
+      else part(box, skin, 0.105 * bw, 0.32, 0.115 * bw, 0, -0.16, 0, arm);
+      const elbow = grp(arm, 0, -0.32, 0);
+      part(box, sleeve === 'long' ? slc : skin, 0.11 * bw, 0.3, 0.12 * bw, 0, -0.15, 0, elbow);
+      if (sleeve === 'long' && (TP === 'pullover' || TP === 'hoodie' || TP === 'regenjacke')) part(box, shade(slc, 0.75), 0.115 * bw, 0.04, 0.125 * bw, 0, -0.28, 0, elbow);
+      part(box, skin, 0.09, 0.1, 0.1, 0, -0.34, 0, elbow);
+      arms.push({ arm, elbow });
+      if (s === -1) hand = grp(elbow, 0, -0.36, 0.03);
+    }
+
+    // ---- Kopf und Gesicht ----
     const neck = grp(torso, 0, 0.62, 0);
     part(box, skin, 0.1, 0.08, 0.1, 0, 0.02, 0, neck);
     const head = grp(neck, 0, 0.04, 0);
     part(box, skin, 0.25, 0.29, 0.26, 0, 0.15, 0, head);
-    const fz = 0.131;
+    for (const s of [-1, 1]) part(box, shade(skin, 0.9), 0.025, 0.06, 0.05, s * 0.135, 0.16, -0.01, head, ns);
+    const fz2 = 0.131;
     for (const s of [-1, 1]) {
-      part(box, '#f4f4f0', 0.06, 0.04, 0.01, s * 0.058, 0.18, fz, head, { noShadow: true });
-      part(box, A.eyes, 0.028, 0.034, 0.012, s * 0.058, 0.18, fz + 0.004, head, { noShadow: true });
-      const brow = part(box, A.brows === 'dick' ? shade(hc, 0.8) : hc, 0.07, A.brows === 'dick' ? 0.03 : 0.016, 0.012, s * 0.058, A.brows === 'hoch' ? 0.235 : 0.218, fz + 0.004, head, { noShadow: true });
-      if (A.brows === 'boese') brow.rotation.z = s * 0.3;
-      if (A.brows === 'hoch') brow.rotation.z = -s * 0.15;
+      part(box, '#f4f4f0', 0.06, 0.04, 0.01, s * 0.058, 0.18, fz2, head, ns);
+      part(box, A.eyes, 0.03, 0.034, 0.012, s * 0.058, 0.18, fz2 + 0.004, head, ns);
+      part(box, '#0a0a0a', 0.012, 0.016, 0.013, s * 0.058, 0.18, fz2 + 0.006, head, ns);
+      const b = A.brows;
+      const bh = { dick: 0.03, duenn: 0.008, buschig: 0.036 }[b] || 0.016, bwid = b === 'buschig' ? 0.082 : 0.07;
+      const by = b === 'hoch' ? 0.237 : b === 'gebogen' ? 0.225 : 0.218;
+      const br = part(box, b === 'buschig' ? shade(hc, 0.85) : hc, bwid, bh, 0.012, s * 0.058, by, fz2 + 0.004, head, ns);
+      if (b === 'boese') br.rotation.z = s * 0.3;
+      if (b === 'traurig') br.rotation.z = -s * 0.3;
+      if (b === 'gebogen') { br.scale.x = 0.04; br.position.x = s * 0.048; const b2 = part(box, hc, 0.035, bh, 0.012, s * 0.08, by - 0.008, fz2 + 0.004, head, ns); b2.rotation.z = -s * 0.5; }
     }
-    const nose = { klein: [0.03, 0.04, 0.03], normal: [0.04, 0.06, 0.04], gross: [0.055, 0.08, 0.06], spitz: [0.03, 0.07, 0.07] }[A.nose] || [0.04, 0.06, 0.04];
-    part(box, shade(skin, 0.9), nose[0], nose[1], nose[2], 0, 0.135, fz + nose[2] / 2 - 0.005, head, { noShadow: true });
-    const mc = '#6a2a2a';
-    if (A.mouth === 'laecheln' || A.mouth === 'grinsen') {
-      part(box, mc, 0.07, 0.016, 0.01, 0, 0.075, fz, head, { noShadow: true });
-      for (const s of [-1, 1]) { const c = part(box, mc, 0.03, 0.014, 0.01, s * 0.045, 0.083, fz, head, { noShadow: true }); c.rotation.z = s * 0.5; }
-      if (A.mouth === 'grinsen') part(box, '#f0f0f0', 0.06, 0.012, 0.012, 0, 0.08, fz + 0.002, head, { noShadow: true });
-    } else if (A.mouth === 'offen') part(box, '#3a1010', 0.06, 0.04, 0.01, 0, 0.075, fz, head, { noShadow: true });
-    else part(box, A.mouth === 'ernst' ? '#4a2020' : mc, 0.09, A.mouth === 'ernst' ? 0.012 : 0.016, 0.01, 0, 0.078, fz, head, { noShadow: true });
-    if (A.beard === 'stoppel') part(box, shade(skin, 0.72), 0.256, 0.1, 0.266, 0, 0.06, 0, head, { noShadow: true });
-    if (A.beard === 'vollbart') { part(box, hc, 0.27, 0.13, 0.28, 0, 0.055, 0.005, head); part(box, hc, 0.16, 0.08, 0.06, 0, 0.0, 0.12, head); }
-    if (A.beard === 'schnurrbart') part(box, hc, 0.11, 0.025, 0.02, 0, 0.1, fz + 0.006, head, { noShadow: true });
-    if (A.beard === 'kinnbart') part(box, hc, 0.06, 0.07, 0.04, 0, 0.03, 0.12, head, { noShadow: true });
-    if (A.scar === 'wange') part(box, '#8a3a3a', 0.012, 0.07, 0.01, 0.08, 0.12, fz + 0.002, head, { noShadow: true });
-    if (A.scar === 'auge') part(box, '#8a3a3a', 0.012, 0.1, 0.01, -0.058, 0.18, fz + 0.009, head, { noShadow: true });
-    if (A.glasses !== 'keine') {
-      const gc = A.glasses === 'sonnenbrille' ? '#0a0a0a' : '#222';
-      for (const s of [-1, 1]) part(box, gc, 0.075, 0.055, A.glasses === 'sonnenbrille' ? 0.014 : 0.006, s * 0.058, 0.18, fz + 0.012, head, { noShadow: true });
-      part(box, gc, 0.05, 0.012, 0.01, 0, 0.19, fz + 0.012, head, { noShadow: true });
+    // Nase
+    if (A.nose === 'knubbel') part(sph, shade(skin, 0.9), 0.034, 0.03, 0.032, 0, 0.13, fz2 + 0.02, head, ns);
+    else {
+      const n = { klein: [0.03, 0.04, 0.03, 0.135], normal: [0.04, 0.06, 0.04, 0.135], gross: [0.055, 0.08, 0.06, 0.13], spitz: [0.03, 0.07, 0.07, 0.135],
+        breit: [0.07, 0.05, 0.04, 0.13], stups: [0.04, 0.035, 0.035, 0.13], lang: [0.035, 0.1, 0.05, 0.13] }[A.nose] || [0.04, 0.06, 0.04, 0.135];
+      const np = part(box, shade(skin, 0.9), n[0], n[1], n[2], 0, n[3], fz2 + n[2] / 2 - 0.005, head, ns);
+      if (A.nose === 'stups') np.rotation.x = -0.4;
     }
-    const hairTop = A.hat === 'keine' || A.hat === 'stirnband';
-    if (A.hair !== 'glatze') {
-      if (A.hair === 'irokese') part(box, hc, 0.05, 0.13, 0.26, 0, 0.36, 0, head);
-      else if (A.hair === 'locken') { for (let i = 0; i < 9; i++) part(box, hc, 0.11, 0.1, 0.11, ((i % 3) - 1) * 0.085, 0.33, (Math.floor(i / 3) - 1) * 0.085, head); }
-      else {
-        if (hairTop) part(box, hc, 0.27, 0.07, 0.28, 0, 0.32, 0, head);
-        part(box, hc, 0.27, 0.16, 0.04, 0, 0.24, -0.125, head);
-        if (A.hair === 'seitenscheitel' && hairTop) part(box, hc, 0.14, 0.05, 0.28, 0.07, 0.36, 0, head);
-        if (A.hair === 'lang') { part(box, hc, 0.28, 0.42, 0.05, 0, 0.12, -0.14, head); for (const s of [-1, 1]) part(box, hc, 0.03, 0.3, 0.2, s * 0.135, 0.17, -0.03, head); }
-        if (A.hair === 'zopf') part(box, hc, 0.07, 0.28, 0.07, 0, 0.12, -0.18, head);
+    // Mund
+    const mc = '#6a2a2a', m = A.mouth;
+    if (m === 'laecheln' || m === 'grinsen' || m === 'traurig') {
+      part(box, mc, m === 'grinsen' ? 0.09 : 0.07, 0.016, 0.01, 0, 0.075, fz2, head, ns);
+      for (const s of [-1, 1]) { const c = part(box, mc, 0.03, 0.014, 0.01, s * (m === 'grinsen' ? 0.055 : 0.045), m === 'traurig' ? 0.068 : 0.083, fz2, head, ns); c.rotation.z = (m === 'traurig' ? -1 : 1) * s * 0.5; }
+      if (m === 'grinsen') part(box, '#f0f0f0', 0.075, 0.012, 0.012, 0, 0.08, fz2 + 0.002, head, ns);
+    } else if (m === 'zaehne') { part(box, '#3a1010', 0.08, 0.035, 0.01, 0, 0.075, fz2, head, ns); part(box, '#f4f4f0', 0.07, 0.013, 0.012, 0, 0.085, fz2 + 0.002, head, ns); }
+    else if (m === 'offen') part(box, '#3a1010', 0.06, 0.04, 0.01, 0, 0.075, fz2, head, ns);
+    else if (m === 'ueberrascht') part(box, '#3a1010', 0.032, 0.045, 0.01, 0, 0.072, fz2, head, ns);
+    else if (m === 'schmollen') part(box, shade('#b05050', 0.9), 0.05, 0.03, 0.02, 0, 0.075, fz2 + 0.004, head, ns);
+    else if (m === 'schief') { const c = part(box, mc, 0.085, 0.016, 0.01, 0.01, 0.078, fz2, head, ns); c.rotation.z = 0.25; }
+    else part(box, m === 'ernst' ? '#4a2020' : mc, 0.09, m === 'ernst' ? 0.011 : 0.016, 0.01, 0, 0.078, fz2, head, ns);
+    // Bart
+    const bd = A.beard;
+    if (bd === 'stoppel') part(box, shade(skin, 0.72), 0.256, 0.1, 0.266, 0, 0.06, 0, head, ns);
+    if (bd === 'vollbart' || bd === 'langbart') { part(box, hc, 0.27, 0.13, 0.28, 0, 0.055, 0.005, head); part(box, hc, 0.16, 0.08, 0.06, 0, 0.0, 0.12, head); }
+    if (bd === 'langbart') part(box, shade(hc, 0.9), 0.13, 0.2, 0.06, 0, -0.12, 0.12, head);
+    if (bd === 'schnurrbart' || bd === 'ziegenbart') part(box, hc, 0.11, 0.025, 0.02, 0, 0.1, fz2 + 0.006, head, ns);
+    if (bd === 'henkelbart') { part(box, hc, 0.1, 0.022, 0.02, 0, 0.1, fz2 + 0.006, head, ns); for (const s of [-1, 1]) { const e = part(box, hc, 0.045, 0.018, 0.02, s * 0.065, 0.115, fz2 + 0.006, head, ns); e.rotation.z = s * 0.7; } }
+    if (bd === 'kinnbart' || bd === 'ziegenbart') part(box, hc, 0.06, bd === 'ziegenbart' ? 0.1 : 0.07, 0.04, 0, bd === 'ziegenbart' ? 0.0 : 0.03, 0.12, head, ns);
+    if (bd === 'kinnstreifen') part(box, hc, 0.018, 0.05, 0.015, 0, 0.04, fz2 + 0.004, head, ns);
+    if (bd === 'koteletten') for (const s of [-1, 1]) part(box, hc, 0.03, 0.12, 0.05, s * 0.128, 0.16, 0.05, head, ns);
+    // Narben
+    const scarC = '#8a3a3a';
+    if (A.scar === 'wange') part(box, scarC, 0.012, 0.07, 0.01, 0.08, 0.12, fz2 + 0.002, head, ns);
+    if (A.scar === 'auge') part(box, scarC, 0.012, 0.1, 0.01, -0.058, 0.18, fz2 + 0.009, head, ns);
+    if (A.scar === 'stirn') { const sc2 = part(box, scarC, 0.09, 0.012, 0.01, 0.02, 0.255, fz2 + 0.002, head, ns); sc2.rotation.z = 0.2; }
+    if (A.scar === 'kinn') part(box, scarC, 0.04, 0.01, 0.01, 0.02, 0.03, fz2 + 0.002, head, ns);
+    if (A.scar === 'kreuz') for (const r of [0.7, -0.7]) { const c = part(box, scarC, 0.012, 0.07, 0.01, -0.08, 0.12, fz2 + 0.003, head, ns); c.rotation.z = r; }
+    // Brille
+    const gc = A.glassesColor, gl = A.glasses;
+    if (gl === 'brille' || gl === 'eckig' || gl === 'sonnenbrille') {
+      const t = gl === 'eckig' ? 0.014 : 0.008;
+      for (const s of [-1, 1]) {
+        const x = s * 0.058, y = 0.18, z = fz2 + 0.014;
+        part(box, gl === 'sonnenbrille' ? '#0a0a0a' : '#bfe3ff', 0.07, 0.048, 0.004, x, y, z, head, gl === 'sonnenbrille' ? ns : { noShadow: true, opacity: 0.35 });
+        part(box, gc, 0.078, t, 0.008, x, y + 0.026, z, head, ns); part(box, gc, 0.078, t, 0.008, x, y - 0.026, z, head, ns);
+        part(box, gc, t, 0.056, 0.008, x - 0.037, y, z, head, ns); part(box, gc, t, 0.056, 0.008, x + 0.037, y, z, head, ns);
+        part(box, gc, 0.008, 0.008, 0.13, s * 0.128, y + 0.01, 0.07, head, ns);
       }
+      part(box, gc, 0.04, 0.008, 0.008, 0, 0.19, fz2 + 0.014, head, ns);
+    } else if (gl === 'rund' || gl === 'monokel') {
+      const ring = L._ringGeo || (L._ringGeo = new T.TorusGeometry(0.032, 0.006, 6, 16));
+      for (const s of (gl === 'monokel' ? [-1] : [-1, 1])) {
+        const r = new T.Mesh(ring, L.mat(gc)); r.position.set(s * 0.058, 0.18, fz2 + 0.014); head.add(r);
+        part(cyl, '#bfe3ff', 0.03, 0.003, 0.03, s * 0.058, 0.18, fz2 + 0.013, head, { noShadow: true, opacity: 0.35 }).rotation.x = Math.PI / 2;
+        if (gl === 'rund') part(box, gc, 0.008, 0.008, 0.13, s * 0.128, 0.19, 0.07, head, ns);
+      }
+      if (gl === 'rund') part(box, gc, 0.05, 0.008, 0.008, 0, 0.19, fz2 + 0.014, head, ns);
+      else part(box, gc, 0.006, 0.12, 0.006, -0.085, 0.11, fz2 + 0.01, head, ns);
+    } else if (gl === 'skibrille') {
+      part(box, '#f2a020', 0.2, 0.055, 0.01, 0, 0.185, fz2 + 0.014, head, { noShadow: true, opacity: 0.75 });
+      part(box, gc, 0.21, 0.065, 0.012, 0, 0.185, fz2 + 0.008, head, ns);
+      part(box, gc, 0.265, 0.03, 0.275, 0, 0.185, 0, head, ns);
+    } else if (gl === 'augenklappe') {
+      part(box, '#0a0a0a', 0.06, 0.05, 0.01, 0.058, 0.18, fz2 + 0.012, head, ns);
+      const st = part(box, '#0a0a0a', 0.3, 0.01, 0.01, 0, 0.21, fz2 + 0.008, head, ns); st.rotation.z = -0.3;
+      part(box, '#0a0a0a', 0.262, 0.01, 0.272, 0, 0.23, 0, head, ns);
     }
-    if (A.hat === 'muetze') { part(box, A.topColor === '#2a2a2a' ? '#8a2a2a' : '#2a2a2a', 0.28, 0.13, 0.29, 0, 0.34, 0, head); part(box, '#d8d0c0', 0.29, 0.04, 0.3, 0, 0.28, 0, head); }
-    if (A.hat === 'cap') { part(box, '#b02a2a', 0.27, 0.07, 0.28, 0, 0.33, 0, head); part(box, '#b02a2a', 0.22, 0.02, 0.12, 0, 0.3, 0.18, head); }
-    if (A.hat === 'helm') { part(box, '#2a2a2a', 0.31, 0.2, 0.32, 0, 0.3, 0, head); part(box, '#101820', 0.27, 0.09, 0.02, 0, 0.19, 0.155, head, { opacity: 0.75 }); }
-    if (A.hat === 'stirnband') part(box, '#c02020', 0.265, 0.04, 0.275, 0, 0.27, 0, head);
-    let hand = null;
-    for (const s of [-1, 1]) {
-      const arm = grp(torso, s * (0.22 * bw + 0.06), 0.55, 0);
-      part(box, sleeve === skin ? A.topColor : sleeve, 0.12 * bw, s === 1 && A.top === 'tshirt' ? 0.16 : 0.32, 0.13 * bw, 0, A.top === 'tshirt' ? -0.08 : -0.16, 0, arm);
-      if (A.top === 'tshirt' || A.top === 'weste') part(box, skin, 0.105 * bw, 0.18, 0.115 * bw, 0, -0.24, 0, arm);
-      const elbow = grp(arm, 0, -0.32, 0);
-      part(box, A.top === 'tshirt' || A.top === 'weste' ? skin : A.topColor, 0.11 * bw, 0.3, 0.12 * bw, 0, -0.15, 0, elbow);
-      part(box, skin, 0.09, 0.1, 0.1, 0, -0.34, 0, elbow);
-      arms.push({ arm, elbow });
-      if (s === -1) { hand = grp(elbow, 0, -0.36, 0.03); }
+    // Kopfbedeckung und Frisur
+    const hat = A.hat, hcol = A.hatColor;
+    const covered = ['muetze', 'beanie', 'cap', 'cap_rueck', 'helm', 'bandana', 'cowboy', 'zylinder', 'sonnenhut'].includes(hat);
+    buildHair(head, A, covered);
+    if (hat === 'muetze' || hat === 'beanie') {
+      part(box, hcol, 0.28, 0.13, 0.29, 0, 0.34, 0, head);
+      part(box, shade(hcol, 0.75), 0.29, 0.045, 0.3, 0, 0.285, 0, head);
+      if (hat === 'beanie') part(sph, '#f2f2f2', 0.05, 0.05, 0.05, 0, 0.43, 0, head);
+    }
+    if (hat === 'cap' || hat === 'cap_rueck') {
+      part(box, hcol, 0.27, 0.07, 0.28, 0, 0.33, 0, head);
+      part(box, hcol, 0.22, 0.02, 0.12, 0, 0.3, hat === 'cap' ? 0.18 : -0.18, head);
+      part(box, shade(hcol, 0.7), 0.03, 0.015, 0.03, 0, 0.37, 0, head, ns);
+    }
+    if (hat === 'helm') { part(box, hcol, 0.31, 0.2, 0.32, 0, 0.3, 0, head); part(box, '#101820', 0.27, 0.09, 0.02, 0, 0.2, 0.155, head, { opacity: 0.75 }); }
+    if (hat === 'stirnband') part(box, hcol, 0.265, 0.04, 0.275, 0, 0.27, 0, head);
+    if (hat === 'bandana') {
+      part(box, hcol, 0.27, 0.06, 0.28, 0, 0.32, 0, head); part(box, shade(hcol, 0.8), 0.272, 0.04, 0.282, 0, 0.28, 0, head);
+      for (const s of [-1, 1]) { const t = part(box, hcol, 0.03, 0.09, 0.02, s * 0.02, 0.24, -0.15, head); t.rotation.z = s * 0.3; }
+    }
+    if (hat === 'cowboy') { part(cyl, hcol, 0.24, 0.015, 0.24, 0, 0.3, 0, head); part(box, hcol, 0.18, 0.12, 0.2, 0, 0.37, 0, head); part(box, shade(hcol, 0.5), 0.185, 0.025, 0.205, 0, 0.32, 0, head, ns); part(box, shade(hcol, 0.8), 0.02, 0.03, 0.2, 0, 0.43, 0, head, ns); }
+    if (hat === 'zylinder') { part(cyl, hcol, 0.17, 0.012, 0.17, 0, 0.3, 0, head); part(cyl, hcol, 0.11, 0.22, 0.11, 0, 0.415, 0, head); part(cyl, shade(hcol, 0.5), 0.112, 0.03, 0.112, 0, 0.33, 0, head, ns); }
+    if (hat === 'sonnenhut') { part(cyl, hcol, 0.27, 0.012, 0.27, 0, 0.3, 0, head); part(sph, hcol, 0.14, 0.08, 0.14, 0, 0.32, 0, head); part(cyl, shade(hcol, 0.6), 0.142, 0.025, 0.142, 0, 0.32, 0, head, ns); }
+    if (hat === 'krone') {
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8 * Math.PI * 2;
+        part(box, hcol, 0.06, 0.04, 0.012, Math.sin(a) * 0.12, 0.31, Math.cos(a) * 0.12, head).rotation.y = a;
+        part(cone, hcol, 0.02, 0.05, 0.02, Math.sin(a) * 0.12, 0.355, Math.cos(a) * 0.12, head);
+      }
+      part(sph, '#c02a2a', 0.015, 0.015, 0.015, 0, 0.31, 0.125, head, ns);
     }
     root.scale.setScalar(hs);
     root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     return { root, body, hips, torso, neck, head, legs, arms, hand, held: null, heldType: null, app: A, kind: 'human' };
   };
+
   // was der Mensch in der Hand hält
   L.setHeld = function (rig, type) {
     if (rig.heldType === type) return;

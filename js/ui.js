@@ -450,9 +450,21 @@
   // ---------- Charakter-Editor ----------
   const CHAR_LABELS = {
     name: 'Name', skin: 'Hautfarbe', hair: 'Frisur', hairColor: 'Haarfarbe', eyes: 'Augenfarbe', brows: 'Augenbrauen', mouth: 'Mund', nose: 'Nase',
-    beard: 'Bart', glasses: 'Brille', hat: 'Kopfbedeckung (Helm schützt auf dem Motorrad)', top: 'Oberteil', topColor: 'Farbe Oberteil', pantsColor: 'Hose', shoes: 'Schuhe', build: 'Statur', height: 'Größe', scar: 'Narbe'
+    beard: 'Bart', glasses: 'Brille', glassesColor: 'Farbe Brille', hat: 'Kopfbedeckung (Helm schützt auf dem Motorrad)', hatColor: 'Farbe Kopfbedeckung',
+    top: 'Oberteil', topColor: 'Farbe Oberteil', pants: 'Hose', pantsColor: 'Farbe Hose', shoeType: 'Schuhe', shoes: 'Farbe Schuhe', build: 'Statur', height: 'Größe', scar: 'Narbe'
   };
-  const WORDS = { kurz: 'kurz', lang: 'lang', glatze: 'Glatze', irokese: 'Irokese', locken: 'Locken', zopf: 'Zopf', seitenscheitel: 'Scheitel', normal: 'normal', dick: 'dick', boese: 'böse', hoch: 'hoch', laecheln: 'Lächeln', ernst: 'ernst', offen: 'offen', grinsen: 'Grinsen', klein: 'klein', gross: 'groß', spitz: 'spitz', kein: 'kein', stoppel: 'Stoppeln', vollbart: 'Vollbart', schnurrbart: 'Schnurrbart', kinnbart: 'Kinnbart', keine: 'keine', brille: 'Brille', sonnenbrille: 'Sonnenbrille', muetze: 'Mütze', cap: 'Cap', helm: 'Helm', stirnband: 'Stirnband', tshirt: 'T-Shirt', jacke: 'Jacke', hoodie: 'Hoodie', weste: 'Weste', schmal: 'schmal', kraeftig: 'kräftig', mittel: 'mittel', wange: 'Wange', auge: 'Auge' };
+  const WORDS = { kurz: 'kurz', seitenscheitel: 'Scheitel', pony: 'Pony', buzz: 'Buzzcut', stachel: 'Stacheln', undercut: 'Undercut', irokese: 'Irokese', locken: 'Locken', wellig: 'wellig', lang: 'lang', bob: 'Bob', zopf: 'Pferdeschwanz', zoepfe: 'Zöpfe', dutt: 'Dutt', dreads: 'Dreads', glatze: 'Glatze',
+    normal: 'normal', duenn: 'dünn', dick: 'dick', buschig: 'buschig', boese: 'böse', hoch: 'hoch', traurig: 'traurig', gebogen: 'gebogen',
+    laecheln: 'Lächeln', grinsen: 'Grinsen', zaehne: 'Zähne', ernst: 'ernst', schmollen: 'Schmollmund', schief: 'schief', offen: 'offen', ueberrascht: 'überrascht',
+    klein: 'klein', gross: 'groß', spitz: 'spitz', breit: 'breit', stups: 'Stupsnase', knubbel: 'Knubbel',
+    kein: 'kein', stoppel: 'Stoppeln', vollbart: 'Vollbart', langbart: 'langer Bart', schnurrbart: 'Schnurrbart', henkelbart: 'Henkelbart', kinnbart: 'Kinnbart', ziegenbart: 'Ziegenbart', koteletten: 'Koteletten', kinnstreifen: 'Kinnstreifen',
+    keine: 'keine', brille: 'Brille', rund: 'rund', eckig: 'eckig', sonnenbrille: 'Sonnenbrille', skibrille: 'Skibrille', monokel: 'Monokel', augenklappe: 'Augenklappe',
+    muetze: 'Mütze', beanie: 'Bommelmütze', cap: 'Cap', cap_rueck: 'Cap rückwärts', helm: 'Helm', stirnband: 'Stirnband', bandana: 'Bandana', cowboy: 'Cowboyhut', zylinder: 'Zylinder', sonnenhut: 'Sonnenhut', krone: 'Krone',
+    tshirt: 'T-Shirt', tanktop: 'Tanktop', hemd: 'Hemd', pullover: 'Pullover', hoodie: 'Hoodie', jacke: 'Jacke', lederjacke: 'Lederjacke', regenjacke: 'Regenjacke', weste: 'Weste', anzug: 'Anzug', trikot: 'Trikot', kittel: 'Kittel',
+    jeans: 'Jeans', jogging: 'Jogginghose', cargo: 'Cargohose', zerrissen: 'zerrissen', anzughose: 'Anzughose',
+    sneaker: 'Sneaker', hightop: 'High-Tops', stiefel: 'Stiefel', sandale: 'Sandalen', lackschuh: 'Lackschuhe', barfuss: 'barfuß',
+    schmal: 'schmal', kraeftig: 'kräftig', muskuloes: 'muskulös', sehr_klein: 'sehr klein', mittel: 'mittel', sehr_gross: 'sehr groß',
+    wange: 'Wange', auge: 'Auge', stirn: 'Stirn', kinn: 'Kinn', kreuz: 'Kreuz' };
   let charApp = null, prev = null;
   function openChar() {
     charApp = Object.assign({}, L.DEFAULT_CHAR, L.save.char || {});
