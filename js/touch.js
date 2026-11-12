@@ -22,7 +22,7 @@
       <button data-k="ShiftLeft" data-toggle="1" id="tRun" title="Rennen">🏃</button><button data-k="KeyC" title="Schleichen">🧎</button>
       <button data-k="KeyX" title="Kriechen">🐛</button><button data-k="KeyR" title="Nachladen">🔄</button>
       <button data-k="KeyG" title="Granate werfen">💣</button><button data-k="KeyQ" title="Verband">🩹</button>
-      <button data-k="KeyL" title="Taschenlampe">🔦</button><button data-wheel="1" title="Nächste Ausrüstung">⏭️</button>
+      <button data-k="KeyL" title="Taschenlampe">🔦</button><button data-wheel="1" title="Nächste Ausrüstung">⏭️</button><button data-act="zoom" title="Kamera: Ego-Sicht / nah / weit">🎥</button>
     </div>
     <div id="tAct">
       <button id="tFire" class="big" data-mouse="left" title="Benutzen / Angreifen">🔨</button>
@@ -32,6 +32,7 @@
       <button id="tVeh" data-k="KeyF" title="Einsteigen">🚗</button>
     </div>
     <div id="tCar" hidden>
+      <button data-act="zoom" title="Kamera">🎥</button>
       <button id="tBrake" class="big" data-k="Space" title="Handbremse / Driften">🛑</button>
       <button id="tBelt" data-k="KeyB" title="Anschnallen">🔒</button>
       <button id="tHorn" data-k="KeyH" title="Hupe">📯</button>
@@ -50,7 +51,8 @@
     const k = b.dataset.k, mb = b.dataset.mouse, act = b.dataset.act;
     if (act === 'chat') { fireKey('Enter', 'Enter'); return null; }
     if (act === 'pause') { if (L.ui.pause) L.ui.pause(); return null; }
-    if (b.dataset.wheel) { L.mouse.wheel += 1; return null; }
+    if (act === 'zoom') { L.cycleZoom(); return null; }
+    if (b.dataset.wheel) { P.sel = (P.sel + 1) % 5; return null; }
     if (k === 'Tab' || k === 'KeyM') { fireKey(k); return null; }
     if (b.dataset.toggle) {
       if (k) { L.keys[k] = !L.keys[k]; b.classList.toggle('on', !!L.keys[k]); }

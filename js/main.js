@@ -41,23 +41,123 @@
     requestAnimationFrame(frame);
   }, 60);
 
+  // ---------- Zoom (Mausrad / I und O / Handy-Knopf): von Ego-Sicht bis weit weg ----------
+  P.zoom = typeof L.save.zoom === 'number' ? L.save.zoom : 4;
+  const ZOOM_STEPS = [4, 9, 15, 0, 2];
+  function setZoom(z) {
+    const nz = L.clamp(z, 0, 16);
+    if ((nz < 0.5) !== (P.zoom < 0.5)) L.msg(nz < 0.5 ? '👁️ Ego-Sicht' : '🎥 Schulter-Kamera', 1200);
+    P.zoom = nz; L.save.zoom = nz; L.persist();
+  }
+  L.cycleZoom = function () {
+    let i = ZOOM_STEPS.findIndex((s) => Math.abs(s - P.zoom) < 0.3);
+    setZoom(ZOOM_STEPS[(i + 1) % ZOOM_STEPS.length]);
+  };
+
+  // ---------- Kurzfilm (Zwischensequenz): Kamera fährt selbst, Spieler ist kurz pausiert ----------
+  L.cine = null;
+  const cineEl = document.createElement('div');
+  cineEl.id = 'cine'; cineEl.hidden = true;
+  cineEl.innerHTML = '<div class="bar top"></div><div class="bar bot"><span id="cineT"></span><small>Leertaste / Tippen = überspringen</small></div>';
+  document.body.appendChild(cineEl);
+  const cst = document.createElement('style');
+  cst.textContent = `#cine{position:fixed;inset:0;z-index:40;pointer-events:auto}
+#cine .bar{position:absolute;left:0;right:0;height:13vh;background:#000;transition:transform .6s ease}
+#cine .top{top:0;transform:translateY(-100%)}#cine .bot{bottom:0;transform:translateY(100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#eee;font-family:inherit}
+#cine.on .top,#cine.on .bot{transform:none}
+#cine #cineT{font-size:clamp(16px,3.2vw,30px);font-weight:800;letter-spacing:.12em;color:#ff5a3a;text-shadow:0 0 12px #000}
+#cine small{opacity:.6;font-size:12px}
+body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
+  document.head.appendChild(cst);
+  cineEl.addEventListener('pointerdown', () => { if (L.cine && L.cine.t > 1) L.cine.t = L.cine.dur; });
+  // shot(t) gibt die Kamera zurück: { x, y, z, lx, ly, lz } oder null (dann endet der Film)
+  L.startCine = function (title, dur, shot) {
+    if (L.state !== 'game' || !P.alive) return;
+    L.cine = { t: 0, dur, shot };
+    L.$('cineT').textContent = title;
+    cineEl.hidden = false; requestAnimationFrame(() => cineEl.classList.add('on'));
+    document.body.classList.add('cinema');
+  };
+  function endCine() {
+    L.cine = null; cineEl.classList.remove('on'); document.body.classList.remove('cinema');
+    setTimeout(() => { if (!L.cine) cineEl.hidden = true; }, 600);
+  }
+  L.endCine = endCine;
+  const groundY = (x, z) => (L.mountainH ? L.mountainH(x, z) : 0);
+  // MAMA IVA erscheint
+  L.cineBossAppear = function (b) {
+    const a0 = Math.atan2(P.x - b.x, P.z - b.z), berg = b.how === 'berg';
+    const peak = groundY(b.x, b.z);
+    L.startCine(berg ? 'MAMA IVA ERSCHEINT' : 'MAMA IVA BRICHT AUS DEM BODEN', 7, (t) => {
+      const B = L.boss; if (!B) return null;
+      const a = a0 + 0.45 - t * 0.06, d = (berg ? 105 : 95) - t * 4;
+      const x = B.x + Math.sin(a) * d, z = B.z + Math.cos(a) * d;
+      const y = Math.max(groundY(x, z) + 16, berg ? peak + 28 : 16 + t * 1.5);
+      return { x, y, z, lx: B.x, ly: groundY(B.x, B.z) + (B.rootY || 0) + 40, lz: B.z };
+    });
+  };
+  // GIGA-CAPY holt MAMA IVA
+  L.cineCapy = function (b) {
+    const c0 = b.capy; if (!c0) return;
+    // von der Seite filmen, auf der Seite des Spielers
+    let side = c0.yaw + Math.PI / 2;
+    const px = Math.sin(side), pz = Math.cos(side);
+    if ((P.x - c0.x) * px + (P.z - c0.z) * pz < 0) side += Math.PI;
+    L.startCine('GIGA-CAPY ERWACHT', 13, (t) => {
+      const B = L.boss, c = B && B.capy; if (!c) return null;
+      const mx = (c.x + B.x) / 2, mz = (c.z + B.z) / 2, a = side + 0.25 - t * 0.035, d = 125 - t * 2.5;
+      const x = mx + Math.sin(a) * d, z = mz + Math.cos(a) * d;
+      const y = Math.max(groundY(x, z) + 14, groundY(mx, mz) + 24 - Math.max(0, t - 9) * 2);
+      const ly = groundY(mx, mz) + (t < 9.5 ? 34 : 34 - (t - 9.5) * 5);
+      return { x, y, z, lx: mx, ly, lz: mz };
+    });
+  };
+  function cineCamera(dt) {
+    const C = L.cine;
+    C.t += dt;
+    if (C.t > 1 && (L.hit('Space') || L.hit('Escape') || L.mouse.click)) C.t = C.dur;
+    const s = C.t < C.dur && P.alive && L.state === 'game' ? C.shot(C.t) : null;
+    if (!s) { endCine(); return false; }
+    camera.position.set(s.x, s.y, s.z);
+    if (L.shake > 0) {
+      const k = L.shake * 0.6;
+      camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; camera.position.z += (Math.random() - 0.5) * k;
+      L.shake = Math.max(0, L.shake - dt * 1.8);
+    }
+    camera.lookAt(s.lx, s.ly, s.lz);
+    camera.far = L.S().view + 1200;
+    camera.updateProjectionMatrix();
+    if (P.rig) P.rig.root.visible = true;
+    return true;
+  }
+
   // ---------- Kamera ----------
   const piv = new T.Vector3(), want = new T.Vector3(), look = new T.Vector3();
   function updateCamera(dt) {
+    if (L.cine && cineCamera(dt)) return;
+    if (!L.uiBlock) {
+      if (L.mouse.wheel) setZoom(P.zoom + L.mouse.wheel * (P.zoom < 3 ? 0.7 : 1.3));
+      if (L.hit('KeyI')) setZoom(P.zoom < 3 ? P.zoom - 1 : P.zoom - 2);
+      if (L.hit('KeyO')) setZoom(P.zoom < 2 ? P.zoom + 1 : P.zoom + 2);
+    }
     const v = P.vehicle;
+    let fp = false;
     let dist, h, py = P.camPitch;
     if (v) {
-      dist = v.t.kind === 'car' ? 7.5 : 5;
+      dist = (v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
       piv.set(v.x, 1.6, v.z);
     } else {
       const ph = !P.alive ? 0.4 : P.stance === 'crawl' ? 0.6 : P.stance === 'crouch' ? 1.1 : 1.6;
       piv.set(P.x, P.y + ph, P.z);
-      dist = P.aiming ? 2.1 : 4;
+      fp = P.alive && P.zoom < 0.5;
+      dist = fp ? 0 : P.aiming ? Math.min(2.1, P.zoom) : P.zoom;
+      if (fp) piv.y += 0.12;
       if (!P.alive) { dist = 6 + Math.min(4, P.deathT * 2); py = 1.0; }
     }
     P.camDist = dist;
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(py), sp = Math.sin(py);
-    const side = v ? 0 : P.aiming ? 0.7 : 0.55;
+    const side = v || fp ? 0 : (P.aiming ? 0.7 : 0.55) * Math.min(1, dist / 2);
+    if (P.rig && L.state === 'game') P.rig.root.visible = !fp;
     const rx = -cy, rz = sy;
     piv.x += rx * side; piv.z += rz * side;
     want.set(piv.x - sy * cp * dist, piv.y + sp * dist, piv.z - cy * cp * dist);

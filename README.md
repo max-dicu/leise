@@ -19,7 +19,7 @@ Stadt Altheim (mit Krankenhaus, Polizei und Supermarkt), Militärbasis Graufels,
 
 ## Steuerung
 WASD laufen · Maus umsehen · Shift rennen · C schleichen · X kriechen · Leertaste springen
-Linksklick benutzen · Rechtsklick zielen · R nachladen · G Granate · 1–5 Ausrüstung · Q Verband
+Linksklick benutzen · Rechtsklick zielen · R nachladen · G Granate · 1–5 Ausrüstung · Mausrad oder I/O zoomen (bis Ego-Sicht) · Q Verband
 E aufheben · F ein-/aussteigen · B anschnallen · H hupen · L Taschenlampe · Tab Inventar · M Karte · Esc Pause
 
 ## Lokal spielen

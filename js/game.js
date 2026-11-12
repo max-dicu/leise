@@ -207,7 +207,7 @@
 
   // ---------- Schaden ----------
   L.hurtPlayer = function (dmg, cause, fx, fz) {
-    if (!P.alive || dmg <= 0) return;
+    if (!P.alive || dmg <= 0 || L.cine) return;
     P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
     L.snd.hurt(); L.shake = Math.min(1.2, L.shake + dmg / 60);
     if (dmg > 8) L.blood(P.x, P.y + 1.2, P.z, Math.min(30, dmg / 2), dmg > 40);
@@ -389,6 +389,7 @@
     P.noiseShow = Math.max(0, P.noiseShow - dt * 30);
     P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
     P.fireCd -= dt;
+    if (L.cine) { if (P.vehicle) { P.vehicle.speed *= Math.max(0, 1 - dt * 2); } return; }
     if (L.hit('KeyL')) { P.flash = !P.flash; L.snd.key(); }
     if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
     const S = L.S(), sens = 0.0022 * S.sens;
@@ -399,7 +400,6 @@
       if (L.hit('KeyC')) P.stance = P.stance === 'crouch' ? 'stand' : 'crouch';
       if (L.hit('KeyX')) P.stance = P.stance === 'crawl' ? 'crouch' : 'crawl';
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) P.sel = i;
-      if (L.mouse.wheel) P.sel = (P.sel + (L.mouse.wheel > 0 ? 1 : 4)) % 5;
     }
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
     const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
@@ -1312,6 +1312,7 @@
     b.capy = { rig, x, z, yaw: Math.atan2(b.x - x, b.z - z), y: -85, roared: false, rumbleT: 0 };
     rig.root.position.set(x, -85, z); rig.root.rotation.y = b.capy.yaw;
     L.banner('GIGA-CAPY ERWACHT', 'Ein riesiges Capybara bricht aus dem Boden …');
+    if (L.cineCapy) L.cineCapy(b);
   };
   const ease3 = (k) => 1 - Math.pow(1 - L.clamp(k, 0, 1), 3);
   // gibt zurück, wie weit MAMA IVA schon im Boden ist (0 … 1)
@@ -1355,6 +1356,7 @@
       L.fx("#5a4630", b.x, 1, b.z, 40, 14, { size: 0.9, life: 2.5 });
       L.banner("MAMA IVA BRICHT AUS DEM BODEN", "Die Erde reißt auf … Versteck dich!");
     } else L.banner("MAMA IVA ERSCHEINT", "Hinter dem Berg erhebt sich etwas Riesiges … Versteck dich!");
+    if (L.cineBossAppear) L.cineBossAppear(b);
   };
   // Aufsteigen / Versinken: gemeinsame Optik für Host und Mitspieler
   L.bossRise = function (b, dt) {
