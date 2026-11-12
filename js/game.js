@@ -463,6 +463,14 @@
       if (L.hit('KeyX')) P.stance = P.stance === 'crawl' ? 'crouch' : 'crawl';
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
+    // 🛡️ Fliegen – nur mit dem freigeschalteten Wächter-Skin. V = abheben / landen
+    const canFly = !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
+    if (!canFly) P.flying = false;
+    if (!block && canFly && L.hit('KeyV')) {
+      if (!P.flying) { P.flying = 1; P.vy = 6; P.air = false; P.stance = 'stand'; L.msg('🦸 Du fliegst! Leertaste = hoch · C = runter · Shift = schnell · V = landen', 4000); L.snd.teleport && L.snd.teleport({ x: P.x, y: P.y + 1, z: P.z }); }
+      else if (P.flying === 1) { P.flying = 2; L.msg('🛬 Landeanflug …', 1500); }
+    }
+    if (P.flying) { updateFlying(dt, block); return; }
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
     const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
     const moving = (fIn || rIn) && P.knockT <= 0 && P.eatT < 0;
@@ -571,6 +579,40 @@
       pitch: -P.camPitch * 0.6, swing: P.swing, throwT: P.throwT, eat: P.eatT >= 0
     };
     L.animHuman(r, P.animSt);
+  }
+  // Flug des Wächters: frei durch die Luft, sanfte Landung, Umhang weht
+  function updateFlying(dt, block) {
+    const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
+    const fast = !block && (L.keys.ShiftLeft || L.keys.ShiftRight), sp = fast ? 48 : 18;
+    const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
+    let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+    const k = Math.min(1, dt * 3);
+    P.vx += (mx * sp * (fIn || rIn ? 1 : 0) - P.vx) * k; P.vz += (mz * sp * (fIn || rIn ? 1 : 0) - P.vz) * k;
+    const up = !block && L.keys.Space, down = !block && (L.keys.KeyC || L.keys.ControlLeft);
+    const wantVy = P.flying === 2 ? -9 : up ? 12 : down ? -14 : 0;
+    P.vy += (wantVy - P.vy) * Math.min(1, dt * 4);
+    let gY = L.seaFloor(P.x, P.z); const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null; if (bf !== null) gY = bf;
+    if (!L.inDim(P.x)) gY = Math.max(gY, L.WATER_Y);
+    P.y = Math.min(450, P.y + P.vy * dt);
+    if (P.y <= gY) { P.y = gY; P.vy = Math.max(0, P.vy); if (P.flying === 2) { P.flying = 0; P.air = false; L.snd.land({ x: P.x, y: 0, z: P.z }); L.msg('🦸 Gelandet', 1200); } }
+    L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38, P.y, RES); P.x = RES.x; P.z = RES.z;
+    L.clampWorld(P, true);
+    const hsp = Math.hypot(P.vx, P.vz);
+    if (hsp > 0.5) P.yaw += L.angDiff(P.yaw, Math.atan2(P.vx, P.vz)) * Math.min(1, dt * 6);
+    P.mode = 'walk'; P.air = false; P.stance = 'stand'; P.knockT = 0;
+    if (!block) playerActions(dt);
+    updateActions(dt);
+    // Superhelden-Pose: nach vorne geneigt, ein Arm voraus, Beine gestreckt
+    const r = P.rig, tilt = L.clamp(hsp / 48, 0, 1);
+    r.root.position.set(P.x, P.y, P.z); r.root.rotation.set(0, P.yaw, 0); r.root.rotateX(tilt * 1.1);
+    L.setHeld(r, selType());
+    P.phase += dt * 3;
+    P.animSt = { mode: 'run', phase: P.phase, speed: 1 };
+    L.animHuman(r, { mode: 'walk', phase: P.phase, speed: 0.05 });
+    for (const l of r.legs) { l.leg.rotation.x = 0.08 + Math.sin(P.phase) * 0.05; l.knee.rotation.x = 0.15; }
+    if (tilt > 0.2) { r.arms[0].arm.rotation.x = -2.9 * tilt; r.arms[1].arm.rotation.x = 0.3; } else { r.arms[0].arm.rotation.z = 0.5; r.arms[1].arm.rotation.z = -0.5; }
+    if (r.cape) r.cape.rotation.x = 0.3 + tilt * 1.1 + Math.sin(P.phase * 6) * 0.08;
+    if (hsp > 20 && Math.random() < dt * 20) L.fx('#ffffff', P.x - P.vx * 0.05, P.y + 1, P.z - P.vz * 0.05, 1, 0.3, { size: 0.15, life: 0.4 });
   }
   function playerActions() {
     const st = selType();
@@ -851,6 +893,7 @@
     rig.root.position.set(sp.x, 0, sp.z); rig.root.rotation.y = sp.yaw;
   }
   function enterVehicle(v) {
+    P.flying = 0;
     const seat = seatFor(v);
     if (seat < 0) { L.msg('Kein Platz mehr frei.'); return; }
     P.vehicle = v; P.seat = seat; P.belted = false; P.stance = 'stand'; P.vx = P.vz = 0; P.beltWarnT = 2;

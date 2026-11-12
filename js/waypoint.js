@@ -102,6 +102,7 @@
       if (Math.max(Math.abs(P.x), Math.abs(P.z)) > 1600) tgt(0, 0, '🏠', 'Heimat');
       else if (L.TOWER) tgt(L.TOWER.x, L.TOWER.z, '🗼', 'Turm');
       if (L.PORTAL) tgt(L.PORTAL.x, L.PORTAL.z, '🌀', 'Portal');
+      if (!L.curIsland) for (const v of L.ents.vehicles) if (v.t.special && P.vehicle !== v) tgt(v.x, v.z, v.t.kind === 'bike' ? '🏍️' : '🏎️', v.t.name);
     }
     if (L.waypoint) tgt(L.waypoint.x, L.waypoint.z, '📍', 'Ziel');
     comp.innerHTML = html;
