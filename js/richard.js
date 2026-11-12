@@ -33,6 +33,17 @@
     root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     return { root, body, head, flips, tail };
   };
+  L.animWalross = animWalross;
+  // normales Walross als Monster: hüpft, bäumt sich auf und klatscht zu
+  L.animWalrossMon = function (r, st) {
+    const m = st.mode, ph = st.phase || 0, ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
+    if (m === 'dead') { ws.roll = 1.4; animWalross(r, 0, ws); r.body.position.y = 0.9; return; }
+    if (m === 'walk' || m === 'run' || m === 'crawl') { const k = m === 'walk' ? 0.12 : 0.3; ws.hop = Math.abs(Math.sin(ph)) * k; ws.rear = -Math.sin(ph) * k * 0.5; ws.flip = Math.sin(ph) * 0.4; }
+    if (m === 'alert') ws.headX = -0.6;
+    if (m === 'search') ws.headY = Math.sin(ph * 0.5) * 0.5;
+    if (m === 'attack') { const a = st.atk || 0; ws.rear = a < 0.45 ? -0.7 * (a / 0.45) : -0.7 + (a - 0.45) / 0.55 * 0.95; ws.headX = 0.3; }
+    animWalross(r, ph, ws);
+  };
   function animWalross(r, ph, st) {
     r.body.rotation.set(st.rear || 0, 0, Math.sin(ph * 0.7) * 0.03 + (st.roll || 0));
     r.body.position.y = 1.1 + (st.hop || 0) + Math.abs(Math.sin(ph)) * 0.05;
@@ -44,7 +55,8 @@
 
   // ---------- Richard (eigener Charakter): riesiger, bärtiger Kämpfer mit Lederjacke und Stiefeln ----------
   const RICHARD = { name: 'Richard', skin: '#d49e74', hair: 'undercut', hairColor: '#4a2f1c', eyes: '#2a6ac0', brows: 'dick', mouth: 'grinsen', nose: 'gross', beard: 'vollbart',
-    glasses: 'keine', hat: 'stirnband', hatColor: '#c02a2a', top: 'lederjacke', topColor: '#1a1a1a', pants: 'cargo', pantsColor: '#3a3a2a', shoeType: 'stiefel', shoes: '#4a2f1c', build: 'muskuloes', height: 'sehr_gross', scar: 'auge' };
+    glasses: 'keine', hat: 'stirnband', hatColor: '#c02a2a', top: 'tanktop', topColor: '#1a1a1a', pants: 'cargo', pantsColor: '#3a3a2a', shoeType: 'stiefel', shoes: '#4a2f1c', build: 'extrem', height: 'sehr_gross', scar: 'auge' };
+  L.RICHARD_APP = RICHARD;
 
   // ---------- Sounds ----------
   const sndWalross = (p) => { for (let k = 0; k < 3; k++) { L.tn({ f: 95, fTo: 70, dur: 0.35, type: 'sawtooth', vol: 0.3, pos: p, delay: k * 0.42, rev: true, ref: 40 }); L.nz({ dur: 0.3, f: 300, type: 'bandpass', q: 2, vol: 0.25, pos: p, delay: k * 0.42, ref: 40 }); } };
@@ -56,17 +68,19 @@
   const T_IN = 3.5, T_MOVE = 2.8, N_MOVE = 4, T_FIN = T_IN + T_MOVE * N_MOVE, T_FINLEN = 4.5, T_SINK = T_FIN + T_FINLEN + 2, T_TOTAL = T_SINK + 3;
   let F = null;
   L.richardFight = () => F;
-  L.startRichard = function (x, z, seed) {
+  // opts.win: Richard gewinnt sicher (wenn er das Boss-Walross besiegt) · opts.ws: Größe des Walrosses
+  L.startRichard = function (x, z, seed, opts) {
+    opts = opts || {};
     L.endRichard();
-    const R = rng(seed), sr = 13 + R() * 7, sw = 6 + R() * 4;
+    const R = rng(seed), sr = 13 + R() * 7, sw0 = 6 + R() * 4, sw = opts.ws || sw0;
     const rich = L.buildHuman(RICHARD); rich.root.scale.multiplyScalar(sr); L.scene.add(rich.root);
     const wal = L.buildWalross(); wal.root.scale.setScalar(sw); L.scene.add(wal.root);
     const pool = MOVES.slice(), moves = [];
     for (let i = 0; i < N_MOVE; i++) { if (!pool.length) pool.push(...MOVES); moves.push({ k: pool.splice(Math.floor(R() * pool.length), 1)[0], hit: false }); }
-    const end = R() < 0.72 ? (R() < 0.5 ? 'schleudern' : 'ko') : 'platt';
+    const r1 = R(), r2 = R(), end = opts.win || r1 < 0.72 ? (r2 < 0.5 ? 'schleudern' : 'ko') : 'platt';
     const axis = R() * Math.PI * 2, gap = sw * 3.6 + sr * 0.9;
-    F = { t: 0, x, z, seed, R, rich, wal, sr, sw, moves, end, axis, gap, ph: 0, landed: false, endHit: false, cam: [R(), R(), R()], said: false };
-    L.banner('RICHARD GEGEN DAS RIESEN-WALROSS', 'Ein neuer Kampf beginnt!');
+    F = { t: 0, x, z, seed, R, rich, wal, sr, sw, moves, end, axis, gap, ph: 0, landed: false, endHit: false, cam: [R(), R(), R()], said: false, noRise: !!opts.win };
+    L.banner('RICHARD GEGEN DAS RIESEN-WALROSS', opts.win ? 'Richard kommt, um das Walross zu besiegen!' : 'Ein neuer Kampf beginnt!');
     // Kurzfilm
     const side = axis + Math.PI / 2 * (F.cam[0] < 0.5 ? 1 : -1), size = Math.max(sr * 2.2, sw * 3);
     L.startCine('RICHARD GEGEN DAS WALROSS', T_TOTAL - 0.5, (t) => {
@@ -89,7 +103,7 @@
     const armPose = [];
     // Auftritt: Walross bricht aus dem Boden, Richard landet aus dem Himmel
     if (t < T_IN) {
-      wRise = -(1 - ease(t / 2.2)) * sw * 3;
+      wRise = F.noRise ? 0 : -(1 - ease(t / 2.2)) * sw * 3;
       rY = Math.max(0, (1 - t / 1.8)) * 260;
       if (t > 1.8 && !F.landed) { F.landed = true; L.snd.stomp(pos); L.shake = Math.max(L.shake, 1); L.fx('#6a5a40', F.x - ax * F.gap / 2, gy + 1, F.z - az * F.gap / 2, 40, 16, { size: 1.4, life: 2 }); sndRichard(pos); }
       if (t > 2.2 && !F.said) { F.said = true; sndWalross(pos); }

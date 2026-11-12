@@ -182,7 +182,7 @@
   // ---------- Mensch (Spieler und NPCs) ----------
   L.buildHuman = function (app) {
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
-    const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32 }[A.build] || 1;
+    const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32, extrem: 1.8 }[A.build] || 1;
     const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
     const root = new T.Group(), body = grp(root), hips = grp(body, 0, 0.95, 0);
     const box = G().box, sph = G().sph, cyl = G().cyl, cone = G().cone;

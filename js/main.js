@@ -123,7 +123,12 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       let ly = gy + (t < 17 ? 32 : Math.max(8, 32 - (t - 17) * 5)), lx = mx, lz = mz;
       // zum Schluss: GIGA-CAPY holt auch Viktor und Daniel
       const D0 = c.duel;
-      if (D0 && t > 21.5) { const k = Math.min(1, (t - 21.5) / 1.5); lx = L.lerp(mx, (c.x + D0.x) / 2, k); lz = L.lerp(mz, (c.z + D0.z) / 2, k); ly = L.lerp(ly, gy + 20, k); }
+      if (D0 && t > 17) {
+        // Daniel springt ab und kämpft gegen Viktor: Kamera schaut seitlich auf die beiden
+        const k = Math.min(1, (t - 17) / 2), sz = Math.max(D0.sv, D0.sd), sa = D0.axis + Math.PI / 2 * dir + (t - 17) * 0.02 * dir;
+        const cx = D0.x + Math.sin(sa) * sz * 7, cz = D0.z + Math.cos(sa) * sz * 7;
+        return { x: L.lerp(x, cx, k), y: L.lerp(y, groundY(cx, cz) + sz * 3, k), z: L.lerp(z, cz, k), lx: L.lerp(mx, D0.x, k), ly: L.lerp(ly, groundY(D0.x, D0.z) + sz * 2, k), lz: L.lerp(mz, D0.z, k) };
+      }
       return { x, y, z, lx, ly, lz };
     });
   };

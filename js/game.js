@@ -156,7 +156,7 @@
     if (rad <= 0) return;
     const hm = L.env.hearMul * L.md.hear;
     // im Turm zu laut (rennen, schießen, hupen …) → MAMA IVA kommt und reißt ihn ein
-    const B0 = L.boss;
+    const B0 = L.boss || L.wboss;
     if (!isClient() && B0 && !B0.dead && !B0.leaving && !B0.towerAtk && rad >= 20 && L.towerSafe() && L.inTower(x, z, 1)) {
       B0.towerAtk = true; B0.smashT = 0; B0.smashed = false;
       L.msg('⚠️ MAMA IVA hat dich im Turm gehört! Sie kommt, um ihn einzureißen …', 7000);
@@ -191,6 +191,8 @@
       out.push([e.x, e.y + 0.9 * low, e.z, 0.42, 1], [e.x, e.y + 1.4 * low, e.z, 0.35, 1], [e.x, e.y + 1.75 * low, e.z, 0.17, 2]);
     } else if (e.kind === 'walker') {
       out.push([e.x, e.hy, e.z, 6.5, 1], [e.x + Math.sin(e.yaw) * 7, e.hy - 0.3, e.z + Math.cos(e.yaw) * 7, 1.3, 3]);
+    } else if (e.kind === 'wboss') {
+      out.push([e.x, (e.rootY || 0) + WB_S * 1.1, e.z, WB_S * 1.4, 1], [e.x + Math.sin(e.yaw) * WB_S * 2.4, (e.rootY || 0) + WB_S * 1.6, e.z + Math.cos(e.yaw) * WB_S * 2.4, WB_S * 0.8, 2]);
     } else if (e.kind === 'boss') {
       out.push([e.x, e.hy, e.z, 6, 1], [e.x, e.hy + 8, e.z, 7, 1], [e.x, e.hy + 20, e.z, 2.6, 2]);
     }
@@ -202,6 +204,7 @@
     for (const n of E.npcs) if (!n.dead) a.push(n);
     for (const w of E.walkers) if (!w.dead) a.push(w);
     if (L.boss && !L.boss.dead) a.push(L.boss);
+    if (L.wboss && !L.wboss.leaving) a.push(L.wboss);
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
@@ -240,7 +243,7 @@
   function killPlayer(cause) {
     P.alive = false; P.deathT = 0; P.cause = cause;
     // Tod: MAMA IVA fängt wieder bei Stufe 1 an
-    L.save.ivaLvl = 0; L.persist();
+    L.save.ivaLvl = 0; L.save.walLvl = 0; L.persist();
     if (P.vehicle) leaveVehicle(true);
     L.blood(P.x, 1, P.z, 40, true); L.decal(P.x, P.z, 2.4); L.snd.splat({ x: P.x, y: 1, z: P.z });
     L.music.set('night');
@@ -1008,7 +1011,7 @@
     else if (impact > 0) { v.speed *= 0.8; v.lat *= 0.5; }
     // Monster und Menschen überfahren
     if (Math.abs(v.speed) > 3 && alt < 2) for (const e of allTargets()) {
-      if (e.kind === 'walker' || e.kind === 'boss' || e.fly) continue;
+      if (e.kind === 'walker' || e.kind === 'boss' || e.kind === 'wboss' || e.fly) continue;
       if (L.dist(e.x, e.z, v.x + fx * t.len * 0.4, v.z + fz * t.len * 0.4) > (t.kind === 'bike' ? 1.2 : t.wid * 0.7 + 0.5)) continue;
       const sp = Math.abs(v.speed);
       if (MK[e.kind] && MK[e.kind].heavy) { L.damageEnt(e, sp * 5, v.x, v.z, isPlayer ? P : null); v.speed *= 0.1; crash(v, sp * 0.7, isPlayer); }
@@ -1140,6 +1143,8 @@
       cause: 'Ein Marsianer hat dich gepackt', voice: (p) => L.snd.marsianer(p), idle: (p) => L.snd.marsianerIdle(p), hit: [[1.55, 0.85, 1], [1.7, 0.3, 2]] },
     starrende: { build: () => L.buildStarrende(), anim: (r, s) => L.animBeast(r, s), spd: [1.2, 6, 11], hp: 120, r: 0.4, reach: 2.4, grab: 2.2, atk: 0.6, wind: 0.3, dmg: 50, veh: 40, knock: 9, up: 4, view: 260,
       cause: 'Die Starrende hat dich erwischt, als du weggeschaut hast', voice: (p) => L.snd.starrende(p), idle: (p) => L.snd.starrendeIdle(p), hit: [[1.2, 0.3, 1], [1.9, 0.25, 1], [2.3, 0.2, 2]] },
+    walross: { build: () => { const r = L.buildWalross(); r.root.scale.setScalar(0.85); return r; }, anim: (r, s) => L.animWalrossMon(r, s), spd: [1.0, 3.6, 6.2], hp: 320, r: 1.3, reach: 3.2, grab: 2.8, atk: 1.0, wind: 0.5, dmg: 45, veh: 45, knock: 13, up: 5, heavy: true, view: 260,
+      cause: 'Ein Walross hat dich platt gemacht', voice: (p) => { L.tn({ f: 120, fTo: 90, dur: 0.35, type: 'sawtooth', vol: 0.2, pos: p }); L.tn({ f: 120, fTo: 90, dur: 0.35, type: 'sawtooth', vol: 0.2, pos: p, delay: 0.45 }); }, idle: (p) => L.nz({ dur: 0.4, f: 300, type: 'bandpass', q: 2, vol: 0.12, pos: p }), hit: [[1.0, 1.2, 1], [1.4, 0.5, 2]] },
     flieger: { build: () => L.buildFlieger(), anim: (r, s) => L.animBeast(r, s), spd: [7, 13, 16], hp: 300, r: 3, fly: true, metal: true, view: 520,
       cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.flieger(p), idle: (p) => L.snd.fliegerIdle(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
   };
@@ -1740,7 +1745,6 @@
   // ---------- GIGA-CAPY gegen MAMA IVA: Aufstieg, Brüllen, ein Kampf (jedes Mal anders), dann zieht es sie in die Tiefe ----------
   // Zeitplan (s): 0–5 aufsteigen · 5–7 brüllen · 7–14,8 drei Kampf-Aktionen · 14,8–16,8 packen · 16,8–22,3 MAMA IVA versinkt · ab 17,8 taucht GIGA-CAPY hinterher
   const C_RISE = 5, C_ROAR = 7, C_MOVE = 2.6, C_NM = 3, C_FIGHT = C_ROAR + C_MOVE * C_NM, C_GRAB = C_FIGHT + 2;
-  L.CAPY_TOTAL = C_GRAB + 15;
   const CAPY_MOVES = ['schlag', 'strahl', 'stampfer', 'biss', 'rammen', 'peitsche'];
   function seededRng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   L.capyStart = function (b, seed) {
@@ -1763,42 +1767,73 @@
   };
   const ease3 = (k) => 1 - Math.pow(1 - L.clamp(k, 0, 1), 3);
   const bump = (u, a, b) => (u < a || u > b ? 0 : Math.sin((u - a) / (b - a) * Math.PI));
-  // ---------- Im Hintergrund: Riesen-Daniel gegen Riesen-Viktor (jedes Mal andere Größe, andere Kampfaktionen, anderes Ende) ----------
+  // ---------- Daniel reitet auf GIGA-CAPY. Danach springt er ab, kämpft gegen Riesen-Viktor, und beide gehen weg ----------
   const DUEL_MOVES = ['schlag', 'kratzen', 'ringen', 'tritt', 'anspringen'], DUEL_ENDS = ['wuergen', 'suplex', 'wurf'];
-  const D_START = 1, D_FIGHT = 5, D_MOVE = 2.6, D_NM = 3, D_END = D_FIGHT + D_MOVE * D_NM, D_ENDLEN = 4;
-  const C_PULL2 = C_GRAB + 5.5; // danach holt GIGA-CAPY auch die beiden
+  const J0 = C_GRAB + 0.8, V0 = J0 + 1.4, D_FIGHT = V0 + 2.6, D_MOVE = 2.6, D_NM = 2, D_END = D_FIGHT + D_MOVE * D_NM, D_ENDLEN = 4, W0 = D_END + D_ENDLEN + 1;
+  L.CAPY_TOTAL = W0 + 5;
   function duelStart(c, b) {
     const rnd = c.rnd;
-    const sv = 9 + rnd() * 15, sd = 8 + rnd() * 12;
+    const sv = 7 + rnd() * 7, sd = 6 + rnd() * 3;
     const vik = L.buildViktor(['grey', 'red', 'blue', 'lange'][Math.floor(rnd() * 4)]), dan = L.buildDaniel();
     vik.root.scale.setScalar(sv); dan.root.scale.setScalar(sd);
-    L.scene.add(vik.root); L.scene.add(dan.root);
+    L.scene.add(vik.root); vik.root.visible = false;
+    // Daniel sitzt GIGA-CAPY auf den Schultern
+    c.rig.torso.add(dan.root); dan.root.position.set(0, 49, -12);
     const pool = DUEL_MOVES.slice(), moves = [];
     for (let i = 0; i < D_NM; i++) moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], hit: false });
     const end = DUEL_ENDS[Math.floor(rnd() * DUEL_ENDS.length)];
-    // hinter dem Kampf, vom Spieler aus gesehen, etwas zur Seite
-    const mx = (c.x + b.x) / 2, mz = (c.z + b.z) / 2, away = Math.atan2(mx - P.x, mz - P.z) + (rnd() - 0.5) * 1.2;
-    const dd = 70 + rnd() * 25, x = mx + Math.sin(away) * dd, z = mz + Math.cos(away) * dd;
-    const axis = away + Math.PI / 2, gap = (sv * 0.45 + sd * 0.45);
-    c.duel = { vik, dan, sv, sd, moves, end, x, z, axis, gap, ph: 0, endHit: false, roared: false, pulled: false };
+    // Kampfplatz: zwischen GIGA-CAPY und dem Spieler, damit man ihn gut sieht
+    const toP = Math.atan2(P.x - c.x, P.z - c.z), x = c.x + Math.sin(toP) * 45, z = c.z + Math.cos(toP) * 45;
+    const axis = toP + Math.PI / 2 + (rnd() - 0.5) * 0.5, gap = sv * 0.5 + sd * 0.55;
+    c.duel = { vik, dan, sv, sd, moves, end, x, z, axis, gap, ph: 0, endHit: false, roared: false, jumped: false, landed: false, rose: false, walkA: toP + Math.PI, wv: 0, wd: 0, sx: 0, sy: 0, sz: 0 };
   }
   function duelUpdate(c, t, dt) {
     const D = c.duel; if (!D) return;
     const { vik, dan, sv, sd } = D, ax = Math.sin(D.axis), az = Math.cos(D.axis);
     D.ph += dt * 6;
     const gy = L.mountainH(D.x, D.z);
-    // Grundstellung: einander gegenüber
-    let vOff = -D.gap / 2, dOff = D.gap / 2, vY = 0, dY = 0, vRx = 0, vRz = 0, dRx = 0, vYaw = D.axis, dYaw = D.axis + Math.PI;
+    // 1) Daniel reitet: sitzt, jubelt, hält sich fest
+    if (t < J0) {
+      L.animDaniel(dan, { mode: 'search', phase: D.ph });
+      dan.root.rotation.set(0, 0, Math.sin(D.ph * 0.5) * 0.08);
+      dan.hips.position.y = 0.75;
+      dan.legs.forEach((l, i) => { l.leg.rotation.set(-1.5, 0, (i ? -1 : 1) * 0.55); l.knee.rotation.x = 1.4; });
+      const cheer = t > C_RISE && t < C_ROAR ? 1 : 0.5 + 0.5 * Math.sin(D.ph * 0.8);
+      dan.arms[0].arm.rotation.set(-2.8 * cheer + Math.sin(D.ph * 2) * 0.3, 0, 0.4); dan.arms[0].elbow.rotation.x = -0.4;
+      dan.arms[1].arm.rotation.set(-1.0, 0, -0.5); dan.arms[1].elbow.rotation.x = -0.8;
+      if (t > C_RISE + 0.5 && !D.roared) { D.roared = true; L.snd.daniel({ x: c.x, y: 50, z: c.z }); }
+      return;
+    }
+    // 2) Absprung von GIGA-CAPY auf den Kampfplatz
+    const dOff0 = D.gap / 2;
+    if (!D.jumped) {
+      D.jumped = true; L.scene.attach(dan.root);
+      D.sx = dan.root.position.x; D.sy = dan.root.position.y; D.sz = dan.root.position.z;
+      L.msg('💪 Daniel springt von GIGA-CAPY!', 3000); L.snd.daniel({ x: D.x, y: 30, z: D.z });
+    }
+    let vOff = -D.gap / 2, dOff = dOff0, vY = 0, dY = 0, vRx = 0, vRz = 0, dRx = 0, vYaw = D.axis, dYaw = D.axis + Math.PI;
     let vMode = 'alert', dMode = 'alert', vAtk = 0, dAtk = 0;
-    const rise = L.clamp((t - D_START) / 3.5, 0, 1), sinkY = -Math.max(sv, sd) * 3.2 * (1 - (1 - Math.pow(1 - rise, 3)));
     const pose = [];
+    if (t < J0 + 1.6) {
+      const k = (t - J0) / 1.6, e = ease3(k);
+      const ex = D.x + ax * dOff0, ez = D.z + az * dOff0;
+      dan.root.position.set(L.lerp(D.sx, ex, e), L.lerp(D.sy, gy, k * k) + Math.sin(k * Math.PI) * 25, L.lerp(D.sz, ez, e));
+      dan.root.rotation.set(Math.sin(k * Math.PI) * -0.4, dYaw, 0);
+      L.animDaniel(dan, { mode: 'run', phase: D.ph });
+      vik.root.visible = false;
+      return;
+    }
+    if (!D.landed) { D.landed = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 1); L.fx('#6a5a40', D.x + ax * dOff0, gy + 1, D.z + az * dOff0, 30, 14, { size: 1.2, life: 1.8 }); }
+    // 3) Viktor steigt aus dem Boden
+    let vRise = 0;
+    if (t < V0 + 2.6) { vRise = -(1 - ease3(L.clamp((t - V0) / 2.4, 0, 1))) * sv * 3.2; if (t > V0 && !D.rose) { D.rose = true; L.snd.viktor({ x: D.x, y: 20, z: D.z }); L.msg('👁️ Riesen-Viktor stellt sich Daniel!', 3000); } if (Math.random() < dt * 14) L.fx('#5a4630', D.x - ax * D.gap / 2 + L.rand(-8, 8), gy + 1, D.z - az * D.gap / 2 + L.rand(-8, 8), 3, 10, { size: 1, life: 2 }); }
+    vik.root.visible = t > V0;
     if (t >= D_FIGHT && t < D_END) {
       const i = Math.floor((t - D_FIGHT) / D_MOVE), u = (t - D_FIGHT - i * D_MOVE) / D_MOVE, mv = D.moves[i];
       if (mv.k === 'schlag') { dMode = 'attack'; dAtk = u; vOff -= bump(u, 0.45, 1) * sv * 0.5; vRx = -bump(u, 0.45, 1) * 0.4; if (u > 0.5 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 10, z: D.z }, 0.9); L.snd.viktor({ x: D.x, y: 15, z: D.z }); } }
       else if (mv.k === 'kratzen') { vMode = 'attack'; vAtk = u; dOff += bump(u, 0.45, 1) * sd * 0.5; dRx = -bump(u, 0.45, 1) * 0.3; if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); } }
       else if (mv.k === 'ringen') {
         vMode = dMode = 'walk'; const k = bump(u, 0, 1); vOff += k * D.gap * 0.3; dOff -= k * D.gap * 0.3; vRx = dRx = 0.3 * k;
-        const spin = u * Math.PI * 0.6; vYaw += spin; dYaw += spin; D.axis += dt * 0.5;
         pose.push(() => { for (const a of vik.arms) a.arm.rotation.x = -1.5 * k; for (const a of dan.arms) a.arm.rotation.x = -1.4 * k; });
         if (u > 0.5 && !mv.hit) { mv.hit = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); }
       } else if (mv.k === 'tritt') {
@@ -1806,65 +1841,68 @@
         pose.push(() => { dan.legs[0].leg.rotation.x = -1.6 * k; dan.legs[0].knee.rotation.x = 0.3 * k; vik.torso.rotation.x = 0.7 * bump(u, 0.45, 1); });
         if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 8, z: D.z }, 1); L.snd.viktor({ x: D.x, y: 15, z: D.z }); }
       } else {
-        // Viktor springt Daniel an
         vMode = 'crawl'; const k = bump(u, 0.1, 0.8); vY = k * sv * 1.1; vOff += k * D.gap * 0.6; dRx = -bump(u, 0.45, 1) * 0.35;
         if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 10, z: D.z }, 0.8); L.snd.daniel({ x: D.x, y: 10, z: D.z }); }
       }
-    } else if (t >= D_END) {
-      // Ende: Daniel gewinnt – würgen, Suplex oder Wurf
+    } else if (t >= D_END && t < D_END + D_ENDLEN) {
+      // Daniel gewinnt: würgen, Suplex oder Wurf
       const u = L.clamp((t - D_END) / D_ENDLEN, 0, 1);
       if (D.end === 'wuergen') {
-        const lift = ease3(u / 0.35); vOff = -D.gap * 0.22; vY = lift * sd * 1.2;
+        const lift = ease3(u / 0.35) * (1 - ease3(L.clamp((u - 0.8) / 0.2, 0, 1))); vOff = -D.gap * 0.22; vY = lift * sd * 1.2;
         const kick = Math.max(0, 1 - u * 1.3);
         pose.push(() => {
-          for (const a of dan.arms) { a.arm.rotation.x = -1.9; a.elbow.rotation.x = -0.3; }
+          for (const a of dan.arms) { a.arm.rotation.x = -1.9 * (u < 0.85 ? 1 : 0.3); a.elbow.rotation.x = -0.3; }
           vik.arms.forEach((a, i) => { a.arm.rotation.set(-2.4 * kick, 0, (i ? -1 : 1) * (0.2 + (1 - kick) * 0.3)); a.elbow.rotation.x = -1.2 * kick; });
           vik.legs.forEach((l, i) => { l.leg.rotation.x = Math.sin(D.ph * 2 + i * 2) * 0.6 * kick; l.knee.rotation.x = 0.6 * kick; });
-          vik.neck.rotation.z = vik.tilt + (1 - kick) * 0.8;
         });
         if (u > 0.2 && !D.endHit) { D.endHit = true; L.snd.viktor({ x: D.x, y: 15, z: D.z }); }
+        if (u > 0.85) vMode = 'dead';
       } else if (D.end === 'suplex') {
-        // Daniel packt Viktor und wirft ihn rückwärts über sich auf den Kopf
-        const k = ease3(L.clamp((u - 0.15) / 0.45, 0, 1)), arc = k * Math.PI;
-        const r = sd * 1.3;
+        const k = ease3(L.clamp((u - 0.15) / 0.45, 0, 1)), arc = k * Math.PI, r = sd * 1.3;
         vOff = D.gap / 2 - Math.cos(arc) * r - r * 0.2; vY = Math.sin(arc) * sd * 1.6; vRx = arc * 1.05;
         const arch = bump(u, 0.15, 0.95);
         pose.push(() => { for (const a of dan.arms) a.arm.rotation.x = -2.2 * bump(u, 0.05, 0.9); dan.torso.rotation.x = -1.0 * arch; dan.neck.rotation.x = -0.4 * arch; });
-        if (u > 0.6 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.7); L.fx('#6a5a40', D.x, 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
-        if (u > 0.6) { vMode = 'dead'; }
+        if (u > 0.6 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.7); L.fx('#6a5a40', D.x, gy + 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
+        if (u > 0.6) vMode = 'dead';
       } else {
-        // Daniel stemmt Viktor über den Kopf und schmettert ihn auf den Boden
         const up = ease3(L.clamp(u / 0.4, 0, 1)), down = ease3(L.clamp((u - 0.55) / 0.12, 0, 1));
-        vOff = D.gap * 0.15 - down * D.gap * 0.5; vY = up * sd * 2.4 * (1 - down); vRz = up * Math.PI / 2;
+        vOff = D.gap * 0.15 - down * D.gap * 0.5; vY = up * sd * 2.4 * (1 - down); vRz = up * Math.PI / 2 * (1 - down * 0.0);
         pose.push(() => { for (const a of dan.arms) a.arm.rotation.x = -2.9 * up * (1 - down * 0.6); });
-        if (u > 0.67 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.8); L.fx('#6a5a40', D.x, 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
+        if (u > 0.67 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.8); L.fx('#6a5a40', D.x, gy + 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
         if (u > 0.67) vMode = 'dead';
       }
-      if (u > 0.85) { dMode = 'alert'; if (!D.roared) { D.roared = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); } }
-      if (D.end === 'wuergen' && u > 0.85) vMode = 'dead';
-    } else { vMode = 'search'; dMode = 'search'; }
-    // GIGA-CAPY holt die beiden: sie versinken im Boden
-    let pull = 0;
-    if (t > C_PULL2) { pull = ease3((t - C_PULL2) / 4.5); if (!D.pulled) { D.pulled = true; L.msg('🦫 GIGA-CAPY zieht auch Viktor und Daniel in die Tiefe!', 4000); L.snd.daniel({ x: D.x, y: 10, z: D.z }); } if (Math.random() < dt * 12) L.fx('#5a4630', D.x + L.rand(-20, 20), 0.5, D.z + L.rand(-20, 20), 3, 10, { size: 1, life: 2 }); }
-    const down = pull * Math.max(sv, sd) * 4;
+      if (u > 0.85) { dMode = 'alert'; if (!D.won) { D.won = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); L.msg('💪 Daniel hat Viktor besiegt!', 3000); } }
+      D.vEnd = vOff; D.vEndY = vY;
+    } else if (t >= D_END + D_ENDLEN) {
+      // 4) Viktor rappelt sich auf – dann gehen beide weg
+      vOff = D.vEnd !== undefined ? D.vEnd : vOff;
+      const up = L.clamp((t - D_END - D_ENDLEN) / 1, 0, 1);
+      if (up < 1) { vMode = 'dead'; vRx = 0; vRz = 0; vY = (D.vEndY || 0) * (1 - up); }
+      if (t > W0) {
+        const w = t - W0, spd = Math.max(sv, sd) * 1.1;
+        D.wv = w * spd; D.wd = w * spd * 0.95;
+        vMode = 'walk'; dMode = 'walk'; vYaw = D.walkA - 0.35; dYaw = D.walkA + 0.35;
+        if (!D.leave) { D.leave = true; L.msg('👣 Viktor und Daniel gehen beide weg …', 3000); }
+      }
+    }
+    // Weggehen: jeder in seine Richtung
+    const vwx = Math.sin(D.walkA - 0.35) * D.wv, vwz = Math.cos(D.walkA - 0.35) * D.wv, dwx = Math.sin(D.walkA + 0.35) * D.wd, dwz = Math.cos(D.walkA + 0.35) * D.wd;
     L.animViktor(vik, { mode: vMode, phase: D.ph, atk: vAtk });
     L.animDaniel(dan, { mode: dMode, phase: D.ph, atk: dAtk });
     for (const f of pose) f();
-    vik.root.position.set(D.x + ax * vOff, gy + sinkY + vY - down, D.z + az * vOff);
-    dan.root.position.set(D.x + ax * dOff, gy + sinkY + dY - down, D.z + az * dOff);
+    vik.root.position.set(D.x + ax * vOff + vwx, gy + vRise + vY, D.z + az * vOff + vwz);
+    dan.root.position.set(D.x + ax * dOff + dwx, gy + dY, D.z + az * dOff + dwz);
     vik.root.rotation.set(0, vYaw, 0); vik.root.rotateX(vRx); vik.root.rotateZ(vRz);
     dan.root.rotation.set(0, dYaw, 0); dan.root.rotateX(dRx);
-    vik.root.visible = dan.root.visible = t > D_START && pull < 0.99;
   }
-
   // gibt zurück, wie weit MAMA IVA schon im Boden ist (0 … 1)
   L.capyUpdate = function (b, dt) {
     const c = b.capy; if (!c) return Math.min(1, b.sinking / 7);
     const t = b.sinking, r = c.rig;
     // Höhe
     if (t < C_RISE) c.y = -85 * (1 - ease3(t / C_RISE));
-    else if (t < C_PULL2 + 3.5) c.y = 0;
-    else c.y = -90 * ease3((t - C_PULL2 - 3.5) / 5.5);
+    else if (t < C_GRAB + 1) c.y = 0;
+    else c.y = -90 * ease3((t - C_GRAB - 1) / 5.5);
     // Pose von GIGA-CAPY und Wirkung auf MAMA IVA
     let armX = [0, 0], elbowX = [0, 0], lean = 0, headX = 0.1, headY = 0, headZ = Math.sin(t * 0.8) * 0.06, adv = 0;
     const fp = { tilt: 0, side: 0, push: 0, dip: 0, armUp: 0, whip: 0, beam: 0 };
@@ -1916,10 +1954,6 @@
         armX = [-0.8 * bump(u, 0.4, 1), -0.8 * bump(u, 0.4, 1)];
         if (u > 0.42 && !mv.hit) { mv.hit = true; L.snd.screech({ x: c.x, y: 40, z: c.z }, 0.4); atCapy(30); L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); }
       }
-    } else if (t >= C_PULL2) {
-      // dreht sich zu Viktor und Daniel und greift nach ihnen
-      const D = c.duel; if (D) c.yaw += L.angDiff(c.yaw, Math.atan2(D.x - c.x, D.z - c.z)) * Math.min(1, dt * 1.5);
-      const k = ease3((t - C_PULL2) / 1.2); adv = 0; armX = [-1.4 * k, -1.4 * k]; elbowX = [-0.6 * k, -0.6 * k]; lean = 0.3 * k;
     } else if (t >= C_FIGHT) {
       // packen und festhalten
       const k = ease3((t - C_FIGHT) / 1.2); adv = 12 + k * 10;
@@ -1937,7 +1971,7 @@
     if (t >= C_RISE && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
     // Beben, Staub und Steine beim Auf- und Abtauchen
     duelUpdate(c, t, dt);
-    if (t < C_RISE || t > C_PULL2 + 3.5) {
+    if (t < C_RISE || (t > C_GRAB && t < C_GRAB + 7)) {
       const d = L.dist(P.x, P.z, c.x, c.z);
       L.shake = Math.max(L.shake, L.clamp((450 - d) / 450, 0, 0.9));
       if (Math.random() < dt * 14) L.fx(Math.random() < 0.5 ? '#5a4630' : '#3a3a36', c.x + L.rand(-18, 18), 0.5, c.z + L.rand(-18, 18), 3, 10, { size: 0.9, life: 2 });
@@ -1961,7 +1995,7 @@
       rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(p.x, p.y + 36, p.z), 1.3);
     }
   };
-  L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); const D = b.capy.duel; if (D) { L.scene.remove(D.vik.root); L.scene.remove(D.dan.root); } b.capy = null; } };
+  L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); const D = b.capy.duel; if (D) { L.scene.remove(D.vik.root); if (D.dan.root.parent) D.dan.root.parent.remove(D.dan.root); } b.capy = null; } };
 
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {
@@ -2019,8 +2053,6 @@
       // GIGA-CAPY zieht MAMA IVA in den Boden
       b.rootY = -72 * L.capyUpdate(b, dt);
       if (b.sinking >= L.CAPY_TOTAL) {
-        // danach: Bosskampf-Kurzfilm Richard gegen das Riesen-Walross
-        if (b.capy) { const rs = Math.floor(Math.random() * 1e9); L.startRichard(b.capy.x, b.capy.z, rs); if (NET() !== 'solo') L.mp.send({ t: 'richard', x: b.capy.x, z: b.capy.z, seed: rs }); }
         L.ivaDone = b.idx; calmMonsters(); L.capyRemove(b); L.scene.remove(rig.root); L.boss = null; L.round.bossT = ivaClock().left; if (isHost()) L.mp.send({ t: 'bossGone' }); L.msg('Ruhe … ' + Math.max(1, Math.round(ivaClock().left / 60)) + ' Minuten Pause, dann kommt MAMA IVA wieder.', 6000); return; }
     }
     // Ziel: Spieler im Umkreis jagen, sonst letztem Lärm folgen
@@ -2122,6 +2154,149 @@
       L.shake = Math.max(L.shake, L.clamp((200 - d) / 200, 0, 0.9));
       L.makeNoise(fp.x, fp.z, 0, null);
     });
+  }
+
+
+  // ---------- Zweiter Boss: DAS RIESEN-WALROSS (wechselt sich mit MAMA IVA ab) ----------
+  // Steigt aus dem Boden, hört alle, die nicht schleichen, hüpft hin und macht Bauchklatscher. Am Ende kommt Richard und besiegt es.
+  const WB_S = 9;
+  function wbVoice(p) { for (let k = 0; k < 3; k++) { L.tn({ f: 70, fTo: 52, dur: 0.45, type: 'sawtooth', vol: 0.45, pos: p, delay: k * 0.5, rev: true, ref: 60 }); L.nz({ dur: 0.4, f: 240, type: 'bandpass', q: 2, vol: 0.35, pos: p, delay: k * 0.5, ref: 60 }); } }
+  L.wbVoice = wbVoice;
+  function spawnWalrusBoss(left) {
+    const rig = L.buildWalross(); rig.root.scale.setScalar(WB_S); L.scene.add(rig.root);
+    let x = P.x + 260, z = P.z;
+    for (let k = 0; k < 40; k++) {
+      const a = Math.random() * 6.28, d = L.rand(220, 330), tx = P.x + Math.sin(a) * d, tz = P.z + Math.cos(a) * d;
+      if (Math.abs(tx) < 1400 && Math.abs(tz) < 1400 && L.mountainH(tx, tz) === 0 && !L.inTower(tx, tz, 60)) { x = tx; z = tz; break; }
+    }
+    const lvl = Math.min(10, L.save.walLvl || 0);
+    L.save.walLvl = lvl + 1; L.persist();
+    const w = { kind: 'wboss', key: 'wboss', rig, x, z, yaw: Math.atan2(P.x - x, P.z - z), hp: 7000 * (1 + lvl * 0.3), life: Math.max(30, (left || 600) - 8), lvl,
+      spdMul: 1 + lvl * 0.15, dmgMul: 1 + lvl * 0.25, emerge: 0, rootY: -WB_S * 3, tx: x, tz: z, slamT: 0, slamCd: 3, roarT: 4, ph: 0, leaving: true, towerAtk: false, smashT: 0, smashed: false, dead: false, hy: WB_S * 1.2 };
+    L.byId.set('wboss', w);
+    L.wboss = w; L.frenzy = true;
+    L.wbossAppear(w);
+    return w;
+  }
+  // Auftritt (auch auf den Geräten der Mitspieler)
+  L.wbossAppear = function (w) {
+    L.towerRestore();
+    const lv = (w.lvl || 0) + 1;
+    L.banner('DAS RIESEN-WALROSS – STUFE ' + lv, (lv > 1 ? 'Schneller und stärker als letztes Mal! ' : '') + 'Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte!');
+    wbVoice({ x: w.x, y: 10, z: w.z });
+    const a0 = Math.atan2(P.x - w.x, P.z - w.z);
+    if (L.startCine) L.startCine('DAS RIESEN-WALROSS', 7.5, (t) => {
+      const W = L.wboss; if (!W) return null;
+      const a = a0 + 0.5 - t * 0.07, d = 120 - t * 5, gx = W.x + Math.sin(a) * d, gz = W.z + Math.cos(a) * d;
+      return { x: gx, y: L.mountainH(gx, gz) + 22 + t, z: gz, lx: W.x, ly: (W.rootY || 0) + WB_S * 1.3, lz: W.z };
+    });
+  };
+  function wbEnd(w) {
+    // Richard kommt und besiegt das Walross (Kurzfilm)
+    const rs = Math.floor(Math.random() * 1e9);
+    L.scene.remove(w.rig.root); L.byId.delete('wboss'); L.wboss = null;
+    L.startRichard(w.x, w.z, rs, { win: true, ws: WB_S });
+    if (NET() !== 'solo') L.mp.send({ t: 'richard', x: w.x, z: w.z, seed: rs, win: 1, ws: WB_S });
+    L.ivaDone = w.idx; calmMonsters();
+    L.round.bossT = ivaClock().left;
+  }
+  function updateWalrusBoss(dt) {
+    const w = L.wboss, rig = w.rig;
+    w.ph += dt * 4; w.roarT -= dt; w.slamCd -= dt;
+    const ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
+    if (w.emerge < 6) {
+      w.emerge += dt; const k = 1 - Math.pow(1 - Math.min(1, w.emerge / 6), 3);
+      w.rootY = -WB_S * 3 * (1 - k);
+      if (Math.random() < dt * 14) L.fx('#5a4630', w.x + L.rand(-20, 20), 1, w.z + L.rand(-20, 20), 3, 10, { size: 1, life: 2 });
+      L.shake = Math.max(L.shake, L.clamp((350 - L.dist(P.x, P.z, w.x, w.z)) / 350, 0, 0.7));
+      if (w.emerge >= 6) { w.leaving = false; w.rootY = 0; L.msg('🦭 Das Riesen-Walross ist da!', 4000); }
+    } else {
+      w.life -= dt;
+      if (w.life <= 0 || w.hp <= 0 || w.dead) { wbEnd(w); return; }
+    }
+    if (w.roarT <= 0) { w.roarT = L.rand(12, 22); wbVoice({ x: w.x, y: 10, z: w.z }); }
+    // Ziel: wer nicht schleicht, wird gehört – im Turm ist man sicher, solange man leise ist
+    const TW = L.TOWER;
+    if (w.towerAtk && !L.towerSafe()) w.towerAtk = false;
+    if (w.towerAtk) { w.tx = TW.x; w.tz = TW.z; }
+    else if (!w.leaving) {
+      let best = null, bd = 1e9;
+      for (const t of players()) {
+        const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
+        if (!loud || safeIn(t.x, t.z)) continue;
+        const d = L.dist(t.x, t.z, w.x, w.z); if (d < bd) { bd = d; best = t; }
+      }
+      if (best) { w.tx = best.x; w.tz = best.z; }
+    }
+    const dT = L.dist(w.x, w.z, w.tx, w.tz);
+    let moving = false;
+    if (!w.leaving && w.slamT <= 0 && dT > (w.towerAtk ? 40 : 18)) {
+      moving = true;
+      const want = Math.atan2(w.tx - w.x, w.tz - w.z);
+      w.yaw += L.clamp(L.angDiff(w.yaw, want), -0.8 * dt, 0.8 * dt);
+      const sp = 7 * w.spdMul * (0.6 + Math.abs(Math.sin(w.ph)) * 0.8);
+      w.x += Math.sin(w.yaw) * sp * dt; w.z += Math.cos(w.yaw) * sp * dt; L.clampWorld(w);
+      ws.hop = Math.abs(Math.sin(w.ph)) * 0.25; ws.rear = -Math.sin(w.ph) * 0.12; ws.flip = Math.sin(w.ph) * 0.5;
+      if (Math.sin(w.ph) < -0.97 && Math.random() < 0.5) { L.snd.stomp({ x: w.x, y: 0, z: w.z }); L.shake = Math.max(L.shake, L.clamp((200 - L.dist(P.x, P.z, w.x, w.z)) / 200, 0, 0.6)); }
+    }
+    // Bauchklatscher: aufbäumen und auf den Boden krachen lassen
+    const [nearP, dNear] = nearestPlayer(w.x, w.z);
+    const wantSlam = (w.towerAtk && dT <= 42) || (nearP && dNear < 34 && !safeIn(nearP.x, nearP.z));
+    if (!w.leaving && wantSlam && w.slamCd <= 0 && w.slamT <= 0) { w.slamT = 1.6 / Math.min(1.6, w.spdMul); w.slamDur = w.slamT; wbVoice({ x: w.x, y: 10, z: w.z }); }
+    if (w.slamT > 0) {
+      w.slamT -= dt;
+      const u = 1 - w.slamT / w.slamDur;
+      ws.rear = u < 0.6 ? -0.8 * (u / 0.6) : -0.8 + (u - 0.6) / 0.4 * 1.05; ws.hop = u < 0.6 ? u * 0.4 : 0;
+      if (w.slamT <= 0) {
+        w.slamCd = 6 / w.spdMul;
+        const sx = w.x + Math.sin(w.yaw) * WB_S * 2, sz = w.z + Math.cos(w.yaw) * WB_S * 2;
+        L.snd.stomp({ x: sx, y: 0, z: sz }); L.snd.crash(1, { x: sx, y: 5, z: sz }); L.shake = Math.max(L.shake, 1.5);
+        L.fx('#6a5a40', sx, 1, sz, 40, 16, { size: 1.3, life: 1.8 });
+        L.makeNoise(sx, sz, 200, null);
+        if (w.towerAtk && L.dist(sx, sz, TW.x, TW.z) < 60) {
+          w.towerAtk = false; L.towerDestroy();
+          if (NET() !== 'solo') L.mp.send({ t: 'tower', down: 1 });
+          for (const rp of RPs()) if (L.inTower(rp.x, rp.z, 1)) hurtRemote(rp, 45 * L.md.dmg, 'Vom einstürzenden Turm erschlagen');
+        }
+        const dd = L.dist(P.x, P.z, sx, sz);
+        if (dd < 30 && P.alive && !safeIn(P.x, P.z)) {
+          const sneaking = P.stance !== 'stand' && !P.vehicle;
+          L.hurtPlayer((sneaking ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - dd / 42), 'Vom Riesen-Walross platt gemacht');
+          if (P.alive && !P.vehicle) { const k = 15; P.vx = (P.x - sx) / (dd || 1) * k; P.vz = (P.z - sz) / (dd || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
+        }
+        for (const rp of RPs()) { const d2 = L.dist(rp.x, rp.z, sx, sz); if (d2 < 30 && !safeIn(rp.x, rp.z)) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - d2 / 42), 'Vom Riesen-Walross platt gemacht', (rp.x - sx) / (d2 || 1) * 15, (rp.z - sz) / (d2 || 1) * 15, 7, sn); } }
+        for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, sx, sz) < 30) L.damageEnt(n, 200, sx, sz, w);
+      }
+    }
+    if (!moving && w.slamT <= 0) { ws.headY = Math.sin(w.ph * 0.3) * 0.5; ws.headX = -0.2; }
+    w.ws = ws;
+    L.animWalross(rig, w.ph, ws);
+    rig.root.position.set(w.x, w.rootY + L.mountainH(w.x, w.z), w.z); rig.root.rotation.set(0, w.yaw, 0);
+  }
+  // Mitspieler: Walross-Boss nach den Daten vom Host
+  L.applyWboss = function (a) {
+    if (!a) { if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.byId.delete('wboss'); L.wboss = null; } return; }
+    let w = L.wboss;
+    if (!w) {
+      const rig = L.buildWalross(); rig.root.scale.setScalar(WB_S); L.scene.add(rig.root);
+      w = L.wboss = { kind: 'wboss', key: 'wboss', rig, x: a[0], z: a[1], yaw: a[2], rootY: a[3], lvl: a[5], life: a[6], ph: 0, puppet: true, hy: WB_S * 1.2, hp: 1 };
+      L.byId.set('wboss', w);
+      L.wbossAppear(w);
+    }
+    w.nx = a[0]; w.nz = a[1]; w.nyaw = a[2]; w.rootY = a[3]; w.slam = a[4]; w.lvl = a[5]; w.life = a[6];
+  };
+  L.wbossState = () => { const w = L.wboss; return w ? [Math.round(w.x), Math.round(w.z), Math.round(w.yaw * 100) / 100, Math.round(w.rootY * 10) / 10, w.slamT > 0 ? Math.round((1 - w.slamT / w.slamDur) * 100) / 100 : 0, w.lvl, Math.round(w.life)] : 0; };
+  function puppetWboss(dt) {
+    const w = L.wboss; if (!w || !w.puppet) return;
+    const k = Math.min(1, dt * 5), ox = w.x, oz = w.z;
+    w.x += ((w.nx === undefined ? w.x : w.nx) - w.x) * k; w.z += ((w.nz === undefined ? w.z : w.nz) - w.z) * k; w.yaw += L.angDiff(w.yaw, w.nyaw || w.yaw) * k;
+    const mv = L.dist(ox, oz, w.x, w.z) / Math.max(dt, 0.001) > 1;
+    w.ph += dt * 4;
+    const ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
+    if (mv) { ws.hop = Math.abs(Math.sin(w.ph)) * 0.25; ws.rear = -Math.sin(w.ph) * 0.12; ws.flip = Math.sin(w.ph) * 0.5; }
+    if (w.slam > 0) { const u = w.slam; ws.rear = u < 0.6 ? -0.8 * (u / 0.6) : -0.8 + (u - 0.6) / 0.4 * 1.05; }
+    L.animWalross(w.rig, w.ph, ws);
+    w.rig.root.position.set(w.x, w.rootY + L.mountainH(w.x, w.z), w.z); w.rig.root.rotation.set(0, w.yaw, 0);
   }
 
   // ---------- NPCs (andere Überlebende) ----------
@@ -2240,6 +2415,7 @@
   L.respawnQueue = [];
   function clearAll() {
     clearCyls(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard();
+    if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
     for (const n of E.npcs) L.scene.remove(n.rig.root);
@@ -2343,6 +2519,7 @@
     place('schwelle', Math.round(18 * cm));
     place('greifer', Math.round(10 * cm));
     place('flieger', Math.round(6 * cm));
+    place('walross', Math.round(14 * cm));
     L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.clearNature(); L.round.cylT = L.rand(60, 90);
     for (let i = 0; i < Math.max(6, Math.round(20 * L.md.count)); i++) {
       const [x, z] = farSpot(400); spawnWalker(x, z);
@@ -2354,6 +2531,8 @@
       const hostile = S.npcMode === 'feindlich' ? true : S.npcMode === 'friedlich' ? false : Math.random() < 0.4;
       spawnNpc(x, z, hostile);
     }
+    // Richard in normaler Größe: kämpft auf deiner Seite gegen Monster
+    for (let i = 0; i < 2; i++) { const [x, z] = farSpot(120); const n = spawnNpc(x, z, false, undefined, L.RICHARD_APP, 'schrotflinte'); n.hp = 400; n.richard = true; }
     L.env.time = L.rand(6.5, 10); L.randomWeather();
     L.state = 'game'; L.paused = false;
     L.music.set('calm');
@@ -2398,21 +2577,28 @@
     const R = L.round;
     R.time += dt;
     // Boss-Timer
-    if (!L.boss && !isClient()) {
+    if (!L.boss && !L.wboss && !isClient()) {
       const K = ivaClock();
+      const nIdx = K.pause ? K.idx : K.idx + 1;
+      R.nextBoss = nIdx % 2 === 1 ? 'DAS RIESEN-WALROSS' : 'MAMA IVA';
       if (K.pause) {
         R.bossT = K.left;
-        if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt MAMA IVA.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
-      } else if (L.ivaDone !== K.idx && K.left > 25) { R.warned = false; spawnBoss(K.left); L.boss.idx = K.idx; }
+        if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt ' + R.nextBoss + '.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
+      } else if (L.ivaDone !== K.idx && K.left > 25) {
+        R.warned = false;
+        if (K.idx % 2 === 1 && !L.ivaInstant) { const w = spawnWalrusBoss(K.left); w.idx = K.idx; }
+        else { spawnBoss(K.left); L.boss.idx = K.idx; }
+      }
       else R.bossT = K.left + K.C; // diesmal ist sie schon weg – nächster Auftritt nach der Pause
 
     }
     if (!P.gone) updatePlayer(dt);
-    if (isClient()) L.mp.puppets(dt);
+    if (isClient()) { L.mp.puppets(dt); puppetWboss(dt); }
     else {
       for (let i = E.monsters.length - 1; i >= 0; i--) if (!updateMonster(E.monsters[i], dt)) { L.byId.delete(E.monsters[i].key); L.scene.remove(E.monsters[i].rig.root); E.monsters.splice(i, 1); }
       for (const w of E.walkers) updateWalker(w, dt);
       if (L.boss) updateBoss(dt);
+      if (L.wboss) updateWalrusBoss(dt);
       for (let i = E.npcs.length - 1; i >= 0; i--) if (!updateNpc(E.npcs[i], dt)) { L.byId.delete(E.npcs[i].key); L.scene.remove(E.npcs[i].rig.root); E.npcs.splice(i, 1); }
     }
     if (NET() !== 'solo') L.mp.update(dt);
@@ -2427,7 +2613,7 @@
     L.updateNature(dt);
     L.updateRichard(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
-    L.towerCall = !!(L.boss && !L.boss.dead && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
+    L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);
     L.updateFusion(dt);
     L.updateTower(dt);
@@ -2451,7 +2637,7 @@
     L.staticAmt = stat;
     if (stat > 0.25 && Math.random() < dt * stat * 3) L.snd.langerIdle({ x: P.x, y: 1.5, z: P.z });
     if (!P.alive) L.music.set('night');
-    else if (L.boss && !L.boss.dead) { L.bossMusicLvl = L.boss.lvl || 0; L.music.set('boss'); }
+    else if ((L.boss && !L.boss.dead) || L.wboss) { L.bossMusicLvl = (L.boss || L.wboss).lvl || 0; L.music.set('boss'); }
     else if (danger >= 3) L.music.set('chase');
     else if (danger >= 1) L.music.set('tension');
     else {
