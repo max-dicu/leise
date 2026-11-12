@@ -231,6 +231,8 @@
   };
   function killPlayer(cause) {
     P.alive = false; P.deathT = 0; P.cause = cause;
+    // Tod: MAMA IVA fängt wieder bei Stufe 1 an
+    L.save.ivaLvl = 0; L.persist();
     if (P.vehicle) leaveVehicle(true);
     L.blood(P.x, 1, P.z, 40, true); L.decal(P.x, P.z, 2.4); L.snd.splat({ x: P.x, y: 1, z: P.z });
     L.music.set('night');
@@ -1017,17 +1019,17 @@
     daniel: { build: () => L.buildDaniel(), anim: (r, s) => L.animDaniel(r, s), spd: MSPD.daniel, hp: 280, r: 0.8, reach: 3.2, grab: 2.6, atk: 1.1, wind: 0.55, dmg: 45, veh: 50, knock: 15, up: 6, heavy: true, view: 260,
       cause: 'Daniel hat dich zerquetscht', voice: (p) => L.snd.daniel(p), idle: (p) => L.snd.heavy(p, 0.2), hit: [] },
     langer: { build: () => L.buildLanger(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 5.5, 9.5], hp: 140, r: 0.4, reach: 3.4, grab: 2.8, atk: 0.9, wind: 0.45, dmg: 40, veh: 35, knock: 11, up: 5, view: 300,
-      cause: 'Der Gesichtslose hat dich geholt', voice: (p) => L.snd.radio(p), idle: (p) => L.snd.radio(p), hit: [[1.4, 0.3, 1], [2.3, 0.3, 1], [3.1, 0.2, 2]] },
+      cause: 'Der Gesichtslose hat dich geholt', voice: (p) => L.snd.langer(p), idle: (p) => L.snd.langerIdle(p), hit: [[1.4, 0.3, 1], [2.3, 0.3, 1], [3.1, 0.2, 2]] },
     rufer: { build: () => L.buildRufer(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 4.5, 8], hp: 650, r: 1.1, reach: 6.5, grab: 5.5, atk: 1.5, wind: 0.6, dmg: 60, veh: 70, knock: 18, up: 8, heavy: true, view: 480,
-      cause: 'Der Rufer hat dich zertreten', voice: (p) => L.snd.horn(p), idle: (p) => L.snd.heavy(p, 0.5), hit: [[3.5, 0.9, 1], [6, 1, 1], [9, 1.1, 2]] },
+      cause: 'Der Rufer hat dich zertreten', voice: (p) => L.snd.rufer(p), idle: (p) => L.snd.ruferStep(p), hit: [[3.5, 0.9, 1], [6, 1, 1], [9, 1.1, 2]] },
     blockling: { build: () => L.buildBlockling(), anim: (r, s) => L.animBeast(r, s), spd: [2.2, 7, 10.5], hp: 55, r: 0.4, reach: 2.2, grab: 2, atk: 0.6, wind: 0.3, dmg: 25, veh: 25, knock: 8, up: 4, view: 220,
-      cause: 'Ein Blockling hat dich erwischt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.click(p), hit: [[0.9, 0.3, 1], [1.6, 0.3, 2]] },
+      cause: 'Ein Blockling hat dich erwischt', voice: (p) => L.snd.blockling(p), idle: (p) => L.snd.blocklingIdle(p), hit: [[0.9, 0.3, 1], [1.6, 0.3, 2]] },
     schwelle: { build: () => L.buildSchwelle(), anim: (r, s) => L.animBeast(r, s), spd: [1.4, 6, 12.5], hp: 90, r: 0.5, reach: 2.6, grab: 2.4, atk: 0.7, wind: 0.35, dmg: 40, veh: 35, knock: 10, up: 4.5, hear: 0.6, view: 240,
-      cause: 'Der Schwellengänger hat dich gepackt', voice: (p) => L.snd.scream(p), idle: (p) => L.snd.click(p), hit: [[1.0, 0.45, 1], [1.1, 0.25, 2]] },
+      cause: 'Der Schwellengänger hat dich gepackt', voice: (p) => L.snd.schwelle(p), idle: (p) => L.snd.schwelleIdle(p), hit: [[1.0, 0.45, 1], [1.1, 0.25, 2]] },
     greifer: { build: () => L.buildGreifer(), anim: (r, s) => L.animBeast(r, s), spd: [1.8, 6.5, 9.5], hp: 380, r: 1.6, reach: 4.5, grab: 3.8, atk: 1.0, wind: 0.5, dmg: 55, veh: 55, knock: 14, up: 6, heavy: true, metal: true, view: 320,
-      cause: 'Ein Greifer hat dich gepackt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.heavy(p, 0.3), hit: [[3.1, 1.6, 1], [3.8, 0.5, 2]] },
+      cause: 'Ein Greifer hat dich gepackt', voice: (p) => L.snd.greifer(p), idle: (p) => L.snd.greiferIdle(p), hit: [[3.1, 1.6, 1], [3.8, 0.5, 2]] },
     flieger: { build: () => L.buildFlieger(), anim: (r, s) => L.animBeast(r, s), spd: [7, 13, 16], hp: 300, r: 3, fly: true, metal: true, view: 520,
-      cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.charge(p), idle: (p) => L.snd.rotor(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
+      cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.flieger(p), idle: (p) => L.snd.fliegerIdle(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
   };
   function spawnMonster(kind, x, z, variant, id) {
     const D = MK[kind] || MK.viktor;
@@ -1061,7 +1063,7 @@
   // Der Rufer ruft alle Monster in der Nähe zu dir
   function ruferCall(m) {
     m.callCd = 25;
-    L.snd.horn({ x: m.x, y: 9, z: m.z });
+    L.snd.rufer({ x: m.x, y: 9, z: m.z });
     for (const o of E.monsters) if (o !== m && !o.dead && o.state !== 'chase' && o.state !== 'attack' && L.dist(o.x, o.z, m.x, m.z) < 260) {
       o.state = 'investigate'; o.tx = m.tx + L.rand(-10, 10); o.tz = m.tz + L.rand(-10, 10); o.timer = 20;
     }
@@ -1239,7 +1241,7 @@
         const sneak = p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh);
         const moving = p === P ? Math.hypot(P.vx, P.vz) > 0.4 || !!P.vehicle : p.moving;
         if (sneak && !moving) continue;
-        if (m.state !== 'chase' && dP < 150) { L.snd.alarm({ x: m.x, y: 16, z: m.z }); if (p === P) L.msg('🛸 Die Flugmaschine hat dich im Licht entdeckt!', 3500); }
+        if (m.state !== 'chase' && dP < 150) { L.snd.flieger({ x: m.x, y: 16, z: m.z }); if (p === P) L.msg('🛸 Die Flugmaschine hat dich im Licht entdeckt!', 3500); }
         m.state = 'chase'; m.tx = p.x; m.tz = p.z; m.prey = p; m.timer = 10;
         L.makeNoise(p.x, p.z, 60, null);
         break;
@@ -1457,11 +1459,15 @@
     const b = { kind: "boss", rig, x, z, yaw: 0, hy: 30, hp: 8000, t: 0, life: stay, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: true, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3,
       how, emerge: -L.FUSION_T, emergeDur: fromMountain ? 9 : 8, rootY: fromMountain ? -50 : -62, startY: fromMountain ? -50 : -62, sinking: 0 };
     b.yaw = Math.atan2(P.x - b.x, P.z - b.z);
+    // jedes Mal schneller und stärker – bis man stirbt
+    const lvl = Math.min(10, L.save.ivaLvl || 0);
+    L.save.ivaLvl = lvl + 1; L.persist();
+    b.lvl = lvl; b.spdMul = 1 + lvl * 0.15; b.dmgMul = 1 + lvl * 0.25; b.hp *= 1 + lvl * 0.3;
     initGait(b, rig);
     rig.root.position.y = b.rootY;
     L.boss = b;
     L.frenzy = true;
-    if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how });
+    if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how, lvl: b.lvl });
     L.bossAppear(b);
   }
   // ---------- GIGA-CAPY: steigt aus dem Boden, packt MAMA IVA und zieht sie in die Tiefe ----------
@@ -1521,7 +1527,8 @@
       L.decal(b.x, b.z, 30, "#1a120c");
       L.fx("#5a4630", b.x, 1, b.z, 40, 14, { size: 0.9, life: 2.5 });
     }
-    L.banner("MAMA IVA ENTSTEHT", "Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte (Karte: M)");
+    const lv = (b.lvl || 0) + 1;
+    L.banner("MAMA IVA ENTSTEHT – STUFE " + lv, (lv > 1 ? "Schneller und stärker als letztes Mal! " : "") + "Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte (Karte: M)");
     L.msg('🗼 Nur im Turm bist du vor den Monstern sicher – aber sei dort leise, sonst reißt MAMA IVA ihn ein!', 9000);
     if (L.cineBossAppear) L.cineBossAppear(b);
   };
@@ -1585,7 +1592,7 @@
     const dT = L.dist(b.x, b.z, b.tx, b.tz);
     let speed = 0;
     if (!b.leaving && b.stompT <= 0 && dT > (b.towerAtk ? 34 : 12)) {
-      speed = b.towerAtk ? 11 : 7.5;
+      speed = (b.towerAtk ? 11 : 7.5) * (b.spdMul || 1);
       const want = Math.atan2(b.tx - b.x, b.tz - b.z);
       b.yaw += L.clamp(L.angDiff(b.yaw, want), -0.45 * dt, 0.45 * dt);
       b.x += Math.sin(b.yaw) * speed * dt; b.z += Math.cos(b.yaw) * speed * dt;
@@ -1603,24 +1610,24 @@
       if (b.smashT > 3.2) { b.towerAtk = false; b.smashT = 0; b.smashed = false; }
     }
     // Stampfen
-    if (!b.leaving && nearP && dNear < 24 && b.stompCd <= 0 && b.stompT <= 0) { b.stompT = 1.4; }
+    if (!b.leaving && nearP && dNear < 24 && b.stompCd <= 0 && b.stompT <= 0) { b.stompT = 1.4 / Math.min(1.6, b.spdMul || 1); }
     if (b.stompT > 0) {
       b.stompT -= dt;
       if (b.stompT <= 0) {
-        b.stompCd = 6;
+        b.stompCd = 6 / (b.spdMul || 1);
         L.snd.stomp({ x: b.x, y: 0, z: b.z }); L.shake = 1.6;
         L.fx('#6a5a40', b.x, 0.5, b.z, 30, 12, { size: 0.4, life: 1.5 });
         L.makeNoise(b.x, b.z, 200, null);
         const d = L.dist(P.x, P.z, b.x, b.z);
         if (d < 26 && P.alive) {
           const sneaking = P.stance !== 'stand' && !P.vehicle;
-          L.hurtPlayer((sneaking ? 40 : 85) * L.md.dmg * (1 - d / 40), 'Von MAMA IVA zertrampelt');
+          L.hurtPlayer((sneaking ? 40 : 85) * L.md.dmg * (b.dmgMul || 1) * (1 - d / 40), 'Von MAMA IVA zertrampelt');
           if (P.alive && !P.vehicle) { const k = 16; P.vx = (P.x - b.x) / (d || 1) * k; P.vz = (P.z - b.z) / (d || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
         }
         for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, b.x, b.z) < 26) L.damageEnt(n, 200, b.x, b.z, b);
         for (const rp of RPs()) {
           const d2 = L.dist(rp.x, rp.z, b.x, b.z);
-          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 40 : 85) * L.md.dmg * (1 - d2 / 40), 'Von MAMA IVA zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
+          if (d2 < 26) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 40 : 85) * L.md.dmg * (b.dmgMul || 1) * (1 - d2 / 40), 'Von MAMA IVA zertrampelt', (rp.x - b.x) / (d2 || 1) * 16, (rp.z - b.z) / (d2 || 1) * 16, 7, sn); }
         }
         if (isHost()) L.mp.send({ t: 'stomp', x: b.x, z: b.z });
       }
@@ -1643,9 +1650,9 @@
         rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(b.aimX, 0.5, b.aimZ), 1.3);
         if (Math.random() < dt * 8) L.decal(b.aimX, b.aimZ, 1.6, '#1a1008');
         if (Math.random() < dt * 3) L.snd.ray({ x: b.aimX, y: 1, z: b.aimZ });
-        if (T.alive && see && L.dist(T.x, T.z, b.aimX, b.aimZ) < 3.2) dps(T, 60 * dt * L.md.dmg, 'Vom Strahl von MAMA IVA verbrannt');
+        if (T.alive && see && L.dist(T.x, T.z, b.aimX, b.aimZ) < 3.2) dps(T, 60 * dt * L.md.dmg * (b.dmgMul || 1), 'Vom Strahl von MAMA IVA verbrannt');
       }
-      if (b.beamT <= 0) { rig.beam.g.visible = false; b.beamCd = 7; }
+      if (b.beamT <= 0) { rig.beam.g.visible = false; b.beamCd = 7 / (b.spdMul || 1); }
     } else rig.beam.g.visible = false;
     // Optik
     b.hy = 30 + Math.sin(b.t * 1.2) * 0.6 - (b.stompT > 0 ? Math.sin((1.4 - b.stompT) / 1.4 * Math.PI) * -3 : 0);
@@ -1954,7 +1961,7 @@
     for (const w of E.walkers) if (!w.dead && w.state === 'fire' && L.dist(P.x, P.z, w.x, w.z) < 200) danger = 3;
     P.danger = danger;
     if (!P.alive) L.music.set('night');
-    else if (L.boss && !L.boss.dead && L.dist(P.x, P.z, L.boss.x, L.boss.z) < 900) L.music.set('boss');
+    else if (L.boss && !L.boss.dead) { L.bossMusicLvl = L.boss.lvl || 0; L.music.set('boss'); }
     else if (danger >= 3) L.music.set('chase');
     else if (danger >= 1) L.music.set('tension');
     else L.music.set(L.env.day < 0.4 ? 'night' : 'calm');

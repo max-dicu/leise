@@ -205,6 +205,40 @@
       [104, 105.7, 156].forEach((f) => L.tn({ f, fTo: f * 0.78, dur: 3.4, type: 'sawtooth', vol: 0.2, pos, at: 0.7, rev: true }));
       L.nz({ dur: 3, f: 300, type: 'bandpass', q: 6, vol: 0.12, pos, at: 0.8 });
     },
+    // Der Gesichtslose: Funkrauschen, das in ein hohes Pfeifen und ein tiefes Brummen kippt
+    langer(pos) {
+      L.nz({ dur: 1.6, f: 2600, type: 'bandpass', q: 0.4, vol: 0.32, pos, at: 0.02 });
+      L.tn({ f: 3100, fTo: 2400, dur: 1.4, type: 'sine', vol: 0.05, pos, at: 0.3 });
+      [55, 58.3].forEach((f) => L.tn({ f, dur: 1.8, type: 'sawtooth', vol: 0.09, pos, at: 0.4 }));
+    },
+    langerIdle(pos) { for (let i = 0; i < 4; i++) L.nz({ dur: 0.06 + Math.random() * 0.12, f: 1800 + Math.random() * 2000, type: 'bandpass', q: 0.5, vol: 0.12, pos, delay: i * 0.15 + Math.random() * 0.1 }); },
+    // Der Rufer: tiefer, zweistimmiger Ruf wie ein Nebelhorn, der anschwillt und abbricht
+    rufer(pos) {
+      [[73, 69], [110, 104]].forEach(([f, t2], i) => { L.tn({ f, fTo: t2, dur: 2.6, type: 'square', vol: 0.16 - i * 0.04, pos, at: 0.9, rev: true }); L.tn({ f: f * 1.01, fTo: t2 * 1.01, dur: 2.6, type: 'sawtooth', vol: 0.1, pos, at: 0.9 }); });
+      L.tn({ f: 92, fTo: 60, dur: 1.2, type: 'square', vol: 0.18, pos, delay: 2.7, rev: true });
+      L.nz({ dur: 2.4, f: 180, type: 'bandpass', q: 3, vol: 0.2, pos, at: 1 });
+    },
+    ruferStep(pos) { L.tn({ f: 38, fTo: 22, dur: 0.6, vol: 0.7, pos }); L.nz({ dur: 0.4, f: 160, vol: 0.5, pos }); L.nz({ dur: 0.15, f: 1200, type: 'bandpass', q: 4, vol: 0.1, pos, delay: 0.05 }); },
+    // Blockling: piepsige Alien-Sprache
+    blockling(pos) { for (let i = 0; i < 6; i++) { const f = L.pick([660, 880, 990, 1320, 1180, 740]); L.tn({ f, fTo: f * (Math.random() < 0.5 ? 1.5 : 0.7), dur: 0.09, type: 'square', vol: 0.07, pos, delay: i * 0.1 }); } },
+    blocklingIdle(pos) { const f = 900 + Math.random() * 500; L.tn({ f, fTo: f * 1.6, dur: 0.08, type: 'square', vol: 0.05, pos }); L.tn({ f: f * 1.2, dur: 0.06, type: 'square', vol: 0.04, pos, delay: 0.12 }); },
+    // Schwellengänger: rasselndes Keuchen und schnelles Klackern
+    schwelle(pos) {
+      L.nz({ dur: 0.9, f: 1400, type: 'bandpass', q: 2, vol: 0.3, pos, at: 0.05 });
+      L.tn({ f: 380, fTo: 160, dur: 0.9, type: 'sawtooth', vol: 0.09, pos });
+      for (let i = 0; i < 10; i++) L.nz({ dur: 0.025, f: 4200, type: 'bandpass', q: 6, vol: 0.22, pos, delay: 0.9 + i * 0.05 });
+    },
+    schwelleIdle(pos) { L.nz({ dur: 0.7, f: 900, type: 'bandpass', q: 1.5, vol: 0.12, pos, at: 0.3 }); L.nz({ dur: 0.5, f: 700, type: 'bandpass', q: 1.5, vol: 0.08, pos, at: 0.2, delay: 0.9 }); },
+    // Greifer: Servo-Heulen und Metallklappern
+    greifer(pos) {
+      L.tn({ f: 300, fTo: 900, dur: 0.5, type: 'sawtooth', vol: 0.1, pos }); L.tn({ f: 900, fTo: 420, dur: 0.6, type: 'sawtooth', vol: 0.1, pos, delay: 0.5 });
+      for (let i = 0; i < 3; i++) L.nz({ dur: 0.08, f: 2600, type: 'bandpass', q: 8, vol: 0.3, pos, delay: 0.2 + i * 0.3 });
+      L.tn({ f: 1210, dur: 0.6, type: 'triangle', vol: 0.05, pos, delay: 0.25, rev: true });
+    },
+    greiferIdle(pos) { L.nz({ dur: 0.35, f: 5000, type: 'highpass', vol: 0.06, pos }); L.nz({ dur: 0.07, f: 2200, type: 'bandpass', q: 8, vol: 0.18, pos, delay: 0.35 }); },
+    // Flugmaschine: pulsierendes, schwankendes Summen
+    flieger(pos) { for (let i = 0; i < 4; i++) L.tn({ f: 240, fTo: 420, dur: 0.35, type: 'triangle', vol: 0.1, pos, delay: i * 0.38 }); L.tn({ f: 60, dur: 1.6, type: 'sawtooth', vol: 0.08, pos }); },
+    fliegerIdle(pos) { L.tn({ f: 88, fTo: 96, dur: 1.2, type: 'sawtooth', vol: 0.07, pos, at: 0.3 }); L.tn({ f: 132, fTo: 128, dur: 1.2, type: 'triangle', vol: 0.05, pos, at: 0.3 }); },
     charge(pos) { L.tn({ f: 200, fTo: 1600, dur: 1.2, type: 'sawtooth', vol: 0.14, pos, at: 0.3 }); },
     ray(pos) { L.tn({ f: 900, fTo: 1300, dur: 0.35, type: 'sawtooth', vol: 0.14, pos }); L.nz({ dur: 0.35, f: 3200, type: 'highpass', vol: 0.18, pos }); },
     // tiefes Riesen-Bellen von GIGA-CAPY
@@ -351,14 +385,28 @@
       drum(t, 8000, 7000, 0.04, 0.03, 7000);
       if (s % 16 === 0) mn({ t, m: L.pick([69, 70, 72]), dur: 1.2, vol: 0.035, type: 'square', lp: 2000 });
     } },
-    boss: { bpm: 96, play(t, s) {
-      if (s % 4 === 0) drum(t, 72, 32, 0.7, 0.8, 300);
-      if (s % 8 === 6 || s % 8 === 7) drum(t, 110, 60, 0.3, 0.35, 500);
-      if (s % 16 === 0) {
-        CH.Dm.forEach((m) => mn({ t, m: m - 12, dur: 1.9, vol: 0.06, type: 'sawtooth', lp: 2600, lpTo: 380 }));
-        mn({ t, m: 26, dur: 3.2, vol: 0.14, type: 'sawtooth', lp: 300 });
-      }
-      if (s % 16 === 8) CH.E.forEach((m) => mn({ t, m: m - 12, dur: 1.6, vol: 0.05, type: 'sawtooth', lp: 2200, lpTo: 400 }));
+    // Bosskampf: treibender Bass, schwere Trommeln, Bläser-Stöße, Chor und eine Melodie. Wird mit jeder Stufe von MAMA IVA schneller
+    boss: { bpm: 138, play(t, s) {
+      const bar = Math.floor(s / 16) % 4, ch = [CH.Dm, CH.Dm, [46, 50, 53], CH.E][bar], root = ch[0] - 24;
+      const lvl = Math.min(6, L.bossMusicLvl || 0);
+      // Bass-Ostinato
+      const bp = [0, 0, 12, 0, 0, 10, 0, 12];
+      mn({ t, m: root + bp[s % 8], dur: 0.22, vol: 0.12, type: 'sawtooth', lp: 700, lpTo: 180 });
+      // Trommeln
+      if (s % 4 === 0) drum(t, 90, 30, 0.45, 0.85, 200);
+      if (s % 8 === 4) drum(t, 220, 120, 0.22, 0.4, 1600);
+      if (s % 16 === 14 || s % 16 === 15) drum(t, 160, 70, 0.18, 0.35, 900);
+      if (lvl >= 2 || s % 2 === 0) drum(t, 9000, 8000, 0.04, 0.03, 8000);
+      // Bläser-Stöße auf dem ersten Schlag
+      if (s % 16 === 0 || s % 16 === 3 || s % 16 === 6) ch.forEach((m) => mn({ t, m: m - 12, dur: 0.35, vol: 0.05, type: 'sawtooth', lp: 3000, lpTo: 600 }));
+      // Chor-Fläche
+      if (s % 16 === 0) ch.forEach((m) => mn({ t, m, dur: 3.4, vol: 0.022, type: 'triangle', at: 0.6, rev: true }));
+      // Melodie
+      const mel = [62, -1, 65, 64, 62, -1, 69, -1, 67, 65, 64, -1, 65, -1, 64, 61];
+      const n = mel[s % 16];
+      if (n > 0 && bar % 2 === 1) mn({ t, m: n + (bar === 3 ? 2 : 0), dur: 0.4, vol: 0.05, type: 'square', lp: 2400, rev: true });
+      // ab höherer Stufe: Alarm-Glocke
+      if (lvl >= 3 && s % 32 === 0) mn({ t, m: 86, dur: 1.4, vol: 0.03, type: 'triangle', rev: true });
     } }
   };
   L.music = {
@@ -378,7 +426,7 @@
       if (this.next < c.currentTime) this.next = c.currentTime + 0.05;
       while (this.next < c.currentTime + 0.3) {
         sty.play(this.next, this.step);
-        this.next += 60 / sty.bpm / 2;
+        this.next += 60 / (sty.bpm + (this.state === 'boss' ? Math.min(6, L.bossMusicLvl || 0) * 6 : 0)) / 2;
         this.step++;
       }
     }
