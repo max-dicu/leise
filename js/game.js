@@ -965,7 +965,7 @@
     if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
     if (t.sub) L.updateSub(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight), !block && L.hit('Space'));
     if (t.plane) updatePlane(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
-    v.whIn = !block && t.wheelie && !t.fly && (L.keys.ShiftLeft || L.keys.ShiftRight);
+    v.whIn = !block && t.wheelie && !(t.fly && (v.alt || 0) > 0.3) && (L.keys.ShiftLeft || L.keys.ShiftRight);
     driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space && !t.sub, true);
     if (!P.vehicle) return;
     P.x = v.x; P.z = v.z; P.y = v.alt || 0;
@@ -1099,10 +1099,29 @@
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     // Wheelie: Shift halten (Motorrad, Crossmaschine, Schattenrad, Quads) – Vorderrad hoch, hinteres Rad bleibt am Boden
     if (t.wheelie) {
-      const can = v.whIn && v.speed > 3 && !(alt > 0.5) && v.hp > 0;
-      const want = can ? (thr > 0 ? 0.62 : 0.42) : 0;
-      v.wh = (v.wh || 0) + (want - (v.wh || 0)) * Math.min(1, dt * (want > (v.wh || 0) ? 2.4 : 4));
-      if (v.wh < 0.003) v.wh = 0;
+      // Wheelie-Physik: Shift drückt das Vorderrad hoch – je länger, desto steiler. Die Schwerkraft zieht es wieder runter,
+      // aber nur bis zum Kipppunkt: wer darüber hinaus zieht, kippt nach hinten um (je schneller, desto gefährlicher).
+      // Durch kurzes, wiederholtes Drücken kann man den Wheelie halten.
+      const BAL = 1.2, FLIP = 1.45, ground = !(alt > 0.5) && v.hp > 0 && v.speed > 2;
+      let wh = v.wh || 0, wv = v.whv || 0;
+      if (ground || wh > 0) {
+        const push = ground && v.whIn ? (thr > 0 ? 3.6 : 3.1) - (t.scooter ? 0.25 : 0) : 0;
+        const grav = -3.0 * Math.sin(BAL - wh);
+        wv += (push + grav + (thr < 0 ? -3.5 : 0)) * dt;
+        wv *= Math.exp(-3 * dt);
+        wh += wv * dt;
+        if (wh <= 0) { if (wv < -2.4 && isPlayer) { L.shake = Math.max(L.shake, 0.35); L.snd.crash(0.15, { x: v.x, y: 0.5, z: v.z }); } wh = 0; wv = 0; }
+        if (wh >= FLIP) {
+          // nach hinten umgekippt
+          wh = 0; wv = 0;
+          const imp = Math.abs(v.speed) + 3; v.speed *= 0.15; v.lat = 0;
+          if (isPlayer) L.msg('💥 Zu weit gezogen – nach hinten umgekippt!', 3000);
+          crash(v, imp, isPlayer);
+          if (isPlayer && P.alive && P.vehicle === v) eject(v, imp, imp * 3.6);
+        }
+      } else { wh = 0; wv = 0; }
+      v.wh = wh; v.whv = wv;
+      if (isPlayer) L.whShow = v.whIn || wh > 0.02 ? wh / FLIP : 0;
       if (v.wh > 0) {
         const zr = t.len * 0.36, wfx = Math.sin(v.yaw), wfz = Math.cos(v.yaw);
         v.rig.root.position.y += zr * Math.sin(v.wh); v.rig.root.position.x -= wfx * zr * (1 - Math.cos(v.wh)); v.rig.root.position.z -= wfz * zr * (1 - Math.cos(v.wh));

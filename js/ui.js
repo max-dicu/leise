@@ -280,6 +280,10 @@
       $('wpArrow').style.transform = 'rotate(' + Math.atan2(dx * -cy + dz * sy, dx * sy + dz * cy).toFixed(2) + 'rad)';
       const d = Math.hypot(dx, dz); $('wpDist').textContent = d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
     }
+    // Wheelie-Anzeige: grün = sicher, gelb = Gleichgewicht, rot = gleich kippst du um
+    { let wm = $('whMeter'); const w = P.vehicle && P.alive ? (L.whShow || 0) : 0;
+      if (!wm && w > 0) { wm = document.createElement('div'); wm.id = 'whMeter'; wm.style.cssText = 'position:fixed;right:24px;top:50%;transform:translateY(-50%);width:18px;height:180px;border:2px solid #fff;border-radius:9px;background:linear-gradient(to top,#2a8a3a 0%,#2a8a3a 68%,#e8c020 68%,#e8c020 83%,#d02020 83%);z-index:8;opacity:.9'; wm.innerHTML = '<i style="position:absolute;left:-6px;right:-6px;height:4px;background:#fff;box-shadow:0 0 4px #000;border-radius:2px"></i><b style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:16px">🤸</b>'; document.body.appendChild(wm); }
+      if (wm) { wm.hidden = !(w > 0); if (w > 0) wm.firstChild.style.bottom = Math.min(100, w * 100).toFixed(1) + '%'; } }
     // Bildrauschen (Der Gesichtslose)
     const sf = $('staticFx'), sa = L.staticAmt || 0;
     // nur leicht: etwas Flimmern, blassere Farben, dunkler Rand – man sieht immer noch genug, um zu fliehen
