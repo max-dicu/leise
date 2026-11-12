@@ -310,6 +310,7 @@
   };
   // Timer-Text für die Anzeige
   L.islandBossText = function () {
+    if (L.inDim(P.x)) return L.dimBossText ? L.dimBossText() : null;
     const I = L.curIsland; if (!I || I.dim || !BY_ISL[I.id]) return null;
     if (boss && boss.I === I) return `${boss.b.icon} ${boss.b.name} ist da – noch ${L.fmt(Math.max(0, boss.life))} · 🛡️ Zuflucht = sicher`;
     const list = BY_ISL[I.id], nx = B[list[((I.bossIdx === undefined ? -1 : I.bossIdx) + 1) % list.length]];

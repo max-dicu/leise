@@ -224,6 +224,8 @@
       const S = e.S || 9, y0 = e.rootY || 0;
       if (e.type === 'walross' || !e.type) out.push([e.x, y0 + S * 1.1, e.z, S * 1.4, 1], [e.x + Math.sin(e.yaw) * S * 2.4, y0 + S * 1.6, e.z + Math.cos(e.yaw) * S * 2.4, S * 0.8, 2]);
       else out.push([e.x, y0 + S * 1.2, e.z, S * 0.5, 1], [e.x, y0 + S * 1.9, e.z, S * 0.55, 1], [e.x, y0 + S * GBT[e.type].top, e.z, S * 0.3, 2]);
+    } else if (e.kind === 'dwurm') {
+      for (const s of e.sph) out.push(s);
     } else if (e.kind === 'boss') {
       out.push([e.x, e.hy, e.z, 6, 1], [e.x, e.hy + 8, e.z, 7, 1], [e.x, e.hy + 20, e.z, 2.6, 2]);
     }
@@ -236,6 +238,7 @@
     for (const w of E.walkers) if (!w.dead) a.push(w);
     if (L.boss && !L.boss.dead) a.push(L.boss);
     if (L.wboss && !L.wboss.leaving) a.push(L.wboss);
+    if (L.dimWorm && !L.dimWorm.dead && L.inDim(P.x)) a.push(L.dimWorm);
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
@@ -281,6 +284,7 @@
   }
   L.damageEnt = function (e, dmg, fromX, fromZ, src) {
     if (e.dead) return;
+    if (e.kind === 'dwurm') { if (L.dimWormHit) L.dimWormHit(dmg, src); return; }
     if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
@@ -2586,7 +2590,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2841,6 +2845,7 @@
     L.updateDuel(dt);
     L.updateIslands(dt);
     if (L.updateIslandBosses) L.updateIslandBosses(dt);
+    if (L.updateDimBoss) L.updateDimBoss(dt);
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);
