@@ -36,3 +36,5 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 - Wenn MAMA IVA weg ist, laufen die Monster davon und alles wird wieder normal.
 - **Marsianer** (nach dem Buch „Krieg der Welten“): runde Körper mit 16 Tentakeln, rufen „Ulla, ulla“ und kriechen um die Stelzer herum. Es gibt jetzt 20 Stelzer.
 - Hintergrundmusik wechselt alle 30 Sekunden (die Bosskampf-Musik kommt nur bei MAMA IVA).
+- **Die Starrende**: Porzellan-Gesicht mit riesigen Augen. Schaust du sie an, erstarrt sie – schaust du weg, kommt sie näher.
+- Der **Rufer** heult regelmäßig seine Sirene (weit hörbar), beim **Gesichtslosen** rauscht das Bild, wenn er nah ist.

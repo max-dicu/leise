@@ -117,11 +117,11 @@
     A.sfx.gain.value = L.S().sfx;
     A.mus.gain.value = L.S().music * 0.75;
   };
-  function dest(pos) {
+  function dest(pos, ref) {
     if (!pos) return A.sfx;
     const p = A.ctx.createPanner();
     p.panningModel = 'equalpower'; p.distanceModel = 'inverse';
-    p.refDistance = 5; p.rolloffFactor = 1.1; p.maxDistance = 3000;
+    p.refDistance = ref || 5; p.rolloffFactor = 1.1; p.maxDistance = 3000;
     if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y || 1; p.positionZ.value = pos.z; }
     else p.setPosition(pos.x, pos.y || 1, pos.z);
     p.connect(A.sfx);
@@ -150,7 +150,7 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol || 0.3), t + (o.at || 0.005));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(dest(o.pos));
+    s.connect(f); f.connect(g); g.connect(dest(o.pos, o.ref));
     if (o.rev) g.connect(A.rev);
     s.start(t, Math.random() * 1.2, dur + 0.1);
   };
@@ -165,7 +165,7 @@
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol || 0.2), t + (o.at || 0.005));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    os.connect(g); g.connect(dest(o.pos));
+    os.connect(g); g.connect(dest(o.pos, o.ref));
     if (o.rev) g.connect(A.rev);
     os.start(t); os.stop(t + dur + 0.05);
   };
@@ -207,7 +207,8 @@
     },
     // Der Gesichtslose: Funkrauschen, das in ein hohes Pfeifen und ein tiefes Brummen kippt
     langer(pos) {
-      L.nz({ dur: 1.6, f: 2600, type: 'bandpass', q: 0.4, vol: 0.32, pos, at: 0.02 });
+      L.nz({ dur: 1.6, f: 2600, type: 'bandpass', q: 0.4, vol: 0.4, pos, at: 0.02, ref: 15 });
+      L.nz({ dur: 2.2, f: 6000, type: 'highpass', vol: 0.12, pos, delay: 0.2 });
       L.tn({ f: 3100, fTo: 2400, dur: 1.4, type: 'sine', vol: 0.05, pos, at: 0.3 });
       [55, 58.3].forEach((f) => L.tn({ f, dur: 1.8, type: 'sawtooth', vol: 0.09, pos, at: 0.4 }));
     },
@@ -217,15 +218,21 @@
     rufer(pos) {
       for (let k = 0; k < 3; k++) {
         const d = k * 1.6;
-        [[330, 880, 'sawtooth', 0.13], [334, 888, 'square', 0.06]].forEach(([a, b, ty, vol]) => {
-          L.tn({ f: a, fTo: b, dur: 0.8, type: ty, vol, pos, delay: d, at: 0.15, rev: true });
-          L.tn({ f: b, fTo: a, dur: 0.8, type: ty, vol, pos, delay: d + 0.8, rev: true });
+        [[330, 880, 'sawtooth', 0.16], [334, 888, 'square', 0.08], [165, 440, 'sawtooth', 0.07]].forEach(([a, b, ty, vol]) => {
+          L.tn({ f: a, fTo: b, dur: 0.8, type: ty, vol, pos, delay: d, at: 0.15, rev: true, ref: 70 });
+          L.tn({ f: b, fTo: a, dur: 0.8, type: ty, vol, pos, delay: d + 0.8, rev: true, ref: 70 });
         });
       }
-      L.nz({ dur: 4.6, f: 900, type: 'bandpass', q: 2, vol: 0.08, pos, at: 0.5 });
+      L.nz({ dur: 4.6, f: 900, type: 'bandpass', q: 2, vol: 0.1, pos, at: 0.5, ref: 70 });
     },
     ruferIdle(pos) { L.tn({ f: 300, fTo: 620, dur: 0.6, type: 'sawtooth', vol: 0.08, pos, rev: true }); L.tn({ f: 620, fTo: 280, dur: 0.7, type: 'sawtooth', vol: 0.06, pos, delay: 0.6 }); L.nz({ dur: 0.6, f: 2000, type: 'bandpass', vol: 0.06, pos, delay: 0.2 }); },
     ruferStep(pos) { L.tn({ f: 38, fTo: 22, dur: 0.6, vol: 0.7, pos }); L.nz({ dur: 0.4, f: 160, vol: 0.5, pos }); L.nz({ dur: 0.15, f: 1200, type: 'bandpass', q: 4, vol: 0.1, pos, delay: 0.05 }); },
+    // Die Starrende: Flüstern und ein hohes, kaputtes Kichern
+    starrende(pos) {
+      L.nz({ dur: 1.5, f: 3500, type: 'bandpass', q: 1.2, vol: 0.18, pos, at: 0.4 });
+      [988, 1175, 932, 1245, 880].forEach((f, i) => L.tn({ f, fTo: f * 0.94, dur: 0.12, type: 'triangle', vol: 0.06, pos, delay: 1.2 + i * 0.13 }));
+    },
+    starrendeIdle(pos) { L.nz({ dur: 1.2, f: 3000, type: 'bandpass', q: 1.5, vol: 0.08, pos, at: 0.5 }); },
     // Marsianer: heulendes „Ulla, ulla“ und nasses Gurgeln
     marsianer(pos) {
       for (let k = 0; k < 2; k++) { L.tn({ f: 210, fTo: 160, dur: 0.55, type: 'sawtooth', vol: 0.14, pos, delay: k * 0.75, at: 0.1, rev: true }); L.tn({ f: 160, fTo: 120, dur: 0.25, type: 'triangle', vol: 0.12, pos, delay: k * 0.75 + 0.5 }); }

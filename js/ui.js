@@ -215,6 +215,14 @@
   const MODE_TXT = { idle: '🧍 Stehen', walk: '🚶 Gehen', run: '🏃 Rennen', crouch: '🧎 Schleichen', crawl: '🐛 Kriechen' };
   ui.hud = function (dt) {
     hudT -= dt;
+    // Bildrauschen (Der Gesichtslose)
+    const sf = $('staticFx'), sa = L.staticAmt || 0;
+    sf.style.opacity = sa > 0.02 ? Math.min(0.85, sa).toFixed(2) : '0';
+    if (sa > 0.02) {
+      const g = sf.getContext('2d'), img = g.createImageData(160, 90), d = img.data;
+      for (let i = 0; i < d.length; i += 4) { const v = Math.random() * 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+      g.putImageData(img, 0, 0);
+    }
     const vig = $('dmgVig');
     vig.style.opacity = Math.min(0.95, P.hurtFlash * 0.8 + (P.hp < 30 && P.alive ? 0.25 + Math.sin(performance.now() / 300) * 0.12 : 0));
     $('bloodScreen').classList.toggle('show', !P.alive);

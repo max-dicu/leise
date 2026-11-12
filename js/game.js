@@ -1098,6 +1098,8 @@
       cause: 'Ein Greifer hat dich gepackt', voice: (p) => L.snd.greifer(p), idle: (p) => L.snd.greiferIdle(p), hit: [[3.1, 1.6, 1], [3.8, 0.5, 2]] },
     marsianer: { build: () => L.buildMarsianer(), anim: (r, s) => L.animBeast(r, s), spd: [1.3, 4.5, 7], hp: 160, r: 0.8, reach: 2.8, grab: 2.4, atk: 0.9, wind: 0.45, dmg: 45, veh: 40, knock: 9, up: 4, view: 260,
       cause: 'Ein Marsianer hat dich gepackt', voice: (p) => L.snd.marsianer(p), idle: (p) => L.snd.marsianerIdle(p), hit: [[1.55, 0.85, 1], [1.7, 0.3, 2]] },
+    starrende: { build: () => L.buildStarrende(), anim: (r, s) => L.animBeast(r, s), spd: [1.2, 6, 11], hp: 120, r: 0.4, reach: 2.4, grab: 2.2, atk: 0.6, wind: 0.3, dmg: 50, veh: 40, knock: 9, up: 4, view: 260,
+      cause: 'Die Starrende hat dich erwischt, als du weggeschaut hast', voice: (p) => L.snd.starrende(p), idle: (p) => L.snd.starrendeIdle(p), hit: [[1.2, 0.3, 1], [1.9, 0.25, 1], [2.3, 0.2, 2]] },
     flieger: { build: () => L.buildFlieger(), anim: (r, s) => L.animBeast(r, s), spd: [7, 13, 16], hp: 300, r: 3, fly: true, metal: true, view: 520,
       cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.flieger(p), idle: (p) => L.snd.fliegerIdle(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
   };
@@ -1130,9 +1132,16 @@
     }
     if (m.kind === 'rufer' && m.state === 'chase' && !(m.callCd > 0)) ruferCall(m);
   }
+  // schaut der Spieler gerade auf dieses Monster? (Blickrichtung der Kamera + freie Sicht)
+  function lookedAt(m) {
+    const cam = L.camera; cam.getWorldDirection(V3);
+    const dx = m.x - cam.position.x, dy = 1.8 - cam.position.y, dz = m.z - cam.position.z, d = Math.hypot(dx, dy, dz) || 1;
+    if ((dx * V3.x + dy * V3.y + dz * V3.z) / d < 0.8) return false;
+    return L.los(m.x, 2, m.z, P.x, (P.y || 0) + 1.5, P.z);
+  }
   // Der Rufer ruft alle Monster in der Nähe zu dir
   function ruferCall(m) {
-    m.callCd = 25;
+    m.callCd = 25; m.sirenT = 10;
     L.snd.rufer({ x: m.x, y: 9, z: m.z });
     for (const o of E.monsters) if (o !== m && !o.dead && o.state !== 'chase' && o.state !== 'attack' && L.dist(o.x, o.z, m.x, m.z) < 260) {
       o.state = 'investigate'; o.tx = m.tx + L.rand(-10, 10); o.tz = m.tz + L.rand(-10, 10); o.timer = 20;
@@ -1213,6 +1222,23 @@
         else if (m.state === 'chase') { m.state = 'search'; m.timer = 3; }
       }
     }
+    // Die Starrende: kommt näher, sobald du wegschaust – schaust du sie an, erstarrt sie
+    if (m.kind === 'starrende') {
+      const dS = L.dist(P.x, P.z, m.x, m.z);
+      if (dS < 90 && P.alive && !P.gone && !safeIn(P.x, P.z) && m.state !== 'attack') { m.state = 'chase'; m.tx = P.x; m.tz = P.z; m.prey = P; m.timer = 5; m.alertT = 0; }
+      if (dS < 90 && lookedAt(m)) {
+        m.frozen = true; m.anim = 'search';
+        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
+        return true;
+      }
+      if (m.frozen && dS < 40 && m.voice <= 0) { m.voice = 3; D.voice({ x: m.x, y: 2, z: m.z }); }
+      m.frozen = false;
+    }
+    // Der Rufer heult immer wieder seine Sirene – weit über die Karte zu hören
+    if (m.kind === 'rufer') {
+      m.sirenT = (m.sirenT === undefined ? L.rand(5, 25) : m.sirenT) - dt;
+      if (m.sirenT <= 0) { m.sirenT = m.state === 'chase' ? L.rand(8, 12) : L.rand(25, 45); if (dP < 700) D.voice({ x: m.x, y: 9, z: m.z }); }
+    }
     // Der Gesichtslose springt beim Jagen ein Stück nach vorne (mit Rauschen)
     if (m.kind === 'langer' && m.state === 'chase' && !(m.alertT > 0)) {
       m.blinkT = (m.blinkT === undefined ? 3 : m.blinkT) - dt;
@@ -1276,7 +1302,7 @@
     }
     // Klick-Geräusche in der Nähe (damit man sie hört)
     if (dP < 80 && Math.random() < dt * 0.3) D.idle({ x: m.x, y: 2.6, z: m.z });
-    if (m.state === 'chase' && dP < 110 && m.voice <= 0) { m.voice = L.rand(4, 7); D.voice({ x: m.x, y: 2.5, z: m.z }); }
+    if (m.state === 'chase' && dP < 110 && m.voice <= 0 && m.kind !== 'rufer') { m.voice = L.rand(4, 7); D.voice({ x: m.x, y: 2.5, z: m.z }); }
     if (!rig.root.visible) return true;
     const anim = m.state === 'attack' ? 'attack' : m.alertT > 0 ? 'alert' : m.state === 'chase' ? (D.chase || 'run') : m.state === 'investigate' ? 'run' : m.state === 'wander' ? 'walk' : 'search';
     m.anim = anim;
@@ -1940,8 +1966,16 @@
     };
     place('viktor', Math.round(115 * cm));
     place('daniel', Math.round(38 * cm));
-    place('langer', Math.round(12 * cm));
-    place('rufer', Math.round(6 * cm));
+    place('langer', Math.round(24 * cm));
+    place('rufer', Math.round(14 * cm));
+    place('starrende', Math.round(16 * cm));
+    for (const k of ['rufer', 'langer', 'starrende']) {
+      for (let i = 0; i < 30; i++) {
+        const a = Math.random() * 6.28, d = L.rand(150, 240), x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
+        if (Math.abs(x) > 1450 || Math.abs(z) > 1450 || L.queryBoxes(x, z, 1.5).length || L.inTower(x, z, 4)) continue;
+        spawnMonster(k, x, z); break;
+      }
+    }
     place('blockling', Math.round(9 * cm)); // je 3 zusammen
     place('schwelle', Math.round(18 * cm));
     place('greifer', Math.round(10 * cm));
@@ -2035,6 +2069,14 @@
     }
     for (const w of E.walkers) if (!w.dead && w.state === 'fire' && L.dist(P.x, P.z, w.x, w.z) < 200) danger = 3;
     P.danger = danger;
+    let stat = 0;
+    for (const m of E.monsters) {
+      if (m.kind !== 'langer' || m.dead) continue;
+      const d = L.dist(P.x, P.z, m.x, m.z); if (d > 40) continue;
+      stat = Math.max(stat, (1 - d / 40) * (lookedAt(m) ? 1 : 0.35));
+    }
+    L.staticAmt = stat;
+    if (stat > 0.25 && Math.random() < dt * stat * 3) L.snd.langerIdle({ x: P.x, y: 1.5, z: P.z });
     if (!P.alive) L.music.set('night');
     else if (L.boss && !L.boss.dead) { L.bossMusicLvl = L.boss.lvl || 0; L.music.set('boss'); }
     else if (danger >= 3) L.music.set('chase');

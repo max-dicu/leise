@@ -205,6 +205,31 @@
     }
   };
 
+  // ---------- Die Starrende: Porzellan-Gesicht mit riesigen Augen, zerrissenes Kleid. Bewegt sich nur, wenn du wegschaust ----------
+  L.buildStarrende = function () {
+    const root = new T.Group(), body = grp(root), hipY = 1.25, hips = grp(body, 0, hipY, 0), box = G().box, sph = G().sph, cone = G().cone;
+    const skin = '#e6e2da', dress = '#6a6660', dk = '#3a3834';
+    const legs = [-1, 1].map((s) => limb(hips, s * 0.09, 0, 0, 0.07, 0.65, 0.6, skin, skin, dk));
+    const torso = grp(hips);
+    part(box, dress, 0.34, 0.75, 0.2, 0, 0.38, 0, torso);
+    part(cone, dress, 0.42, 0.95, 0.42, 0, -0.25, 0, torso);
+    for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; part(box, dk, 0.08, 0.25, 0.02, Math.sin(a) * 0.36, -0.68, Math.cos(a) * 0.36, torso, { noShadow: true }).rotation.y = a; }
+    const arms = [-1, 1].map((s) => limb(torso, s * 0.22, 0.72, 0, 0.06, 0.75, 0.75, skin, skin));
+    for (const a of arms) for (let f = 0; f < 4; f++) { const fg = part(box, skin, 0.015, 0.22, 0.015, (f - 1.5) * 0.02, -0.85, 0, a.b); fg.rotation.z = (f - 1.5) * 0.15; }
+    const neck = grp(torso, 0, 0.78, 0);
+    part(box, skin, 0.06, 0.16, 0.06, 0, 0.08, 0, neck);
+    const head = grp(neck, 0, 0.16, 0);
+    part(sph, skin, 0.17, 0.22, 0.17, 0, 0.18, 0, head, { metal: 0.2, rough: 0.3 });
+    for (const s of [-1, 1]) {
+      part(sph, '#ffffff', 0.075, 0.08, 0.05, s * 0.07, 0.22, 0.14, head, glow);
+      part(sph, '#000000', 0.018, 0.018, 0.01, s * 0.07, 0.22, 0.188, head, glow);
+    }
+    // Risse im Porzellan
+    part(box, '#5a5550', 0.006, 0.12, 0.005, 0.03, 0.36, 0.13, head, { noShadow: true }).rotation.z = 0.4;
+    part(box, '#5a5550', 0.006, 0.08, 0.005, -0.1, 0.1, 0.12, head, { noShadow: true }).rotation.z = -0.6;
+    return rigOut(root, body, hips, torso, head, legs, arms, hipY, { kind: 'starrende' });
+  };
+
   // ---------- Marsianer (wie im Buch „Krieg der Welten“): Körper wie ein großer Kopf, 16 peitschende Tentakel ----------
   L.buildMarsianer = function () {
     const root = new T.Group(), body = grp(root), hipY = 0.75, hips = grp(body, 0, hipY, 0), sph = G().sph, box = G().box, cone = G().cone;
@@ -306,7 +331,7 @@
     const gy = L.mountainH ? L.mountainH(x, z) : 0, g = new T.Group(); L.scene.add(g);
     const list = [
       [L.buildViktor('grey'), 3.2], [L.buildViktor('red'), 3.2], [L.buildDaniel(), 3], [L.buildLanger(), 2.6], [L.buildRufer(), 1.1],
-      [L.buildBlockling(), 4.5], [L.buildSchwelle(), 3.5], [L.buildMarsianer(), 3.5], [L.buildGreifer(), 1.8], [L.buildFlieger(), 0.9], [L.buildWalker(), 0.32]
+      [L.buildBlockling(), 4.5], [L.buildSchwelle(), 3.5], [L.buildMarsianer(), 3.5], [L.buildStarrende(), 3], [L.buildGreifer(), 1.8], [L.buildFlieger(), 0.9], [L.buildWalker(), 0.32]
     ];
     // vom Stelzer nur der Rumpf (die Beine werden sonst erst beim Laufen ausgerichtet)
     const wk = list[list.length - 1][0];
