@@ -110,12 +110,17 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     let side = c0.yaw + Math.PI / 2;
     const px = Math.sin(side), pz = Math.cos(side);
     if ((P.x - c0.x) * px + (P.z - c0.z) * pz < 0) side += Math.PI;
-    L.startCine('GIGA-CAPY ERWACHT', 13, (t) => {
+    const R = c0.cam || [0.5, 0.5, 0.5, 0.5, 0.5], dir = R[0] < 0.5 ? -1 : 1;
+    L.startCine('GIGA-CAPY GEGEN MAMA IVA', L.CAPY_TOTAL - 2, (t) => {
       const B = L.boss, c = B && B.capy; if (!c) return null;
-      const mx = (c.x + B.x) / 2, mz = (c.z + B.z) / 2, a = side + 0.25 - t * 0.035, d = 125 - t * 2.5;
+      const mx = (c.x + B.x) / 2, mz = (c.z + B.z) / 2, gy = groundY(mx, mz);
+      // jede Kampf-Aktion bekommt einen eigenen Kamerawinkel
+      const seg = t < 7 ? 0 : Math.min(4, 1 + Math.floor((t - 7) / 2.6));
+      const off = [0.25, -0.45, 0.55, -0.65, 0.35][seg] * (0.6 + R[seg] * 0.6) * dir;
+      const a = side + off + dir * t * 0.03, d = [125, 95, 110, 85, 120][seg] - (t % 2.6) * 3;
       const x = mx + Math.sin(a) * d, z = mz + Math.cos(a) * d;
-      const y = Math.max(groundY(x, z) + 14, groundY(mx, mz) + 34 - Math.max(0, t - 9) * 2);
-      const ly = groundY(mx, mz) + (t < 9.5 ? 34 : 34 - (t - 9.5) * 5);
+      const y = Math.max(groundY(x, z) + 14, gy + [34, 22, 40, 18, 30][seg] - Math.max(0, t - 17) * 2);
+      const ly = gy + (t < 17 ? 32 : 32 - (t - 17) * 5);
       return { x, y, z, lx: mx, ly, lz: mz };
     });
   };

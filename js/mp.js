@@ -322,7 +322,7 @@
       case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;
       case 'towerWarn': if (!host) L.msg('⚠️ MAMA IVA hat jemanden im Turm gehört! Sie kommt, um ihn einzureißen …', 7000); break;
       case 'bossGone': if (!host && L.boss) { L.capyRemove(L.boss); L.scene.remove(L.boss.rig.root); L.boss = null; } break;
-      case 'capy': if (!host && L.boss && !L.boss.capy) { L.boss.sinking = 0.001; L.capyStart(L.boss); const c = L.boss.capy; c.x = m.x; c.z = m.z; c.yaw = m.yaw; } break;
+      case 'capy': if (!host && L.boss && !L.boss.capy) { L.boss.sinking = 0.001; L.capyStart(L.boss, m.seed); const c = L.boss.capy; c.x = m.x; c.z = m.z; c.yaw = m.yaw; } break;
       case 'stomp':
         L.snd.stomp({ x: m.x, y: 0, z: m.z });
         L.shake = Math.max(L.shake, L.clamp(1.6 - L.dist(P.x, P.z, m.x, m.z) / 120, 0, 1.6));
@@ -677,6 +677,7 @@
       if (Math.random() < dt * 8) L.decal(b.aimX, b.aimZ, 1.6, '#1a1008');
       if (Math.random() < dt * 3) L.snd.ray({ x: b.aimX, y: 1, z: b.aimZ });
     } else rig.beam.g.visible = false;
+    L.capyBossPose(b);
     G().gait(b, rig, dt, speed, 10, 0.85, 5, (fp) => {
       const d = L.dist(P.x, P.z, fp.x, fp.z);
       L.snd.stomp({ x: fp.x, y: 0, z: fp.z });

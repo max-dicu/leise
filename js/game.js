@@ -1685,10 +1685,11 @@
 
   // ---------- MAMA IVA (der Riesen-Boss) ----------
   // Sie erscheint entweder hinter einem Berg oder bricht aus dem Boden, bleibt eine Weile und versinkt dann wieder.
-  // MAMA-IVA-Uhr nach der echten Uhrzeit: abwechselnd Pause und Auftritt (je eingestellte Minuten).
-  // Bei Tod oder neuer Runde läuft sie einfach weiter – und auf jedem Gerät gleich.
+  // MAMA-IVA-Uhr: startet, wenn man zum ersten Mal eine Runde betritt (Tab neu laden = von vorne).
+  // Bei Tod oder neuer Runde läuft sie einfach weiter. Im Mehrspieler bestimmt der Host die Zeit.
   function ivaClock() {
-    const C = L.S().bossMin * 60, cyc = 2 * C, t = Date.now() / 1000, ph = ((t % cyc) + cyc) % cyc;
+    if (L.ivaEpoch === undefined) L.ivaEpoch = Date.now();
+    const C = L.S().bossMin * 60, cyc = 2 * C, t = (Date.now() - L.ivaEpoch) / 1000, ph = ((t % cyc) + cyc) % cyc;
     return { pause: ph < C, left: ph < C ? C - ph : cyc - ph, idx: Math.floor(t / cyc), C };
   }
   L.ivaClock = ivaClock;
@@ -1727,51 +1728,129 @@
     if (isHost()) L.mp.send({ t: "boss", x: b.x, z: b.z, yaw: b.yaw, how, lvl: b.lvl });
     L.bossAppear(b);
   }
-  // ---------- GIGA-CAPY: steigt aus dem Boden, packt MAMA IVA und zieht sie in die Tiefe ----------
-  // Zeitplan (Sekunden): 0–5 aufsteigen · 5–7,5 brüllen · 7,5–9,5 packen · 9,5–15 MAMA IVA versinkt · 10,5–16 GIGA-CAPY taucht hinterher
-  L.CAPY_TOTAL = 16.5;
-  L.capyStart = function (b) {
+  // ---------- GIGA-CAPY gegen MAMA IVA: Aufstieg, Brüllen, ein Kampf (jedes Mal anders), dann zieht es sie in die Tiefe ----------
+  // Zeitplan (s): 0–5 aufsteigen · 5–7 brüllen · 7–14,8 drei Kampf-Aktionen · 14,8–16,8 packen · 16,8–22,3 MAMA IVA versinkt · ab 17,8 taucht GIGA-CAPY hinterher
+  const C_RISE = 5, C_ROAR = 7, C_MOVE = 2.6, C_NM = 3, C_FIGHT = C_ROAR + C_MOVE * C_NM, C_GRAB = C_FIGHT + 2;
+  L.CAPY_TOTAL = C_GRAB + 7;
+  const CAPY_MOVES = ['schlag', 'strahl', 'stampfer', 'biss', 'rammen', 'peitsche'];
+  function seededRng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  L.capyStart = function (b, seed) {
     if (b.capy) return;
     const rig = L.buildGigaCapy(); L.scene.add(rig.root);
+    seed = seed === undefined ? Math.floor(Math.random() * 1e9) : seed;
+    const rnd = seededRng(seed);
+    // drei verschiedene Kampf-Aktionen in zufälliger Reihenfolge, jede mit eigener Stärke und Seite
+    const pool = CAPY_MOVES.slice(), moves = [];
+    for (let i = 0; i < C_NM; i++) moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], s: rnd() < 0.5 ? -1 : 1, pow: 0.75 + rnd() * 0.5, hit: false });
     // neben MAMA IVA, etwas zum Spieler hin – damit man GIGA-CAPY ganz sieht
-    const a = Math.atan2(P.x - b.x, P.z - b.z) + (Math.random() < 0.5 ? 1 : -1) * 1.0;
-    const x = b.x + Math.sin(a) * 55, z = b.z + Math.cos(a) * 55;
-    b.capy = { rig, x, z, yaw: Math.atan2(b.x - x, b.z - z), y: -85, roared: false, rumbleT: 0 };
+    const a = Math.atan2(P.x - b.x, P.z - b.z) + (rnd() < 0.5 ? 1 : -1) * (0.7 + rnd() * 0.6);
+    const x = b.x + Math.sin(a) * 60, z = b.z + Math.cos(a) * 60;
+    b.capy = { rig, x, z, yaw: Math.atan2(b.x - x, b.z - z), y: -85, roared: false, rumbleT: 0, seed, rnd, moves, cam: [rnd(), rnd(), rnd(), rnd(), rnd()] };
+    b.fp = null;
     rig.root.position.set(x, -85, z); rig.root.rotation.y = b.capy.yaw;
-    L.banner('GIGA-CAPY ERWACHT', 'Ein riesiges Capybara bricht aus dem Boden …');
+    L.banner('GIGA-CAPY ERWACHT', 'Ein riesiges Capybara bricht aus dem Boden – und greift MAMA IVA an!');
     if (L.cineCapy) L.cineCapy(b);
   };
   const ease3 = (k) => 1 - Math.pow(1 - L.clamp(k, 0, 1), 3);
+  const bump = (u, a, b) => (u < a || u > b ? 0 : Math.sin((u - a) / (b - a) * Math.PI));
   // gibt zurück, wie weit MAMA IVA schon im Boden ist (0 … 1)
   L.capyUpdate = function (b, dt) {
     const c = b.capy; if (!c) return Math.min(1, b.sinking / 7);
     const t = b.sinking, r = c.rig;
     // Höhe
-    if (t < 5) c.y = -85 * (1 - ease3(t / 5));
-    else if (t < 10.5) c.y = 0;
-    else c.y = -90 * ease3((t - 10.5) / 5.5);
-    // beim Packen ein Stück auf MAMA IVA zu
-    const reach = L.clamp((t - 7.5) / 2, 0, 1) * 18;
-    r.root.position.set(c.x + Math.sin(c.yaw) * reach, c.y + L.mountainH(c.x, c.z), c.z + Math.cos(c.yaw) * reach);
+    if (t < C_RISE) c.y = -85 * (1 - ease3(t / C_RISE));
+    else if (t < C_GRAB + 1) c.y = 0;
+    else c.y = -90 * ease3((t - C_GRAB - 1) / 5.5);
+    // Pose von GIGA-CAPY und Wirkung auf MAMA IVA
+    let armX = [0, 0], elbowX = [0, 0], lean = 0, headX = 0.1, headY = 0, headZ = Math.sin(t * 0.8) * 0.06, adv = 0;
+    const fp = { tilt: 0, side: 0, push: 0, dip: 0, armUp: 0, whip: 0, beam: 0 };
+    const capyChest = () => V2.set(r.root.position.x, r.root.position.y + 38, r.root.position.z);
+    const atIva = (n, col) => L.fx(col || '#ffb040', b.x + L.rand(-6, 6), b.hy + L.rand(0, 18), b.z + L.rand(-6, 6), n, 10, { basic: true, size: 0.7, life: 0.8 });
+    const atCapy = (n, col) => { const p = capyChest(); L.fx(col || '#ffb040', p.x + L.rand(-6, 6), p.y + L.rand(-8, 8), p.z + L.rand(-6, 6), n, 10, { basic: true, size: 0.7, life: 0.8 }); };
+    if (t >= C_RISE && t < C_ROAR) {
+      const k = ease3((t - C_RISE) / 0.8); armX = [-2.5 * k, -2.5 * k]; elbowX = [-0.5 * k, -0.5 * k]; lean = -0.12 * k; headX = -0.35;
+    } else if (t >= C_ROAR && t < C_FIGHT) {
+      adv = 12 * ease3((t - C_ROAR) / 1.5);
+      const i = Math.floor((t - C_ROAR) / C_MOVE), u = (t - C_ROAR - i * C_MOVE) / C_MOVE, mv = c.moves[i], s = mv.s, w = mv.pow, j = s > 0 ? 0 : 1;
+      if (mv.k === 'schlag') {
+        // GIGA-CAPY holt aus und schlägt zu – MAMA IVA taumelt
+        armX[j] = u < 0.4 ? 0.9 * (u / 0.4) : L.lerp(0.9, -1.9, ease3((u - 0.4) / 0.15)); elbowX[j] = -0.6;
+        armX[1 - j] = -0.6; lean = 0.15 + bump(u, 0.35, 0.7) * 0.25; adv += bump(u, 0.3, 0.75) * 7;
+        fp.tilt = -bump(u, 0.5, 1) * 0.35 * w; fp.side = s * bump(u, 0.5, 1) * 0.25 * w; fp.push = bump(u, 0.5, 1) * 5 * w;
+        if (u > 0.5 && !mv.hit) { mv.hit = true; L.snd.crash(1, { x: b.x, y: 20, z: b.z }); L.snd.heavy({ x: b.x, y: 20, z: b.z }, 1); atIva(30); L.shake = Math.max(L.shake, 0.8); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
+      } else if (mv.k === 'strahl') {
+        // MAMA IVA feuert ihren Brust-Strahl – GIGA-CAPY schützt sich und taumelt zurück
+        fp.beam = u > 0.12 && u < 0.78 ? 1 : 0;
+        armX = [-1.5 * bump(u, 0.1, 0.9), -1.5 * bump(u, 0.1, 0.9)]; elbowX = [-1.2, -1.2]; lean = -0.25 * bump(u, 0.1, 0.9) * w; adv -= bump(u, 0.1, 0.9) * 6;
+        headY = s * 0.4 * bump(u, 0.2, 0.9);
+        if (fp.beam && Math.random() < dt * 25) atCapy(3);
+        if (u > 0.12 && !mv.hit) { mv.hit = true; L.snd.charge({ x: b.x, y: b.hy, z: b.z }); }
+        if (fp.beam && Math.random() < dt * 4) L.snd.ray({ x: b.x, y: b.hy, z: b.z });
+        if (u > 0.8 && !mv.roar) { mv.roar = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); }
+      } else if (mv.k === 'stampfer') {
+        // MAMA IVA reißt die Arme hoch und stampft – der Boden bebt, GIGA-CAPY wankt
+        fp.armUp = u < 0.5 ? 2.2 * (u / 0.5) : L.lerp(2.2, -0.5, ease3((u - 0.5) / 0.12)) * (1 - bump(u, 0.75, 1) * 0.3);
+        fp.dip = bump(u, 0.5, 0.75) * 3;
+        lean = -0.22 * bump(u, 0.55, 1) * w; adv -= bump(u, 0.55, 1) * 5; headZ += s * 0.3 * bump(u, 0.55, 1);
+        if (u > 0.55 && !mv.hit) { mv.hit = true; L.snd.stomp({ x: b.x, y: 0, z: b.z }); L.shake = Math.max(L.shake, 1.2); for (let k = 0; k < 4; k++) L.fx('#6a5a40', L.lerp(b.x, c.x, k / 4), 0.5, L.lerp(b.z, c.z, k / 4), 12, 10, { size: 0.9, life: 1.6 }); }
+      } else if (mv.k === 'biss') {
+        // GIGA-CAPY beißt MAMA IVA in die Schulter
+        lean = 0.5 * bump(u, 0.2, 0.85) * w; headX = 0.1 + 0.7 * bump(u, 0.25, 0.8); headY = s * 0.3 * bump(u, 0.25, 0.8);
+        armX = [-1.2 * bump(u, 0.2, 0.9), -1.2 * bump(u, 0.2, 0.9)]; adv += bump(u, 0.2, 0.85) * 8;
+        fp.side = -s * bump(u, 0.45, 1) * 0.4 * w; fp.tilt = -bump(u, 0.45, 1) * 0.15;
+        if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.snd.crash(0.8, { x: b.x, y: 25, z: b.z }); atIva(40, '#ff6a20'); L.shake = Math.max(L.shake, 0.7); }
+      } else if (mv.k === 'rammen') {
+        // GIGA-CAPY rennt los und rammt MAMA IVA weg
+        lean = 0.45 * bump(u, 0.1, 0.8); armX = [-0.6, -0.6]; adv += 11 * bump(u, 0.1, 0.8);
+        fp.push = bump(u, 0.45, 1) * 9 * w; fp.tilt = -bump(u, 0.45, 1) * 0.45 * w;
+        if (Math.random() < dt * 8 && u < 0.6) L.snd.stomp({ x: c.x, y: 0, z: c.z });
+        if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.crash(1, { x: b.x, y: 15, z: b.z }); atIva(40); L.shake = Math.max(L.shake, 1.3); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
+      } else {
+        // MAMA IVA peitscht mit ihren dünnen Armen – GIGA-CAPY reißt den Kopf zur Seite
+        fp.whip = bump(u, 0.1, 0.7);
+        headY = -s * 0.7 * bump(u, 0.4, 1); headZ += s * 0.2 * bump(u, 0.4, 1); lean = -0.12 * bump(u, 0.4, 1);
+        armX = [-0.8 * bump(u, 0.4, 1), -0.8 * bump(u, 0.4, 1)];
+        if (u > 0.42 && !mv.hit) { mv.hit = true; L.snd.screech({ x: c.x, y: 40, z: c.z }, 0.4); atCapy(30); L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); }
+      }
+    } else if (t >= C_FIGHT) {
+      // packen und festhalten
+      const k = ease3((t - C_FIGHT) / 1.2); adv = 12 + k * 10;
+      armX = [L.lerp(-0.6, -1.25, k), L.lerp(-0.6, -1.25, k)]; elbowX = [L.lerp(-0.2, -0.9, k), L.lerp(-0.2, -0.9, k)]; lean = L.lerp(0, 0.38, k);
+      if (t > C_FIGHT + 0.6 && !c.grabbed) { c.grabbed = true; L.snd.heavy({ x: b.x, y: 20, z: b.z }, 1); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); }
+    }
+    // MAMA IVA schaut zu GIGA-CAPY
+    if (!isClient()) b.yaw += L.angDiff(b.yaw, Math.atan2(c.x - b.x, c.z - b.z)) * Math.min(1, dt * 2);
+    b.fp = fp;
+    r.root.position.set(c.x + Math.sin(c.yaw) * adv, c.y + L.mountainH(c.x, c.z), c.z + Math.cos(c.yaw) * adv);
     r.root.rotation.y = c.yaw;
-    // Arme: hängen → hochreißen (Brüllen) → nach vorne packen
-    let armX = 0, elbowX = 0, lean = 0;
-    if (t >= 5 && t < 7.5) { const k = ease3((t - 5) / 0.8); armX = -2.5 * k; elbowX = -0.5 * k; lean = -0.12 * k; }
-    else if (t >= 7.5) { const k = ease3((t - 7.5) / 1.2); armX = L.lerp(-2.5, -1.25, k); elbowX = L.lerp(-0.5, -0.9, k); lean = L.lerp(-0.12, 0.38, k); }
-    for (let i = 0; i < 2; i++) { r.arms[i].arm.rotation.set(armX + Math.sin(t * 3 + i) * 0.05, 0, (i ? -1 : 1) * 0.18); r.arms[i].elbow.rotation.x = elbowX; }
+    for (let i = 0; i < 2; i++) { r.arms[i].arm.rotation.set(armX[i] + Math.sin(t * 3 + i) * 0.05, 0, (i ? -1 : 1) * 0.18); r.arms[i].elbow.rotation.x = elbowX[i]; }
     r.torso.rotation.x = lean;
-    r.head.rotation.set(t >= 5 && t < 7.5 ? -0.35 : 0.1, 0, Math.sin(t * 0.8) * 0.06);
-    if (t >= 5 && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
+    r.head.rotation.set(headX, headY, headZ);
+    if (t >= C_RISE && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
     // Beben, Staub und Steine beim Auf- und Abtauchen
-    if (t < 5 || t > 9.5) {
+    if (t < C_RISE || t > C_GRAB) {
       const d = L.dist(P.x, P.z, c.x, c.z);
       L.shake = Math.max(L.shake, L.clamp((450 - d) / 450, 0, 0.9));
       if (Math.random() < dt * 14) L.fx(Math.random() < 0.5 ? '#5a4630' : '#3a3a36', c.x + L.rand(-18, 18), 0.5, c.z + L.rand(-18, 18), 3, 10, { size: 0.9, life: 2 });
       c.rumbleT -= dt; if (c.rumbleT <= 0) { c.rumbleT = 0.6; L.snd.stomp({ x: c.x, y: 0, z: c.z }); }
     }
-    if (t > 9.5) L.bossRise(b, dt);
-    if (t >= 9.5 && !c.pulled) { c.pulled = true; L.msg('🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!', 5000); }
-    return t < 9.5 ? 0 : ease3((t - 9.5) / 5.5);
+    if (t > C_GRAB) L.bossRise(b, dt);
+    if (t >= C_GRAB && !c.pulled) { c.pulled = true; L.msg('🦫 MAMA IVA hat verloren – GIGA-CAPY zieht sie in die Tiefe!', 5000); }
+    return t < C_GRAB ? 0 : ease3((t - C_GRAB) / 5.5);
+  };
+  // Kampf-Haltung von MAMA IVA (nach ihrer normalen Animation anwenden)
+  L.capyBossPose = function (b) {
+    const fp = b.fp, c = b.capy; if (!fp || !c) return;
+    const rig = b.rig, a = Math.atan2(c.x - b.x, c.z - b.z);
+    rig.hull.position.x -= Math.sin(a) * fp.push; rig.hull.position.z -= Math.cos(a) * fp.push; rig.hull.position.y -= fp.dip;
+    rig.hull.rotation.set(fp.tilt, b.yaw, fp.side);
+    for (const arm of rig.arms) arm.arm.rotation.x -= fp.armUp;
+    if (fp.whip) for (let i = 0; i < 2; i++) { rig.thin[i].arm.rotation.x = -1.2 - fp.whip * 1.6; rig.thin[i].elbow.rotation.x = -0.2 + fp.whip * 0.6; }
+    if (fp.beam) {
+      const chest = V1.set(b.x + Math.sin(b.yaw) * 3, b.hy + 9, b.z + Math.cos(b.yaw) * 3);
+      const p = c.rig.root.position;
+      rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(p.x, p.y + 36, p.z), 1.3);
+    }
   };
   L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); b.capy = null; } };
 
@@ -1823,7 +1902,7 @@
       if (b.life <= 0) {
         b.sinking = 0.001; b.leaving = true; rig.beam.g.visible = false;
         L.capyStart(b);
-        if (isHost()) L.mp.send({ t: 'capy', x: b.capy.x, z: b.capy.z, yaw: b.capy.yaw });
+        if (isHost()) L.mp.send({ t: 'capy', x: b.capy.x, z: b.capy.z, yaw: b.capy.yaw, seed: b.capy.seed });
       }
     } else {
       b.sinking += dt;
@@ -1923,6 +2002,7 @@
     rig.neck.rotation.set(0.15, Math.sin(b.t * 0.5) * 0.5, Math.sin(b.t * 0.7) * 0.25);
     rig.mouth.scale.y = 0.3 + (b.roarT > 12 ? 0.4 : 0);
     rig.core.scale.setScalar(1.5 + Math.sin(b.t * 6) * 0.2);
+    L.capyBossPose(b);
     gait(b, rig, dt, speed, 10, 0.85, 5, (fp) => {
       const d = L.dist(P.x, P.z, fp.x, fp.z);
       L.snd.stomp({ x: fp.x, y: 0, z: fp.z });
