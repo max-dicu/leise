@@ -76,6 +76,17 @@
   // aus Sicht des Hosts: Mitspieler, die gerade lebend in der Runde sind
   const RPs = () => (isHost() ? remotesList().filter((r) => r.inRound && r.alive && !r.gone) : []);
   function players() { const a = []; if (P.alive && !P.gone) a.push(P); for (const r of RPs()) a.push(r); return a; }
+  // Boss-Zeit (MAMA IVA, Riesen-Boss oder Raserei): wer schleicht, ist unsichtbar und unhörbar.
+  // Nur wer sich direkt neben einem Monster duckt, wird noch ganz kurz gesehen (unter 1 Sekunde).
+  const bossOn = () => !!((L.boss && !L.boss.dead) || L.wboss || L.frenzy);
+  L.bossOn = bossOn;
+  const isSneak = (p) => (p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh));
+  function hiddenFrom(p, d, near) {
+    if (!bossOn() || !isSneak(p)) return false;
+    const st = p === P ? (P.sneakT || 0) : (p.sneakT === undefined ? 9 : p.sneakT);
+    return !(d < (near || 2.5) && st < 0.9);
+  }
+  function nearestSeen(x, z, near) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (hiddenFrom(p, d, near)) continue; if (d < bd) { bd = d; best = p; } } return [best, bd]; }
   function nearestPlayer(x, z) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
   function hurtRemote(r, dmg, cause, kx, kz, ky, sneak) { L.mp.sendTo(r.pid, { t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
   function hurtAny(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (isRemote(t)) hurtRemote(t, dmg, cause); }
@@ -530,7 +541,7 @@
         P.stepAcc = 0;
         if (L.waterDepth(P.x, P.z) > 0.15) L.nz({ dur: 0.25, f: 900 + Math.random() * 300, type: 'bandpass', vol: 0.1 + st[2] });
         else L.snd.step({ x: P.x, y: 0, z: P.z }, st[2], L.onRoad(P.x, P.z));
-        L.makeNoise(P.x, P.z, st[1] * (weed ? 2 : 1) + (weed ? 4 : 0), P);
+        if (!(bossOn() && P.stance !== 'stand')) L.makeNoise(P.x, P.z, st[1] * (weed ? 2 : 1) + (weed ? 4 : 0), P);
         if (weed) L.nz({ dur: 0.25, f: 2200, type: 'bandpass', vol: 0.15 });
       }
     }
@@ -1283,7 +1294,7 @@
       const d = L.dist(p.x, p.z, m.x, m.z);
       // wer schleicht und nicht ganz nah ist, verschwindet aus ihrem Blick
       const sneak = p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh);
-      if (sneak && d > 25) continue;
+      if (sneak && (d > 25 || hiddenFrom(p, d))) continue;
       if (d < bd) { bd = d; best = p; }
     }
     return best;
@@ -1311,8 +1322,8 @@
   const safeIn = (x, z) => (L.towerSafe() && L.inTower(x, z)) || (L.wsSafe ? L.wsSafe(x, z) : false);
   function monsterVictims(m) {
     const list = [];
-    if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5 && !(P.spawnProt > 0)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
-    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z) && (rp.y || 0) < 2.5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
+    if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5 && !(P.spawnProt > 0)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle, hidden: hiddenFrom(P, L.dist(P.x, P.z, m.x, m.z)) });
+    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z) && (rp.y || 0) < 2.5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh, hidden: hiddenFrom(rp, L.dist(rp.x, rp.z, m.x, m.z)) });
     for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
     return list;
   }
@@ -1357,7 +1368,7 @@
     // Die Starrende: kommt näher, sobald du wegschaust – schaust du sie an, erstarrt sie
     if (m.kind === 'starrende') {
       const dS = L.dist(P.x, P.z, m.x, m.z);
-      if (dS < 90 && P.alive && !P.gone && !safeIn(P.x, P.z) && m.state !== 'attack') { m.state = 'chase'; m.tx = P.x; m.tz = P.z; m.prey = P; m.timer = 5; m.alertT = 0; }
+      if (dS < 90 && P.alive && !P.gone && !safeIn(P.x, P.z) && !hiddenFrom(P, dS) && m.state !== 'attack') { m.state = 'chase'; m.tx = P.x; m.tz = P.z; m.prey = P; m.timer = 5; m.alertT = 0; }
       if (dS < 90 && lookedAt(m)) {
         m.frozen = true; m.anim = 'search';
         rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
@@ -1422,6 +1433,7 @@
     if (m.state !== 'attack' && m.cd <= 0 && dN < 30) {
       for (const v of monsterVictims(m)) {
         const d = L.dist(v.x, v.z, m.x, m.z);
+        if (v.hidden && d >= 0.6) continue; // Boss-Zeit: wer schleicht, wird nur beim direkten Zusammenstoß bemerkt
         const touch = v.sneaking ? 1.1 : 1.7;
         const hunting = m.state === 'chase' || m.state === 'investigate';
         // direkt angestoßen (unter 0,8 m) spürt er dich immer – auch wenn du still liegst
@@ -2166,12 +2178,13 @@
       let best = null, bd = 1e9;
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
-        if (!loud || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
-        const d = L.dist(t.x, t.z, b.x, b.z); if (d < bd) { bd = d; best = t; }
+        const d = L.dist(t.x, t.z, b.x, b.z);
+        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
+        if (d < bd) { bd = d; best = t; }
       }
       if (best) { b.tx = best.x; b.tz = best.z; }
     }
-    const [nearP, dNear] = nearestPlayer(b.x, b.z);
+    const [nearP, dNear] = nearestSeen(b.x, b.z, 8);
     const dT = L.dist(b.x, b.z, b.tx, b.tz);
     let speed = 0;
     if (!b.leaving && b.stompT <= 0 && dT > (b.towerAtk ? 34 : 12)) {
@@ -2355,8 +2368,9 @@
       let best = null, bd = 1e9;
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
-        if (!loud || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
-        const d = L.dist(t.x, t.z, w.x, w.z); if (d < bd) { bd = d; best = t; }
+        const d = L.dist(t.x, t.z, w.x, w.z);
+        if ((!loud && hiddenFrom(t, d, 8)) || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
+        if (d < bd) { bd = d; best = t; }
       }
       if (best) { w.tx = best.x; w.tz = best.z; }
     }
@@ -2371,7 +2385,7 @@
       if (Math.sin(w.ph * (w.type === 'walross' ? 1 : 1.5)) < -0.97 && Math.random() < 0.5) { L.snd.stomp({ x: w.x, y: 0, z: w.z }); L.shake = Math.max(L.shake, L.clamp((200 - L.dist(P.x, P.z, w.x, w.z)) / 200, 0, 0.6)); }
     }
     // Bodenschlag (Walross: Bauchklatscher, Viktor: Krallenhieb, Daniel: Faust in den Boden)
-    const [nearP, dNear] = nearestPlayer(w.x, w.z);
+    const [nearP, dNear] = nearestSeen(w.x, w.z, 8);
     const wantSlam = (w.towerAtk && dT <= 42) || (nearP && dNear < 34 && !safeIn(nearP.x, nearP.z) && !(nearP === P && P.spawnProt > 0));
     if (!w.leaving && wantSlam && w.slamCd <= 0 && w.slamT <= 0) { w.slamT = 1.6 / Math.min(1.6, w.spdMul); w.slamDur = w.slamT; G0.voice({ x: w.x, y: 10, z: w.z }); }
     let slamU = 0;
@@ -2741,6 +2755,8 @@
   L.updateGame = function (dt, t) {
     const R = L.round;
     R.time += dt;
+    P.sneakT = isSneak(P) ? (P.sneakT || 0) + dt : 0;
+    for (const rp of RPs()) rp.sneakT = isSneak(rp) ? (rp.sneakT || 0) + dt : 0;
     // Boss-Timer
     if (L.bossShow && !isClient()) {
       // 1 = gleich MAMA IVA · 2 = MAMA IVA läuft · 3 = gleich Walross · 4 = Walross läuft · dann fertig
