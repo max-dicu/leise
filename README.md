@@ -46,3 +46,8 @@ Zu zweit auf zwei Geräten, mit Chat, Freund auf der Karte und Items verschenken
 - **Tsunamis** rollen nach einer Warnung vom Meer aufs Land. Rette dich ins Landesinnere, in den Turm oder hoch hinaus.
 - **Bosse wechseln sich ab:** einmal MAMA IVA (Ende: GIGA-CAPY mit Daniel auf dem Rücken, danach Daniel gegen Riesen-Viktor), beim nächsten Mal das **Riesen-Walross** (Ende: **Richard** besiegt es). Jeder Boss hat eigene Stufen.
 - Walrosse und Richard (als Mitstreiter) gibt es auch in normaler Größe auf der Karte.
+
+## Inseln (neue Welten)
+Rund um die Heimat liegen 8 Inseln im Meer – erreichbar mit dem Flugzeug oder dem fliegenden JOYOR T10:
+❄️ Eisland · 🏜️ Wüsteninsel · 🌴 Dschungelinsel · 🌋 Vulkaninsel (Lavabomben) · ⚡ Götterinsel Asgard (Blitze, Regenbogenbrücke) · 🍄 Pilzinsel · 💎 Kristallinsel · 👻 Geisterinsel.
+Jede Insel hat eigene Landschaft, Gebäude, Wetter, Farben, Musik, eingefärbte Monster, Menschen und Fahrzeuge – und einen Checkpoint (Lichtsäule in der Mitte). Freigeschaltete Checkpoints kann man im Menü als Startpunkt wählen. Auf dem offenen Meer: Riesenhaie, Meeresriesen und Wasserhosen. Taste M zeigt unterwegs die Weltkarte.

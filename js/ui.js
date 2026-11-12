@@ -163,9 +163,10 @@
     const S = 200, view = 420, k = L.mapScale, src = view * k, g = mm;
     g.save(); g.clearRect(0, 0, S, S);
     g.beginPath(); g.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2); g.clip();
-    g.fillStyle = '#111'; g.fillRect(0, 0, S, S);
-    g.drawImage(L.mapCanvas, (P.x + L.HALF) * k - src / 2, (P.z + L.HALF) * k - src / 2, src, src, 0, 0, S, S);
+    g.fillStyle = '#1e4a66'; g.fillRect(0, 0, S, S);
     const toM = (x, z) => [S / 2 + (x - P.x) / view * S, S / 2 + (z - P.z) / view * S];
+    for (const I of L.ISL || []) { const [ix, iy] = toM(I.x, I.z), ir = I.r / view * S; if (ix + ir < 0 || ix - ir > S || iy + ir < 0 || iy - ir > S) continue; g.fillStyle = I.ground[0]; g.beginPath(); g.arc(ix, iy, ir, 0, 6.28); g.fill(); }
+    g.drawImage(L.mapCanvas, (P.x + L.HALF) * k - src / 2, (P.z + L.HALF) * k - src / 2, src, src, 0, 0, S, S);
     g.font = '14px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const p of L.POIS) { const [x, y] = toM(p.x, p.z); if (x > -10 && x < S + 10 && y > -10 && y < S + 10) g.fillText(p.icon, x, y); }
     g.fillStyle = '#ddd';
@@ -194,7 +195,22 @@
     const p1 = toM(a[0][0], a[0][1]), p2 = toM(a[1][0], a[1][1]);
     g.save(); g.strokeStyle = 'rgba(60,160,255,0.9)'; g.lineWidth = 4; g.setLineDash([8, 6]); g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke(); g.restore();
   }
+  function drawWorldMap() {
+    const c = $('bigmap'), g = c.getContext('2d'), S = c.width, W = L.FAR, k = S / (W * 2), toM = (x, z) => [(x + W) * k, (z + W) * k];
+    g.fillStyle = '#163a52'; g.fillRect(0, 0, S, S);
+    g.drawImage(L.mapCanvas, toM(-L.HALF, 0)[0], toM(0, -L.HALF)[1], L.HALF * 2 * k, L.HALF * 2 * k);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const cp = L.save.checkpoints || {};
+    for (const I of L.ISL || []) {
+      const [x, y] = toM(I.x, I.z); g.fillStyle = I.ground[0]; g.beginPath(); g.arc(x, y, I.r * k, 0, 6.28); g.fill();
+      g.font = '22px sans-serif'; g.fillText(I.icon, x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText(I.name + (cp[I.id] ? ' ✅' : ''), x, y + I.r * k + 10);
+    }
+    g.font = 'bold 13px sans-serif'; g.fillStyle = '#fff'; g.fillText('🏠 Heimat (Altheim)', toM(0, 0)[0], toM(0, 0)[1]);
+    const [px, py] = toM(P.x, P.z); arrow(g, px, py, P.vehicle ? P.vehicle.yaw : P.yaw, 9, '#ffdd33');
+    g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffdd33'; g.fillText('WELTKARTE – Inseln erreichst du mit dem Flugzeug oder dem fliegenden JOYOR T10', S / 2, 16);
+  }
   function drawBigMap() {
+    if (Math.max(Math.abs(P.x), Math.abs(P.z)) > L.HALF + 200) { drawWorldMap(); return; }
     const c = $('bigmap'), g = c.getContext('2d'), S = c.width, k = S / (L.HALF * 2);
     g.drawImage(L.mapCanvas, 0, 0, S, S);
     const toM = (x, z) => [(x + L.HALF) * k, (z + L.HALF) * k];
@@ -395,6 +411,15 @@
   };
   $('btnChar').onclick = () => { firstSound(); openChar(); };
   $('btnStash').onclick = () => { firstSound(); openStash('view'); };
+  // Startpunkt: Heimat oder freigeschaltete Insel-Checkpoints
+  const spawnBtn = document.createElement('button'); spawnBtn.className = 'btn'; spawnBtn.id = 'btnSpawn';
+  const spawnLabel = () => { const I = (L.ISL || []).find((i) => i.id === L.save.spawnAt); spawnBtn.textContent = '📍 Start: ' + (I && (L.save.checkpoints || {})[I.id] ? I.icon + ' ' + I.name : '🏠 Heimat'); };
+  spawnBtn.onclick = () => {
+    const opts = [null].concat((L.ISL || []).filter((i) => (L.save.checkpoints || {})[i.id]).map((i) => i.id));
+    if (opts.length < 2) { L.save.spawnAt = null; spawnLabel(); spawnBtn.title = 'Erreiche einen Insel-Checkpoint, um dort starten zu können.'; return; }
+    L.save.spawnAt = opts[(opts.indexOf(L.save.spawnAt || null) + 1) % opts.length]; L.persist(); spawnLabel();
+  };
+  $('btnStash').parentNode.insertBefore(spawnBtn, $('btnStash')); spawnLabel();
   $('btnSettings').onclick = () => { firstSound(); backTo = 'menu'; openSettings(); };
   $('btnMp').onclick = () => { firstSound(); show('mpScreen'); L.mp.renderLobby(); };
   $('btnHelp').onclick = () => { firstSound(); backTo = 'menu'; show('helpScreen'); };

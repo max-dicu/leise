@@ -97,8 +97,10 @@
       L.round.torT = (L.round.torT === undefined ? L.rand(90, 180) : L.round.torT) - dt * (L.env.weather === 'gewitter' ? 3 : 1);
       if (L.round.torT <= 0 && tors.length < 3) {
         L.round.torT = L.rand(150, 300);
+        const CI = L.curIsland;
         for (let i = 0; i < 30; i++) {
-          const x = L.rand(-1400, 1400), z = L.rand(-1400, 1400);
+          let x = L.rand(-1400, 1400), z = L.rand(-1400, 1400);
+          if (CI) { const a2 = Math.random() * 6.28, d2 = Math.sqrt(Math.random()) * (CI.r - 80); x = CI.x + Math.sin(a2) * d2; z = CI.z + Math.cos(a2) * d2; if (L.dist(x, z, P.x, P.z) < 120) continue; L.spawnTornado(x, z); break; }
           if (L.dist(x, z, P.x, P.z) < 250 || (L.inTower && L.inTower(x, z, 40))) continue;
           L.spawnTornado(x, z); break;
         }

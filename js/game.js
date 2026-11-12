@@ -1352,8 +1352,9 @@
           // wandert zu einem anderen Ort auf der Karte
           const p = L.pick(L.POIS);
           m.tx = L.clamp(p.x + L.rand(-p.r, p.r) * 0.7, -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r) * 0.7, -1480, 1480);
+          if (m.isl) { const q = L.islandWander(m); m.tx = q.x; m.tz = q.z; }
           m.home = { x: m.tx, z: m.tz }; m.timer = L.rand(60, 160);
-        } else { m.tx = L.clamp(m.x + L.rand(-150, 150), -1480, 1480); m.tz = L.clamp(m.z + L.rand(-150, 150), -1480, 1480); m.timer = L.rand(15, 35); }
+        } else { m.tx = L.clamp(m.x + L.rand(-150, 150), -1480, 1480); m.tz = L.clamp(m.z + L.rand(-150, 150), -1480, 1480); m.timer = L.rand(15, 35); if (m.isl) { const q = L.islandWander(m); m.tx = q.x; m.tz = q.z; } }
       }
       if (m.state === 'wander') moveToward(m, m.tx, m.tz, m.spd[0], dt, r);
     }
@@ -1395,7 +1396,7 @@
       if (L.dist(m.x, m.z, m.tx, m.tz) < 4 || m.timer <= 0) { m.state = 'search'; m.timer = L.rand(4, 8); }
     } else {
       m.timer -= dt;
-      if (m.timer <= 0) { const p = L.pick(L.POIS); m.state = 'wander'; m.tx = L.clamp(p.x + L.rand(-p.r, p.r), -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r), -1480, 1480); m.timer = L.rand(40, 90); }
+      if (m.timer <= 0) { const p = L.pick(L.POIS); m.state = 'wander'; m.tx = L.clamp(p.x + L.rand(-p.r, p.r), -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r), -1480, 1480); m.timer = L.rand(40, 90); if (m.isl) { const q = L.islandWander(m); m.tx = q.x; m.tz = q.z; } }
     }
     const spd = (m.state === 'chase' ? m.spd[2] * (L.frenzy ? 1.1 : 1) : m.state === 'investigate' ? m.spd[1] : m.state === 'wander' ? m.spd[0] : 0);
     if (spd > 0) {
@@ -2119,7 +2120,7 @@
       const want = Math.atan2(b.tx - b.x, b.tz - b.z);
       b.yaw += L.clamp(L.angDiff(b.yaw, want), -0.45 * dt, 0.45 * dt);
       b.x += Math.sin(b.yaw) * speed * dt; b.z += Math.cos(b.yaw) * speed * dt;
-      L.clampWorld(b);
+      L.clampWorld(b, true);
     } else if (!b.leaving && !b.towerAtk && dT <= 12 && b.stompT <= 0) { b.tx = P.x + L.rand(-200, 200); b.tz = P.z + L.rand(-200, 200); }
     // Turm einreißen: ausholen, zuschlagen
     if (b.towerAtk && !b.leaving && dT <= 35 && b.stompT <= 0) {
@@ -2307,7 +2308,7 @@
       const want = Math.atan2(w.tx - w.x, w.tz - w.z);
       w.yaw += L.clamp(L.angDiff(w.yaw, want), -0.8 * dt, 0.8 * dt);
       const sp = G0.speed * w.spdMul * (w.type === 'walross' ? 0.6 + Math.abs(Math.sin(w.ph)) * 0.8 : 1);
-      w.x += Math.sin(w.yaw) * sp * dt; w.z += Math.cos(w.yaw) * sp * dt; L.clampWorld(w);
+      w.x += Math.sin(w.yaw) * sp * dt; w.z += Math.cos(w.yaw) * sp * dt; L.clampWorld(w, true);
       if (Math.sin(w.ph * (w.type === 'walross' ? 1 : 1.5)) < -0.97 && Math.random() < 0.5) { L.snd.stomp({ x: w.x, y: 0, z: w.z }); L.shake = Math.max(L.shake, L.clamp((200 - L.dist(P.x, P.z, w.x, w.z)) / 200, 0, 0.6)); }
     }
     // Bodenschlag (Walross: Bauchklatscher, Viktor: Krallenhieb, Daniel: Faust in den Boden)
@@ -2409,6 +2410,7 @@
         n.state = 'wander';
         const p = Math.random() < 0.7 ? L.pick(L.POIS) : { x: n.x + L.rand(-200, 200), z: n.z + L.rand(-200, 200), r: 20 };
         n.tx = L.clamp(p.x + L.rand(-(p.r || 40), p.r || 40) * 0.6, -1450, 1450); n.tz = L.clamp(p.z + L.rand(-(p.r || 40), p.r || 40) * 0.6, -1450, 1450);
+        if (n.isl) { const q = L.islandWander(n); n.tx = q.x; n.tz = q.z; }
       }
       spd = 3.2; n.mode = 'walk';
     }
@@ -2481,7 +2483,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearIslands) L.clearIslands(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2515,6 +2517,9 @@
       if (left > 0) L.save.stash.push(Object.assign({}, it, { count: left }));
     }
     const sp = L.pick(L.spawnSpots); P.x = sp[0]; P.z = sp[1]; P.yaw = P.camYaw = Math.random() * 6.28;
+    // Start an einem freigeschalteten Insel-Checkpoint
+    const spI = L.save.spawnAt && L.save.checkpoints && L.save.checkpoints[L.save.spawnAt] && L.ISL && L.ISL.find((i) => i.id === L.save.spawnAt);
+    if (spI) { const c = L.islandCheckpoint(spI); P.x = c.x; P.z = c.z; setTimeout(() => L.msg('📍 Start am Checkpoint: ' + spI.name, 5000), 900); }
     // Schutz nach dem Start: Monster und Bosse lassen dich kurz in Ruhe
     P.spawnProt = 25;
     // Einmal-Bonus: alle Bosskämpfe hintereinander, sicher aus dem Turm ansehen
@@ -2715,6 +2720,7 @@
     L.updateNature(dt);
     L.updateRichard(dt);
     L.updateDuel(dt);
+    L.updateIslands(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);
@@ -2745,7 +2751,7 @@
     else if (danger >= 1) L.music.set('tension');
     else {
       L.bgT = (L.bgT || 0) + dt;
-      const list = L.env.day < 0.4 ? ['night', 'drift', 'nightB', 'lonely'] : ['calm', 'wander', 'lonely', 'drift'];
+      const list = L.curIsland ? L.curIsland.music : L.env.day < 0.4 ? ['night', 'drift', 'nightB', 'lonely'] : ['calm', 'wander', 'lonely', 'drift'];
       L.music.set(list[Math.floor(L.bgT / 30) % list.length]);
     }
     // Herzschlag bei Nähe

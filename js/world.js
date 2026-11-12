@@ -103,9 +103,13 @@
   };
   L.gateOpen = false;
   // Hinter Westen, Osten und Süden geht es über einen Strand ins Meer. Im Norden bleibt die Sperrzone.
-  L.FAR = 2400; L.WATER_Y = -0.6;
+  L.FAR = 8800; L.WATER_Y = -0.6;
+  // Inseln (werden in islands.js gefüllt): { x, z, r }
+  L.ISLANDS = L.ISLANDS || [];
   L.seaFloor = function (x, z) {
-    const o = Math.max(Math.abs(x), z) - HALF;
+    // Heimat: Strand im Westen, Osten und Süden; im Norden ein schmaler Streifen Sperrgebiet, dahinter auch Meer
+    let o = Math.max(Math.abs(x) - HALF, z - HALF, -z - HALF - 150);
+    for (const I of L.ISLANDS) { const d = Math.hypot(x - I.x, z - I.z) - I.r; if (d < o) o = d; }
     return o <= 0 ? 0 : -Math.min(9, o * 0.06);
   };
   L.waterDepth = (x, z) => L.WATER_Y - L.seaFloor(x, z);
@@ -113,13 +117,15 @@
     const lim = HALF - 3;
     if (far) {
       o.x = L.clamp(o.x, -L.FAR, L.FAR); o.z = L.clamp(o.z, -L.FAR, L.FAR);
-      if (o.z < -lim && !(L.gateOpen && Math.abs(o.x) < 7)) {
-        // nördlich vom Zaun ist Sperrgebiet: vom Land aus der Zaun, vom Meer aus die Küste
-        if (Math.abs(o.x) <= HALF) { if (Math.abs(o.x) > HALF - 40) o.x = Math.sign(o.x) * (HALF + 0.5); else o.z = -lim; }
+      if (o.z < -lim && o.z > -HALF - 150 && !(L.gateOpen && Math.abs(o.x) < 7)) {
+        // nördlich vom Zaun ist ein Streifen Sperrgebiet: vom Land aus der Zaun, vom Meer aus die Küste
+        if (Math.abs(o.x) <= HALF) { if (Math.abs(o.x) > HALF - 40) o.x = Math.sign(o.x) * (HALF + 0.5); else if (o.z < -HALF - 75) o.z = -HALF - 150.5; else o.z = -lim; }
       }
       if (L.gateOpen && Math.abs(o.x) < 7) o.z = Math.max(o.z, -HALF - 30);
       return;
     }
+    // Wesen auf einer Insel bleiben auf ihrer Insel
+    if (o.isl) { const I = o.isl, d = Math.hypot(o.x - I.x, o.z - I.z), lim2 = I.r + 10; if (d > lim2) { o.x = I.x + (o.x - I.x) / d * lim2; o.z = I.z + (o.z - I.z) / d * lim2; } return; }
     const sea = HALF + 12;
     o.x = L.clamp(o.x, -sea, sea);
     if (L.gateOpen && Math.abs(o.x) < 7) o.z = L.clamp(o.z, -HALF - 30, sea);
@@ -756,7 +762,7 @@
       const x = pos.getX(i), z = pos.getZ(i), h = Math.min(-0.06, L.seaFloor(x, z));
       pos.setY(i, h);
       const k = L.clamp(-h / 9, 0, 1);
-      const north = z < -HALF && Math.abs(x) <= HALF + 40;
+      const north = z < -HALF && z > -HALF - 150 && Math.abs(x) <= HALF + 40;
       if (north) { cols[i * 3] = 0.42; cols[i * 3 + 1] = 0.5; cols[i * 3 + 2] = 0.3; }
       else { cols[i * 3] = L.lerp(0.86, 0.35, k); cols[i * 3 + 1] = L.lerp(0.78, 0.36, k); cols[i * 3 + 2] = L.lerp(0.56, 0.3, k); }
     }
@@ -764,6 +770,8 @@
     geo.computeVertexNormals();
     const bed = new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true }));
     bed.receiveShadow = true; L.scene.add(bed);
+    const deep = new T.Mesh(new T.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2), new T.MeshLambertMaterial({ color: '#2e3a40' }));
+    deep.position.y = -9.1; L.scene.add(deep);
     // Wasser: folgt der Kamera, Wellen laufen auf den Strand zu
     const N = 70, W = 1500, wg = new T.PlaneGeometry(W, W, N, N); wg.rotateX(-Math.PI / 2);
     const wm = new T.Mesh(wg, new T.MeshPhongMaterial({ color: 0x2a6a8a, transparent: true, opacity: 0.86, shininess: 60, specular: 0x6688aa, flatShading: true }));
@@ -777,7 +785,7 @@
   };
   L.updateOcean = function (cam, t) {
     const O = L.ocean; if (!O) return;
-    const near = Math.max(Math.abs(cam.position.x), Math.abs(cam.position.z)) > HALF - 1000;
+    const near = Math.max(Math.abs(cam.position.x), Math.abs(cam.position.z)) > HALF - 1000 || !!L.curIsland;
     O.mesh.visible = near;
     if (!near) return;
     const cx = Math.round(cam.position.x / 20) * 20, cz = Math.round(cam.position.z / 20) * 20;
@@ -928,7 +936,10 @@
     wolkig: { cloud: 0.7, rain: 0, fog: 0.1, label: '☁️ Wolkig' },
     regen: { cloud: 0.9, rain: 0.7, fog: 0.25, label: '🌧️ Regen' },
     nebel: { cloud: 0.5, rain: 0, fog: 0.85, label: '🌫️ Nebel' },
-    gewitter: { cloud: 1, rain: 1, fog: 0.3, storm: true, label: '⛈️ Gewitter' }
+    gewitter: { cloud: 1, rain: 1, fog: 0.3, storm: true, label: '⛈️ Gewitter' },
+    schnee: { cloud: 0.75, rain: 0.8, fog: 0.4, snow: true, label: '❄️ Schnee' },
+    sand: { cloud: 0.2, rain: 0, fog: 0.6, label: '🌪️ Sandsturm' },
+    asche: { cloud: 0.9, rain: 0.5, fog: 0.5, snow: true, ash: true, label: '🌋 Asche' }
   };
   L.env = { time: 8, weather: 'klar', wT: 240, cloud: 0.1, rain: 0, fog: 0, bolt: 0, day: 1, hearMul: 1, nextBolt: 10 };
   L.initEnv = function (scene) {
@@ -998,6 +1009,8 @@
     const dusk = L.clamp(1 - Math.abs(el) * 5, 0, 1) * 0.8;
     cSky.copy(cNight).lerp(cDay, day); cSky.lerp(cDusk, dusk * day);
     cTmp.copy(cGrey).multiplyScalar(0.25 + day * 0.75); cSky.lerp(cTmp, E.cloud * 0.75);
+    // Farbstimmung der aktuellen Insel
+    if (L.envTint) cSky.lerp(cTmp.set(L.envTint.color), L.envTint.amt * (0.35 + day * 0.65));
     // Gewitter
     if (W.storm && !paused) {
       E.nextBolt -= dt;
@@ -1032,10 +1045,12 @@
     // Regen
     E.rainMesh.visible = E.rain > 0.02;
     if (E.rainMesh.visible) {
-      E.rainMesh.material.opacity = E.rain * 0.55;
-      const p = E.rainMesh.geometry.attributes.position, arr = p.array;
+      E.rainMesh.material.opacity = E.rain * (W.snow ? 0.9 : 0.55);
+      E.rainMesh.material.color.set(W.ash ? 0x555555 : W.snow ? 0xffffff : 0xaabbd0);
+      const p = E.rainMesh.geometry.attributes.position, arr = p.array, fall = W.snow ? 3.5 : 32;
       for (let i = 0; i < arr.length; i += 6) {
-        arr[i + 1] -= dt * 32; arr[i + 4] -= dt * 32;
+        arr[i + 1] -= dt * fall; arr[i + 4] -= dt * fall;
+        if (W.snow) { const w = Math.sin(arr[i + 1] * 0.5 + i) * dt * 1.5; arr[i] += w; arr[i + 3] = arr[i] + 0.05; arr[i + 4] = arr[i + 1] + 0.12; }
         if (arr[i + 1] < -2) { arr[i + 1] += 40; arr[i + 4] += 40; }
       }
       p.needsUpdate = true;
