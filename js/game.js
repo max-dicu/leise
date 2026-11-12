@@ -399,6 +399,7 @@
     P.noiseShow = Math.max(0, P.noiseShow - dt * 30);
     P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
     P.fireCd -= dt;
+    P.tpCd = Math.max(0, (P.tpCd || 0) - dt);
     if (L.cine) { if (P.vehicle) { P.vehicle.speed *= Math.max(0, 1 - dt * 2); } return; }
     if (L.hit('KeyL')) { P.flash = !P.flash; L.snd.key(); }
     if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
@@ -766,6 +767,8 @@
   }
   function leaveVehicle(silent) {
     const v = P.vehicle; if (!v) return;
+    if ((v.alt || 0) > 1.5 && v.hp > 0 && !silent) { L.msg('✈️ Erst landen! (C oder Strg zum Sinken, nur auf dem Boden aussteigen)', 2500); return; }
+    if (silent && (v.alt || 0) > 1.5) { v.vy = 0; }
     const kmh = Math.abs(v.speed) * 3.6;
     const seat = P.seat || 0, st = (v.rig.seats || [v.rig.seat])[seat] || v.rig.seat;
     // auf der Seite des eigenen Sitzes aussteigen
@@ -786,7 +789,7 @@
     const seat = P.seat || 0;
     P.vehicle = null; P.belted = false; P.seat = 0; L.engine.set(false, 0);
     if (NET() !== 'solo') L.mp.send({ t: 'vleave', id: v.id, seat, x: v.x, z: v.z, yaw: v.yaw, hp: v.hp });
-    P.x = v.x + fx * (v.t.len * 0.55); P.z = v.z + fz * (v.t.len * 0.55); P.y = 1.3;
+    P.x = v.x + fx * (v.t.len * 0.55); P.z = v.z + fz * (v.t.len * 0.55); P.y = (v.alt || 0) + 1.3;
     L.collide(P.x, P.z, 0.4, 0, RES); P.x = RES.x; P.z = RES.z;
     P.vx = fx * spd * 0.62; P.vz = fz * spd * 0.62; P.vy = 4 + spd * 0.08;
     P.air = true; P.tumble = 0.01; P.ejected = true; P.knockT = 2;
@@ -843,11 +846,11 @@
       }
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
-    P.x = v.x; P.z = v.z; P.y = 0;
+    P.x = v.x; P.z = v.z; P.y = v.alt || 0;
     const rpm = Math.abs(v.speed) / (t.vmax / 3.6);
     L.engine.set(v.occupied && v.hp > 0, t.electric ? rpm : (rpm * 3) % 1 * 0.5 + rpm * 0.6, t.kind === 'bike', t.electric);
     const r = P.rig, s = (v.rig.seats || [v.rig.seat])[P.seat] || v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
-    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
+    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
     r.root.rotation.set(0, v.yaw, 0); r.root.rotateZ(-v.lean);
     L.setHeld(r, null);
     P.animSt = { mode: t.scooter ? 'scooter' : t.kind === 'bike' ? 'ride' : 'sit' };
@@ -868,9 +871,11 @@
       if (L.hit('KeyH')) { L.snd.hupe({ x: v.x, y: 1, z: v.z }); L.makeNoise(v.x, v.z, 150, P); }
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
-    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
+    if (!block && L.hit('KeyT') && t.teleport) { if (P.tpCd > 0) L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); else teleportVehicle(v); }
+    if (t.fly) updateFlight(v, dt, !block && L.keys.Space, !block && (L.keys.KeyC || L.keys.ControlLeft));
+    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space && !t.fly, true);
     if (!P.vehicle) return;
-    P.x = v.x; P.z = v.z; P.y = 0;
+    P.x = v.x; P.z = v.z; P.y = v.alt || 0;
     // Gurtwarner
     if (t.kind === 'car' && !P.belted && Math.abs(v.speed) > 4) { P.beltWarnT -= dt; if (P.beltWarnT <= 0) { P.beltWarnT = 4; L.snd.beltWarn(); } }
     // Motorgeräusch und Lärm
@@ -881,7 +886,7 @@
     if (v.noiseAcc > 0.5) { v.noiseAcc = 0; L.makeNoise(v.x, v.z, v.hp > 0 ? (t.electric ? 3 + Math.abs(v.speed) * 0.35 : 16 + Math.abs(v.speed) * 1.1) : 0, P); }
     // Figur auf dem Sitz
     const r = P.rig, s = v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
-    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
+    r.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
     r.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') r.root.rotation.z = 0;
     r.root.rotateZ(-v.lean);
@@ -891,7 +896,7 @@
     if (v.hp <= 0 && Math.abs(v.speed) < 0.5 && !v.deadMsg) { v.deadMsg = true; L.msg('🔥 Das Fahrzeug ist kaputt. Steig aus!'); }
   }
   function driveVehicle(v, dt, thr, str, hb, isPlayer) {
-    const t = v.t, onR = L.onRoad(v.x, v.z), vmax = t.vmax / 3.6 * (onR ? 1 : t.off) * (v.hp > 0 ? 1 : 0);
+    const t = v.t, onR = L.onRoad(v.x, v.z) || (v.alt || 0) > 0.5, vmax = t.vmax / 3.6 * (onR ? 1 : t.off) * (v.hp > 0 ? 1 : 0);
     if (v.hp <= 0) thr = 0;
     if (thr > 0) { if (v.speed < -0.5) v.speed += 16 * dt; else if (v.speed < vmax) v.speed = Math.min(vmax, v.speed + t.acc * dt * (1 - Math.max(0, v.speed) / (vmax * 1.15 + 0.01))); }
     else if (thr < 0) { if (v.speed > 0.5) v.speed -= 15 * dt; else v.speed = Math.max(-8, v.speed - 4 * dt); }
@@ -918,7 +923,24 @@
     if (!hb && Math.abs(lat) > 0.5) v.speed += Math.sign(v.speed) * Math.abs(lat) * 0.15 * grip * dt * 0.3;
     v.lat = lat;
     const before = v.speed, latBefore = lat;
-    v.x += (fx * v.speed + rx * lat) * dt; v.z += (fz * v.speed + rz * lat) * dt;
+    // in kleinen Schritten bewegen und dabei jedes Mal auf Wände prüfen
+    const alt = v.alt || 0, mvx = (fx * v.speed + rx * lat) * dt, mvz = (fz * v.speed + rz * lat) * dt;
+    const nSub = Math.min(40, Math.max(1, Math.ceil(Math.hypot(mvx, mvz) / 0.4)));
+    let impact = 0;
+    for (let k = 0; k < nSub; k++) {
+      v.x += mvx / nSub; v.z += mvz / nSub;
+      let hit = false;
+      for (const c of vehCircles(v)) {
+        L.collide(c[0], c[1], c[2], alt + 0.2, RES);
+        if (RES.hit) {
+          hit = true;
+          v.x += RES.x - c[0]; v.z += RES.z - c[1];
+          const into = -((fx * before + rx * latBefore) * RES.nx + (fz * before + rz * latBefore) * RES.nz);
+          if (into > impact) impact = into;
+        }
+      }
+      if (hit) break;
+    }
     // Driften: Reifenquietschen, Rauch, Lärm
     if (Math.abs(lat) > 3 && spd > 5) {
       v.driftT = (v.driftT || 0) - dt;
@@ -933,19 +955,9 @@
         if (isPlayer) L.makeNoise(v.x, v.z, 35, P);
       }
     }
-    // Zusammenstöße
-    let impact = 0;
-    const circles = vehCircles(v);
-    for (const c of circles) {
-      L.collide(c[0], c[1], c[2], 0.2, RES);
-      if (RES.hit) {
-        v.x += RES.x - c[0]; v.z += RES.z - c[1];
-        const into = -((fx * before + rx * latBefore) * RES.nx + (fz * before + rz * latBefore) * RES.nz);
-        if (into > impact) impact = into;
-      }
-    }
+    // Zusammenstöße mit anderen Fahrzeugen
     for (const o of E.vehicles) {
-      if (o === v || L.dist(o.x, o.z, v.x, v.z) > 7) continue;
+      if (o === v || L.dist(o.x, o.z, v.x, v.z) > 7 || Math.abs((o.alt || 0) - alt) > 2) continue;
       for (const a of vehCircles(v)) for (const b of vehCircles(o)) {
         const d = L.dist(a[0], a[1], b[0], b[1]), min = a[2] + b[2];
         if (d < min && d > 0.001) {
@@ -960,7 +972,7 @@
     if (impact > 2.5) { v.speed = -before * 0.15; v.lat = -latBefore * 0.2; crash(v, impact, isPlayer); }
     else if (impact > 0) { v.speed *= 0.8; v.lat *= 0.5; }
     // Monster und Menschen überfahren
-    if (Math.abs(v.speed) > 3) for (const e of allTargets()) {
+    if (Math.abs(v.speed) > 3 && alt < 2) for (const e of allTargets()) {
       if (e.kind === 'walker' || e.kind === 'boss' || e.fly) continue;
       if (L.dist(e.x, e.z, v.x + fx * t.len * 0.4, v.z + fz * t.len * 0.4) > (t.kind === 'bike' ? 1.2 : t.wid * 0.7 + 0.5)) continue;
       const sp = Math.abs(v.speed);
@@ -974,20 +986,74 @@
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
     v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
-    v.rig.root.position.set(v.x, 0, v.z);
+    v.rig.root.position.set(v.x, alt, v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
+    if (alt > 0.5 && v.vy) v.rig.root.rotateX(-L.clamp(v.vy / 40, -0.3, 0.3));
+  }
+  // ---------- JOYOR T10: Fliegen ----------
+  // Boden unter dem Fahrzeug: Berg oder Dach
+  function flyFloor(x, z) {
+    let h = L.mountainH(x, z);
+    for (const b of L.queryBoxes(x, z, 0.4)) if (b.kind !== 'water' && b.kind !== 'tree' && x > b.x1 && x < b.x2 && z > b.z1 && z < b.z2) h = Math.max(h, b.h);
+    return h;
+  }
+  function updateFlight(v, dt, up, down) {
+    const floor = flyFloor(v.x, v.z);
+    let vy = v.vy || 0;
+    if (v.hp <= 0) { up = false; down = true; }
+    if (up) vy += (14 - vy) * Math.min(1, dt * 3);
+    else if (down) vy += (-14 - vy) * Math.min(1, dt * 3);
+    else vy += ((v.alt > floor + 0.3 ? -1.2 : 0) - vy) * Math.min(1, dt * 2);
+    v.alt = Math.min(250, (v.alt || 0) + vy * dt);
+    if (v.alt <= floor) { v.alt = floor; vy = Math.max(0, vy); }
+    v.vy = vy;
+  }
+  // geparkte Fahrzeuge in der Luft sinken langsam auf den Boden
+  function settleVehicle(v, dt) {
+    if (!(v.alt > 0)) return;
+    const floor = v.t.fly ? flyFloor(v.x, v.z) : 0;
+    v.vy = Math.max(-15, (v.vy || 0) - 12 * dt);
+    v.alt = Math.max(floor, v.alt + v.vy * dt);
+    if (v.alt <= floor) v.vy = 0;
+    v.rig.root.position.y = v.alt;
+  }
+  // ---------- JOYOR T6E Pro: Teleport nach vorne, danach 5 Sekunden Pause ----------
+  function spotFree(x, z, v) {
+    if (Math.abs(x) > 1480 || Math.abs(z) > 1480 || L.mountainH(x, z) > 0.3) return false;
+    if (L.queryBoxes(x, z, 1.3).length) return false;
+    for (const o of E.vehicles) if (o !== v && L.dist(o.x, o.z, x, z) < 3) return false;
+    return true;
+  }
+  function teleportVehicle(v) {
+    const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw);
+    for (let d = 60; d >= 12; d -= 4) {
+      const x = v.x + fx * d, z = v.z + fz * d;
+      if (!spotFree(x, z, v)) continue;
+      L.fx('#a050ff', v.x, 1, v.z, 30, 5, { basic: true, size: 0.25, life: 0.8 });
+      v.x = x; v.z = z; v.lat = 0; v.alt = 0; v.vy = 0;
+      P.x = x; P.z = z; P.tpCd = 5;
+      L.fx('#a050ff', x, 1, z, 40, 6, { basic: true, size: 0.3, life: 0.9 });
+      L.snd.teleport({ x, y: 1, z });
+      L.shake = Math.max(L.shake, 0.25);
+      v.rig.root.position.set(v.x, 0, v.z);
+      return true;
+    }
+    L.msg('🚫 Vorne ist kein freier Platz zum Teleportieren.', 2000);
+    return false;
   }
   // Fahrzeug, das gerade vom anderen Spieler gesteuert wird (Position kommt übers Netz)
   function netVeh(v, dt) {
     const p = v.netPose, k = Math.min(1, dt * 10);
+    if (L.dist(v.x, v.z, p.x, p.z) > 20) { v.x = p.x; v.z = p.z; } // Teleport: sofort springen statt gleiten
     v.x += (p.x - v.x) * k; v.z += (p.z - v.z) * k; v.yaw += L.angDiff(v.yaw, p.yaw) * k;
+    v.alt = (v.alt || 0) + ((p.alt || 0) - (v.alt || 0)) * k;
     v.speed = p.speed || 0; v.steer = p.steer || 0; if (p.hp !== undefined) v.hp = p.hp;
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
     v.lean = v.t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
-    v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
+    v.rig.root.position.set(v.x, v.alt || 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
     if (v.t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < 300;
     if (p.until && performance.now() > p.until) v.netPose = null;
@@ -998,6 +1064,7 @@
       if (v.netPose) { netVeh(v, dt); continue; }
       if (v === P.vehicle) continue;
       if (Math.abs(v.speed) > 0.05 && !isClient()) driveVehicle(v, dt, 0, 0, false, false);
+      settleVehicle(v, dt);
       v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < (v.t.kind === 'bike' ? 200 : 300);
       if (v.hp <= 0 && Math.random() < dt * 4 && v.rig.root.visible) L.fx('#2a2a2a', v.x, 1.5, v.z, 1, 0.4, { size: 0.5, life: 2, g: -0.2, grow: 0.6 });
     }
@@ -1100,8 +1167,8 @@
   const safeIn = (x, z) => L.towerSafe() && L.inTower(x, z);
   function monsterVictims(m) {
     const list = [];
-    if (P.alive && !P.gone && !safeIn(P.x, P.z)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
-    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z)) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
+    if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
+    for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z) && (rp.y || 0) < 2.5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
     for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
     return list;
   }

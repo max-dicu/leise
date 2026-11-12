@@ -263,7 +263,9 @@
       const belt = $('belt');
       if (v.t.kind === 'car') { belt.textContent = P.belted ? '✅ Angeschnallt' : '⚠️ NICHT angeschnallt (B)'; belt.className = P.belted ? '' : 'off'; }
       else { belt.textContent = (L.save.char || {}).hat === 'helm' ? '🪖 Helm auf' : '⚠️ Ohne Helm'; belt.className = ''; }
-      $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`;
+      $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`
+        + (v.t.teleport ? (P.tpCd > 0 ? ` · 🌀 Teleport in ${Math.ceil(P.tpCd)} s` : ' · 🌀 T: Teleport bereit') : '')
+        + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (Leertaste hoch, C runter)` : '');
     }
     $('hint').textContent = L.uiBlock ? '' : L.interactHint();
     $('cross').className = P.aiming ? 'aim' : '';

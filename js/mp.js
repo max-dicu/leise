@@ -174,7 +174,7 @@
     if (m.veh && m.veh.length === 2) { R.inVeh = true; R.vehId = m.veh[0]; R.seat = m.veh[1]; }
     else if (m.veh) {
       const v = L.byId.get('v' + m.veh[0]);
-      if (v) { v.occupied = true; if (v !== P.vehicle || P.seat > 0) v.netPose = { x: m.veh[1], z: m.veh[2], yaw: m.veh[3], speed: m.veh[4], steer: m.veh[5], hp: m.veh[6] }; }
+      if (v) { v.occupied = true; if (v !== P.vehicle || P.seat > 0) v.netPose = { x: m.veh[1], z: m.veh[2], yaw: m.veh[3], speed: m.veh[4], steer: m.veh[5], hp: m.veh[6], alt: m.veh[7] || 0 }; }
       R.inVeh = true; R.vehId = m.veh[0]; R.seat = 0;
     } else if (R.inVeh) { R.inVeh = false; R.seat = 0; }
   }
@@ -189,7 +189,7 @@
     if (v) {
       const s = (v.rig.seats || [v.rig.seat])[R.seat || 0] || v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
       R.x = R.nx = v.x; R.z = R.nz = v.z;
-      rig.root.position.set(v.x + s.x * cy + s.z * sy, s.y, v.z - s.x * sy + s.z * cy);
+      rig.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
       rig.root.rotation.set(0, v.yaw, 0); rig.root.rotateZ(-v.lean);
     } else { rig.root.position.set(R.x, R.y, R.z); rig.root.rotation.set(0, R.yaw, 0); }
     L.setHeld(rig, v ? null : R.held);
@@ -388,7 +388,7 @@
       t: 'ps', x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), st: P.animSt, stance: P.stance,
       moving: Math.hypot(P.vx || 0, P.vz || 0) > 0.4 || !!(v && Math.abs(v.speed) > 0.5),
       alive: !!P.alive, gone: !!P.gone, held: P.rig ? P.rig.heldType : null, flash: !!P.flash, hp: Math.round(P.hp || 0),
-      veh: v ? (P.seat > 0 ? [v.id, P.seat] : [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp)]) : 0
+      veh: v ? (P.seat > 0 ? [v.id, P.seat] : [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), r1(v.alt || 0)]) : 0
     });
   }
   // Host: Schnappschuss für einen Mitspieler (nur was in seiner Nähe ist)
@@ -406,7 +406,7 @@
     for (const v of E.vehicles) {
       if (v.netPose) continue;
       const hostDrives = v === P.vehicle && !(P.seat > 0);
-      if (hostDrives || (Math.abs(v.speed) > 0.05 && v !== P.vehicle)) V.push([v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), hostDrives ? 1 : 0]);
+      if (hostDrives || (Math.abs(v.speed) > 0.05 && v !== P.vehicle)) V.push([v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), hostDrives ? 1 : 0, r1(v.alt || 0)]);
     }
     const b = L.boss;
     const B = b ? [r1(b.x), r1(b.z), r2(b.yaw), r1(b.hy), b.rig.beam.g.visible ? 1 : 0, r1(b.aimX || 0), r1(b.aimZ || 0), r2(b.stompT || 0), b.dead ? 1 : 0, r1(b.rootY || 0), Math.round(b.life || 0)] : null;
@@ -506,7 +506,7 @@
     const seen = new Set();
     for (const a of s.V) {
       const v = L.byId.get('v' + a[0]); if (!v || (v === P.vehicle && !(P.seat > 0))) continue;
-      v.netPose = { x: a[1], z: a[2], yaw: a[3], speed: a[4], steer: a[5], hp: a[6], until: now + 700 };
+      v.netPose = { x: a[1], z: a[2], yaw: a[3], speed: a[4], steer: a[5], hp: a[6], alt: a[8] || 0, until: now + 700 };
       if (a[7]) { v.occupied = true; seen.add(v); occ.add(v); }
     }
     for (const v of [...occ]) if (!seen.has(v)) { if (![...RM.values()].some((r) => r.inVeh && r.vehId === v.id && !(r.seat > 0))) v.occupied = false; occ.delete(v); }

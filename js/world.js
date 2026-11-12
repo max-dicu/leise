@@ -945,9 +945,9 @@
     const nightAmt = 1 - day;
     E.sun.position.set(focus.x + (el > 0 ? sd.x : -sd.x) * 200, (el > 0 ? Math.max(sd.y, 0.15) : Math.max(-sd.y, 0.3)) * 200, focus.z + sd.z * 200);
     E.sun.target.position.set(focus.x, 0, focus.z);
-    E.sun.intensity = day * 1.05 * (1 - E.cloud * 0.6) + nightAmt * 0.18;
+    E.sun.intensity = day * 1.05 * (1 - E.cloud * 0.6) + nightAmt * 0.21;
     E.sun.color.setRGB(1, 0.92 + day * 0.05 - dusk * 0.2, 0.85 - dusk * 0.35).lerp(cTmp.setRGB(0.6, 0.7, 1), nightAmt);
-    E.hemi.intensity = 0.12 + day * 0.48 * (1 - E.cloud * 0.3) + E.bolt * 1.6;
+    E.hemi.intensity = 0.145 + day * 0.455 * (1 - E.cloud * 0.3) + E.bolt * 1.6;
     E.hemi.color.copy(cSky).lerp(cTmp.setRGB(1, 1, 1), 0.4);
     E.stars.position.copy(cam.position);
     E.stars.material.opacity = nightAmt * (1 - E.cloud * 0.9);

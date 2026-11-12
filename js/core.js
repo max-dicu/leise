@@ -239,6 +239,7 @@
     // Flugmaschine: pulsierendes, schwankendes Summen
     flieger(pos) { for (let i = 0; i < 4; i++) L.tn({ f: 240, fTo: 420, dur: 0.35, type: 'triangle', vol: 0.1, pos, delay: i * 0.38 }); L.tn({ f: 60, dur: 1.6, type: 'sawtooth', vol: 0.08, pos }); },
     fliegerIdle(pos) { L.tn({ f: 88, fTo: 96, dur: 1.2, type: 'sawtooth', vol: 0.07, pos, at: 0.3 }); L.tn({ f: 132, fTo: 128, dur: 1.2, type: 'triangle', vol: 0.05, pos, at: 0.3 }); },
+    teleport(pos) { L.tn({ f: 300, fTo: 2400, dur: 0.25, type: 'sine', vol: 0.18, pos }); L.tn({ f: 2400, fTo: 600, dur: 0.35, type: 'triangle', vol: 0.12, pos, delay: 0.22 }); L.nz({ dur: 0.4, f: 5000, type: 'highpass', vol: 0.12, pos }); },
     charge(pos) { L.tn({ f: 200, fTo: 1600, dur: 1.2, type: 'sawtooth', vol: 0.14, pos, at: 0.3 }); },
     ray(pos) { L.tn({ f: 900, fTo: 1300, dur: 0.35, type: 'sawtooth', vol: 0.14, pos }); L.nz({ dur: 0.35, f: 3200, type: 'highpass', vol: 0.18, pos }); },
     // tiefes Riesen-Bellen von GIGA-CAPY

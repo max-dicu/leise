@@ -929,8 +929,8 @@
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6 },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95 },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5 },
-    joyort10: { name: 'JOYOR T10', vmax: 100, acc: 9, hp: 45, kind: 'bike', scooter: true, electric: true, len: 1.3, wid: 0.6, off: 0.55 },
-    joyort6e: { name: 'JOYOR T6E Pro', vmax: 100, acc: 8.5, hp: 50, kind: 'bike', scooter: true, electric: true, len: 1.3, wid: 0.65, off: 0.65 }
+    joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55 },
+    joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65 }
   };
   const CAR_COLORS = ['#b02a2a', '#2a4a8a', '#e8e8e8', '#1a1a1a', '#7a7a7a', '#c0a020', '#2a6a3a', '#5a2a6a', '#d06a20'];
   L.buildVehicle = function (type) {
