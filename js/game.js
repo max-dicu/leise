@@ -411,6 +411,7 @@
     P.hurtFlash = Math.max(0, P.hurtFlash - dt * 0.8);
     P.fireCd -= dt;
     P.tpCd = Math.max(0, (P.tpCd || 0) - dt);
+    P.spawnProt = Math.max(0, (P.spawnProt || 0) - dt);
     if (L.cine) { if (P.vehicle) { P.vehicle.speed *= Math.max(0, 1 - dt * 2); } return; }
     if (L.hit('KeyL')) { P.flash = !P.flash; L.snd.key(); }
     if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
@@ -446,7 +447,7 @@
       P.vx += (mx * spd - P.vx) * k; P.vz += (mz * spd - P.vz) * k;
     } else if (!P.air) { P.vx *= 1 - Math.min(1, dt * 5); P.vz *= 1 - Math.min(1, dt * 5); }
     P.knockT -= dt;
-    if (sprint) P.stam = Math.max(0, P.stam - 16 * dt); else P.stam = Math.min(100, P.stam + (P.stance === 'stand' ? 11 : 15) * dt);
+    if (sprint) P.stam = Math.max(0, P.stam - (L.frenzy ? 8 : 16) * dt); else P.stam = Math.min(100, P.stam + (P.stance === 'stand' ? 11 : 15) * dt);
     // Schwimmen kostet Kraft – ohne Kraft ertrinkt man
     if (P.swim) {
       P.stam = Math.max(0, P.stam - 18 * dt);
@@ -1194,10 +1195,15 @@
   }
   // Ziel in der Raserei: nächster Spieler, der nicht im Turm ist
   function frenzyTarget(m) {
-    let best = null, bd = 450;
+    let best = null, bd = 230;
     for (const p of players()) {
       if (L.towerSafe() && L.inTower(p.x, p.z)) continue;
-      const d = L.dist(p.x, p.z, m.x, m.z); if (d < bd) { bd = d; best = p; }
+      if (p === P && P.spawnProt > 0) continue;
+      const d = L.dist(p.x, p.z, m.x, m.z);
+      // wer schleicht und nicht ganz nah ist, verschwindet aus ihrem Blick
+      const sneak = p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh);
+      if (sneak && d > 25) continue;
+      if (d < bd) { bd = d; best = p; }
     }
     return best;
   }
@@ -1223,7 +1229,7 @@
   const safeIn = (x, z) => L.towerSafe() && L.inTower(x, z);
   function monsterVictims(m) {
     const list = [];
-    if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
+    if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5 && !(P.spawnProt > 0)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
     for (const rp of RPs()) if (Math.abs(rp.x - m.x) < 5 && Math.abs(rp.z - m.z) < 5 && !safeIn(rp.x, rp.z) && (rp.y || 0) < 2.5) list.push({ e: rp, x: rp.x, z: rp.z, moving: rp.moving, sneaking: rp.stance !== 'stand' && !rp.inVeh });
     for (const n of E.npcs) if (!n.dead && Math.abs(n.x - m.x) < 4 && Math.abs(n.z - m.z) < 4) list.push({ e: n, x: n.x, z: n.z, moving: n.moving, sneaking: false });
     return list;
@@ -1312,7 +1318,7 @@
         // kurz zusammenzucken und zum Geräusch drehen, dann losrennen
         m.alertT -= dt;
         m.yaw += L.angDiff(m.yaw, Math.atan2(m.tx - m.x, m.tz - m.z)) * Math.min(1, dt * 8);
-      } else moveToward(m, m.tx, m.tz, (m.state === 'chase' ? m.spd[2] : m.spd[1]) * (L.frenzy && m.state === 'chase' ? 2.3 : 1), dt, r);
+      } else moveToward(m, m.tx, m.tz, m.state === 'chase' ? (L.frenzy ? Math.min(m.spd[2] * 1.25, 6.6) : m.spd[2]) : m.spd[1], dt, r);
       m.timer -= dt;
       if (L.dist(m.x, m.z, m.tx, m.tz) < 1.6 || m.timer <= 0) { m.state = 'search'; m.timer = L.rand(4, 7); }
     } else {
@@ -1368,7 +1374,7 @@
       m.timer -= dt;
       if (m.timer <= 0) { const p = L.pick(L.POIS); m.state = 'wander'; m.tx = L.clamp(p.x + L.rand(-p.r, p.r), -1480, 1480); m.tz = L.clamp(p.z + L.rand(-p.r, p.r), -1480, 1480); m.timer = L.rand(40, 90); }
     }
-    const spd = (m.state === 'chase' ? m.spd[2] * (L.frenzy ? 1.6 : 1) : m.state === 'investigate' ? m.spd[1] : m.state === 'wander' ? m.spd[0] : 0);
+    const spd = (m.state === 'chase' ? m.spd[2] * (L.frenzy ? 1.1 : 1) : m.state === 'investigate' ? m.spd[1] : m.state === 'wander' ? m.spd[0] : 0);
     if (spd > 0) {
       m.yaw += L.angDiff(m.yaw, Math.atan2(m.tx - m.x, m.tz - m.z)) * Math.min(1, dt * 1.5);
       m.x += Math.sin(m.yaw) * spd * dt; m.z += Math.cos(m.yaw) * spd * dt; L.clampWorld(m);
@@ -1422,8 +1428,8 @@
     if (v === P) {
       const sneaking = P.stance !== 'stand' && !P.vehicle;
       const D = MK[m.kind];
-      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.5 : 1) : 999;
-      if (P.vehicle) dmg = D.veh * dmul * (L.frenzy ? 1.5 : 1);
+      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.15 : 1) : 999;
+      if (P.vehicle) dmg = D.veh * dmul * (L.frenzy ? 1.15 : 1);
       const k = D.knock;
       L.blood(P.x, 1.3, P.z, 25, true);
       L.snd.splat({ x: P.x, y: 1, z: P.z });
@@ -1435,8 +1441,8 @@
     } else if (isRemote(v)) {
       const sneaking = v.stance !== 'stand' && !v.inVeh;
       const D = MK[m.kind];
-      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.5 : 1) : 999;
-      if (v.inVeh) dmg = D.veh * dmul * (L.frenzy ? 1.5 : 1);
+      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.15 : 1) : 999;
+      if (v.inVeh) dmg = D.veh * dmul * (L.frenzy ? 1.15 : 1);
       const k = D.knock;
       hurtRemote(v, dmg, m.kind === 'viktor' ? 'Viktor hat dich erwischt' : D.cause, dx / d * k, dz / d * k, D.up, sneaking);
       L.blood(v.x, 1.3, v.z, 20, true); L.snd.splat({ x: v.x, y: 1, z: v.z });
@@ -2009,7 +2015,7 @@
     }
     const lv = (b.lvl || 0) + 1;
     L.banner("MAMA IVA ENTSTEHT – STUFE " + lv, (lv > 1 ? "Schneller und stärker als letztes Mal! " : "") + "Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte (Karte: M)");
-    L.msg('🗼 Nur im Turm bist du vor den Monstern sicher – aber sei dort leise, sonst reißt MAMA IVA ihn ein!', 9000);
+    L.msg('🗼 Turm = sicher (aber leise sein!). Tipp: Sprinte weg und duck dich dann (C) – so verlieren die Monster deine Spur.', 9000);
     if (L.cineBossAppear) L.cineBossAppear(b);
   };
   // Aufsteigen / Versinken: gemeinsame Optik für Host und Mitspieler
@@ -2064,7 +2070,7 @@
       let best = null, bd = 1e9;
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
-        if (!loud || safeIn(t.x, t.z)) continue;
+        if (!loud || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
         const d = L.dist(t.x, t.z, b.x, b.z); if (d < bd) { bd = d; best = t; }
       }
       if (best) { b.tx = best.x; b.tz = best.z; }
@@ -2223,7 +2229,7 @@
       let best = null, bd = 1e9;
       for (const t of players()) {
         const loud = t === P ? (P.stance === 'stand' || P.vehicle) : (t.stance === 'stand' || t.inVeh);
-        if (!loud || safeIn(t.x, t.z)) continue;
+        if (!loud || safeIn(t.x, t.z) || (t === P && P.spawnProt > 0)) continue;
         const d = L.dist(t.x, t.z, w.x, w.z); if (d < bd) { bd = d; best = t; }
       }
       if (best) { w.tx = best.x; w.tz = best.z; }
@@ -2448,6 +2454,9 @@
       if (left > 0) L.save.stash.push(Object.assign({}, it, { count: left }));
     }
     const sp = L.pick(L.spawnSpots); P.x = sp[0]; P.z = sp[1]; P.yaw = P.camYaw = Math.random() * 6.28;
+    // Schutz nach dem Start: Monster und Bosse lassen dich kurz in Ruhe
+    P.spawnProt = 25;
+    setTimeout(() => L.msg((L.frenzy ? '🛡️ 25 Sekunden Schutz – lauf zum 🗼 Turm oder schnapp dir ein Fahrzeug!' : '🛡️ 25 Sekunden Schutz nach dem Start.'), 6000), 1200);
     // Einmal-Bonus: im sicheren Turm starten (nur über den geheimen Link, nur einmal pro Gerät)
     if (L.save.towerSpawnPending) {
       L.save.towerSpawnPending = false; L.persist();
