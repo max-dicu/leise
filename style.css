@@ -70,6 +70,10 @@ button { font: inherit; cursor: pointer; }
 #weather { font-size: 16px; color: var(--dim); }
 #bossTimer { font-size: 15px; color: #ff8a7a; margin-top: 4px; }
 #towerNav { position: fixed; top: 92px; left: 50%; transform: translateX(-50%); background: rgba(120, 0, 0, .75); border: 2px solid #ff4040; color: #fff; font-size: 18px; padding: 6px 14px; border-radius: 10px; z-index: 5; animation: tnPulse 1s infinite alternate; white-space: nowrap; }
+#wpNav { position: fixed; top: 140px; left: 50%; transform: translateX(-50%); background: rgba(80, 20, 110, .8); border: 2px solid #c040ff; color: #fff; font-size: 16px; padding: 4px 12px; border-radius: 10px; z-index: 5; white-space: nowrap; }
+#wpArrow { display: inline-block; font-size: 22px; color: #e8a0ff; }
+body.touch #wpNav { top: 150px; font-size: 13px; }
+#bigmap { cursor: crosshair; }
 #tnArrow { display: inline-block; font-size: 24px; color: #ffdd55; transition: transform .1s; }
 @keyframes tnPulse { from { box-shadow: 0 0 6px #f00; } to { box-shadow: 0 0 22px #f44; } }
 body.touch #towerNav { top: 104px; font-size: 14px; padding: 4px 10px; }

@@ -167,6 +167,7 @@
     const toM = (x, z) => [S / 2 + (x - P.x) / view * S, S / 2 + (z - P.z) / view * S];
     for (const I of L.ISL || []) { const [ix, iy] = toM(I.x, I.z), ir = I.r / view * S; if (ix + ir < 0 || ix - ir > S || iy + ir < 0 || iy - ir > S) continue; g.fillStyle = I.ground[0]; g.beginPath(); g.arc(ix, iy, ir, 0, 6.28); g.fill(); }
     g.drawImage(L.mapCanvas, (P.x + L.HALF) * k - src / 2, (P.z + L.HALF) * k - src / 2, src, src, 0, 0, S, S);
+    L.drawRoute(g, toM, 3);
     g.font = '14px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const p of L.POIS) { const [x, y] = toM(p.x, p.z); if (x > -10 && x < S + 10 && y > -10 && y < S + 10) g.fillText(p.icon, x, y); }
     g.fillStyle = '#ddd';
@@ -209,14 +210,25 @@
     g.font = 'bold 13px sans-serif'; g.fillStyle = '#fff'; g.fillText('🏠 Heimat (Altheim)', toM(0, 0)[0], toM(0, 0)[1]);
     { const [x, y] = toM(L.PORTAL.x, L.PORTAL.z); g.font = '26px sans-serif'; g.fillText('🌀', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#d0a0ff'; g.fillText('PORTAL (Tiefsee – nur mit U-Boot)', x, y + 20); }
     for (const v of L.ents.vehicles) if (v.t.sub || v.t.plane) { const [x, y] = toM(v.x, v.z); g.font = '18px sans-serif'; g.fillText(v.t.sub ? '⚓' : '✈️', x, y); }
+    L.bigMapXform = { k, ox: W };
+    L.drawRoute(g, toM, 3);
     const [px, py] = toM(P.x, P.z); arrow(g, px, py, P.vehicle ? P.vehicle.yaw : P.yaw, 9, '#ffdd33');
     g.font = 'bold 14px sans-serif'; g.fillStyle = '#ffdd33'; g.fillText('WELTKARTE – Inseln erreichst du mit dem Flugzeug oder dem fliegenden JOYOR T10', S / 2, 16);
   }
+  // Klick / Tippen auf die große Karte setzt einen Wegpunkt
+  $('bigmap').addEventListener('click', (e) => {
+    const c = $('bigmap'), r = c.getBoundingClientRect(), X = L.bigMapXform; if (!X) return;
+    const px = (e.clientX - r.left) * c.width / r.width, py = (e.clientY - r.top) * c.height / r.height;
+    L.setWaypoint(px / X.k - X.ox, py / X.k - X.ox);
+    drawBigMap();
+  });
   function drawBigMap() {
     if (Math.max(Math.abs(P.x), Math.abs(P.z)) > L.HALF + 200) { drawWorldMap(); return; }
     const c = $('bigmap'), g = c.getContext('2d'), S = c.width, k = S / (L.HALF * 2);
     g.drawImage(L.mapCanvas, 0, 0, S, S);
     const toM = (x, z) => [(x + L.HALF) * k, (z + L.HALF) * k];
+    L.bigMapXform = { k, ox: L.HALF };
+    L.drawRoute(g, toM, 4);
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (const p of L.POIS) {
       const [x, y] = toM(p.x, p.z);
@@ -259,6 +271,13 @@
       const fwd = dx * sy + dz * cy, right = dx * -cy + dz * sy;
       $('tnArrow').style.transform = 'rotate(' + Math.atan2(right, fwd).toFixed(2) + 'rad)';
       $('tnDist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
+    }
+    const wn = $('wpNav'), wp = L.waypoint;
+    wn.hidden = !wp;
+    if (wp) {
+      const dx = wp.x - P.x, dz = wp.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
+      $('wpArrow').style.transform = 'rotate(' + Math.atan2(dx * -cy + dz * sy, dx * sy + dz * cy).toFixed(2) + 'rad)';
+      const d = Math.hypot(dx, dz); $('wpDist').textContent = d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m';
     }
     // Bildrauschen (Der Gesichtslose)
     const sf = $('staticFx'), sa = L.staticAmt || 0;

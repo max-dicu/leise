@@ -2732,6 +2732,7 @@
     L.updateDuel(dt);
     L.updateIslands(dt);
     L.updateOcean2(dt);
+    L.updateWaypoint(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);
