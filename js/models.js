@@ -1159,8 +1159,10 @@
     sportwagen: { name: 'Sportwagen', vmax: 260, acc: 12, hp: 90, kind: 'car', len: 4.4, wid: 1.9, off: 0.45, h: 1.2 },
     pickup: { name: 'Pickup', vmax: 165, acc: 6.8, hp: 160, kind: 'car', len: 5.2, wid: 2.0, off: 0.85, h: 1.8 },
     jeep: { name: 'Militär-Jeep', vmax: 135, acc: 7, hp: 230, kind: 'car', len: 4.3, wid: 2.0, off: 0.95, h: 1.7 },
-    motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6 },
-    cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95 },
+    motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6, wheelie: true },
+    cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95, wheelie: true },
+    quad: { name: 'Straßen-Quad', vmax: 165, acc: 14, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.25, off: 0.75 },
+    atv: { name: 'Gelände-ATV', vmax: 125, acc: 12, hp: 140, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.3, off: 1 },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5 },
     jetski: { name: 'Jetski', vmax: 110, acc: 13, hp: 60, kind: 'bike', boat: true, len: 3, wid: 1.2, off: 1 },
     motorboot: { name: 'Motorboot', vmax: 85, acc: 7, hp: 140, kind: 'car', boat: true, len: 7, wid: 2.6, off: 1, h: 2 },
@@ -1170,11 +1172,12 @@
     flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55 },
     nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true },
-    schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true },
+    schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true, wheelie: true },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65 }
   };
   const CAR_COLORS = ['#b02a2a', '#2a4a8a', '#e8e8e8', '#1a1a1a', '#7a7a7a', '#c0a020', '#2a6a3a', '#5a2a6a', '#d06a20'];
-  L.buildVehicle = function (type) {
+  L.buildVehicle = function (type, cust) {
+    if (L.CUSTOM_TYPES && L.CUSTOM_TYPES[type] && L.buildCustomVehicle) return L.buildCustomVehicle(type, cust);
     const t = L.VTYPES[type], root = new T.Group(), box = G().box;
     const color = type === 'jeep' ? '#4a5a3a' : L.pick(CAR_COLORS);
     const wheels = [], steer = [];

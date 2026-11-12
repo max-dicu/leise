@@ -33,7 +33,7 @@
     </div>
     <div id="tCar" hidden>
       <button id="tZoomC" data-act="zoom" title="Kamera">🎥</button>
-      <button id="tTele" data-k="KeyT" title="Teleport">🌀</button><button id="tUp" data-k="KeyE" title="Steigen">⬆️</button><button id="tDown" data-k="KeyC" title="Sinken">⬇️</button>
+      <button id="tTele" data-k="KeyT" title="Teleport">🌀</button><button id="tWheel" data-k="ShiftLeft" title="Wheelie">🤸</button><button id="tCust" data-k="KeyK" title="Customizen">🔧</button><button id="tUp" data-k="KeyE" title="Steigen">⬆️</button><button id="tDown" data-k="KeyC" title="Sinken">⬇️</button>
       <button id="tBrake" class="big" data-k="Space" title="Handbremse / Driften">🛑</button>
       <button id="tBelt" data-k="KeyB" title="Anschnallen">🔒</button>
       <button id="tHorn" data-k="KeyH" title="Hupe">📯</button>
@@ -153,6 +153,8 @@
     $('tCar').hidden = !inV; $('tAct').hidden = inV; $('tFoot').hidden = inV;
     $('tBelt').hidden = !inV || P.vehicle.t.kind !== 'car';
     $('tTele').hidden = !inV || !P.vehicle.t.teleport || P.seat > 0;
+    $('tWheel').hidden = !inV || !P.vehicle.t.wheelie || P.seat > 0;
+    $('tCust').hidden = !(L.wsHint && L.wsHint());
     $('tDown').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane || P.vehicle.t.sub) || P.seat > 0;
     $('tUp').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane || P.vehicle.t.sub) || P.seat > 0;
     $('tBrake').textContent = inV && P.vehicle.t.sub ? '🚀' : '🛑';

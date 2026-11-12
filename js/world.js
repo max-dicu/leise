@@ -677,7 +677,7 @@
   }
   // Viele zusätzliche E-Roller und Motorräder (Gehwege in der Stadt und bei allen Orten)
   function extraBikes() {
-    const types = ['joyort10', 'joyort6e', 'joyort10', 'joyort6e', 'motorrad', 'cross', 'joyort10', 'joyort6e', 'motorrad', 'cross'];
+    const types = ['joyort10', 'joyort6e', 'joyort10', 'joyort6e', 'motorrad', 'cross', 'joyort10', 'joyort6e', 'motorrad', 'cross', 'quad', 'atv', 'quad', 'atv'];
     let placed = 0, tries = 0;
     while (placed < 90 && tries++ < 3000) {
       let x, z;

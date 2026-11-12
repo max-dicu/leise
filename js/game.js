@@ -742,6 +742,7 @@
     const it = nearestItem();
     if (it) return it.note !== undefined ? 'E: Zettel lesen' : `E: ${ITEMS[it.type].name}${it.count > 1 ? ' ×' + it.count : ''} aufheben`;
     const ch = L.cruiseHint && L.cruiseHint(); if (ch) return ch;
+    const wh = L.wsHint && L.wsHint(); if (wh) return wh;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) return 'E: ' + L.containerName(cont) + ' öffnen';
     const v = nearestVehicle();
@@ -818,9 +819,9 @@
   }
   function spawnVehicle(sp) {
     const t = L.VTYPES[sp.type]; if (!t) return;
-    const rig = L.buildVehicle(sp.type); L.scene.add(rig.root);
+    const rig = L.buildVehicle(sp.type, sp.cust); L.scene.add(rig.root);
     const hp = sp.hp !== undefined ? sp.hp : sp.worn ? Math.round(t.hp * L.rand(0.45, 1)) : t.hp;
-    const v = { type: sp.type, t, rig, x: sp.x, z: sp.z, yaw: sp.yaw, speed: 0, steer: 0, hp, wheel: 0, lean: 0 };
+    const v = { type: sp.type, t, rig, x: sp.x, z: sp.z, yaw: sp.yaw, speed: 0, steer: 0, hp, wheel: 0, lean: 0, cust: sp.cust || null };
     v.id = sp.id || NID++; v.key = 'v' + v.id; L.byId.set(v.key, v);
     E.vehicles.push(v);
     rig.root.position.set(sp.x, 0, sp.z); rig.root.rotation.y = sp.yaw;
@@ -833,6 +834,8 @@
     if (NET() !== 'solo') L.mp.send({ t: 'venter', id: v.id, seat });
     L.snd.key();
     if (seat > 0) { L.msg(`👥 Du fährst bei ${driverName(v)} mit${v.t.kind === 'car' ? ' – B zum Anschnallen!' : ' – halt dich fest!'}`); return; }
+    if (L.onEnterVehicle) L.onEnterVehicle(v);
+    if (v.t.wheelie) { L.msg(`${v.t.quad ? '🏍️' : '🏍️'} ${v.t.name} – Shift halten = Wheelie! Ohne Gurt, fahr vorsichtig.`); L.snd.key(); return; }
     L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
     L.snd.key();
   }
@@ -947,6 +950,7 @@
     if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
     if (t.sub) L.updateSub(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight), !block && L.hit('Space'));
     if (t.plane) updatePlane(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
+    v.whIn = !block && t.wheelie && !t.fly && (L.keys.ShiftLeft || L.keys.ShiftRight);
     driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space && !t.sub, true);
     if (!P.vehicle) return;
     P.x = v.x; P.z = v.z; P.y = v.alt || 0;
@@ -964,6 +968,7 @@
     r.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') r.root.rotation.z = 0;
     r.root.rotateZ(-v.lean);
+    if (v.wh > 0) { v.rig.root.updateMatrixWorld(); const sp = new T.Vector3(s.x, s.y, s.z).applyMatrix4(v.rig.root.matrixWorld); r.root.position.copy(sp); r.root.rotateX(-v.wh); }
     L.setHeld(r, null);
     P.animSt = { mode: t.scooter ? 'scooter' : t.kind === 'bike' ? 'ride' : 'sit' };
     L.animHuman(r, P.animSt);
@@ -1073,10 +1078,23 @@
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
-    v.lean = t.kind === 'bike' ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
+    v.lean = t.kind === 'bike' && !t.quad ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
     v.rig.root.position.set(v.x, t.sub || t.boat ? (alt || 0) : alt > 0 ? alt : Math.max(L.WATER_Y + 0.5, Math.max(L.seaFloor(v.x, v.z), L.inDim(v.x) ? 0 : -2.2)), v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
+    // Wheelie: Shift halten (Motorrad, Crossmaschine, Schattenrad, Quads) – Vorderrad hoch, hinteres Rad bleibt am Boden
+    if (t.wheelie) {
+      const can = v.whIn && v.speed > 3 && !(alt > 0.5) && v.hp > 0;
+      const want = can ? (thr > 0 ? 0.62 : 0.42) : 0;
+      v.wh = (v.wh || 0) + (want - (v.wh || 0)) * Math.min(1, dt * (want > (v.wh || 0) ? 2.4 : 4));
+      if (v.wh < 0.003) v.wh = 0;
+      if (v.wh > 0) {
+        const zr = t.len * 0.36, wfx = Math.sin(v.yaw), wfz = Math.cos(v.yaw);
+        v.rig.root.position.y += zr * Math.sin(v.wh); v.rig.root.position.x -= wfx * zr * (1 - Math.cos(v.wh)); v.rig.root.position.z -= wfz * zr * (1 - Math.cos(v.wh));
+        v.rig.root.rotateX(-v.wh);
+      }
+      if (isPlayer) { if (v.wh > 0.3) v.whT = (v.whT || 0) + dt; else if (v.whT > 0) { if (v.whT > 2) L.msg('🤸 Wheelie: ' + v.whT.toFixed(1) + ' Sekunden!', 2000); v.whT = 0; } }
+    }
     if (alt > 0.5 && v.vy) v.rig.root.rotateX(-L.clamp(v.vy / 40, -0.3, 0.3));
     if (t.plane && alt > 0.5) v.rig.root.rotateZ(-v.steer * 0.45);
     if (t.boat) { v.rig.root.rotateX(-L.clamp(v.speed / 60, -0.12, 0.25)); v.rig.root.rotateZ(Math.sin(performance.now() / 700 + v.x) * 0.04 - v.steer * 0.08); if (Math.abs(v.speed) > 3 && Math.random() < dt * 20) L.fx('#f0f8ff', v.x - Math.sin(v.yaw) * t.len * 0.5, L.WATER_Y + 0.2, v.z - Math.cos(v.yaw) * t.len * 0.5, 2, 2, { size: 0.4, life: 0.8 }); }
@@ -1285,11 +1303,12 @@
   }
   // Monster bleiben draußen vor dem Turm
   function keepOutOfTower(e) {
+    if (L.wsKeepOut) L.wsKeepOut(e);
     if (!L.towerSafe() || !L.inTower(e.x, e.z, 1.5)) return;
     const T0 = L.TOWER, dx = e.x - T0.x, dz = e.z - T0.z, lim = T0.half + 1.5;
     if (Math.abs(dx) > Math.abs(dz)) e.x = T0.x + Math.sign(dx || 1) * lim; else e.z = T0.z + Math.sign(dz || 1) * lim;
   }
-  const safeIn = (x, z) => L.towerSafe() && L.inTower(x, z);
+  const safeIn = (x, z) => (L.towerSafe() && L.inTower(x, z)) || (L.wsSafe ? L.wsSafe(x, z) : false);
   function monsterVictims(m) {
     const list = [];
     if (P.alive && !P.gone && !safeIn(P.x, P.z) && (P.y || 0) < 2.5 && !(P.spawnProt > 0)) list.push({ e: P, x: P.x, z: P.z, moving: Math.hypot(P.vx, P.vz) > 0.4 || (P.vehicle && Math.abs(P.vehicle.speed) > 0.5), sneaking: P.stance !== 'stand' && !P.vehicle });
@@ -2523,7 +2542,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2696,6 +2715,7 @@
     if (NET() !== 'solo') L.mp.send({ t: 'done', result, why });
     const items = L.allPlayerItems();
     if (result === 'escape') L.save.stats.escapes++; else L.save.stats.deaths++;
+    if (L.roundCoins) L.roundCoins(result);
     L.save.safe = P.safe ? Object.assign({}, P.safe) : null;
     L.persist();
     L.ui.showEnd(result, why, items);
@@ -2778,6 +2798,7 @@
     L.updateNav(dt);
     L.updateInteriors(dt);
     L.updateExtras(dt);
+    if (L.updateWorkshop) L.updateWorkshop(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);

@@ -125,13 +125,20 @@
     $('mpStart').hidden = !(N.role === 'host' && others.length > 0 && !mp.anyInRound());
     if (idle) return;
     const list = [`<span style="color:${mp.color(N.pid)}">● ${esc(myName())} (du${N.role === 'host' ? ', Host' : ''})</span>`]
-      .concat(others.sort((a, b) => a.pid - b.pid).map((r) => `<span style="color:${mp.color(r.pid)}">● ${esc(r.name)}${r.pid === 0 ? ' (Host)' : ''}${r.inRound ? ' – spielt gerade' : ''}</span>`));
+      .concat(others.sort((a, b) => a.pid - b.pid).map((r) => `<span style="color:${mp.color(r.pid)}">● ${esc(r.name)}${r.pid === 0 ? ' (Host)' : ''}${r.inRound ? ' – spielt gerade' : ''}</span> <button class="giftc" data-pid="${r.pid}" style="font-size:12px;padding:2px 6px;border-radius:6px;cursor:pointer">🪙 schenken</button>`));
     let head = '';
     if (N.role === 'host') head = N.peer && N.peer.open ? `Raum-Code:<div class="bigcode">${N.code}</div>Bis zu ${MAXP} Spieler. Gib den Code deinen Freunden.` : '⏳ Raum wird erstellt …';
     else head = N.connected ? '✅ Verbunden. Warte, bis der Host die Runde startet …' : '⏳ Verbinde …';
     status(`${head}<div class="plist">Spieler (${others.length + 1}/${MAXP}):<br>${list.join('<br>')}</div>` + (N.role === 'host' && mp.anyInRound() ? '<br>⏳ Es läuft noch eine Runde. Warte, bis alle fertig sind.' : ''));
   }
   mp.renderLobby = renderLobby;
+  // Münzen an Mitspieler in der Lobby schenken
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.giftc'); if (!b) return;
+    const pid = +b.dataset.pid, r = RM.get(pid);
+    const n = prompt('Wie viele Münzen willst du ' + (r ? r.name : 'dem Spieler') + ' schenken? (du hast ' + L.save.coins + ')', '50');
+    if (n !== null && L.giftCoins) L.giftCoins(pid, n);
+  });
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
   $('mpHost').onclick = () => mp.host();
   $('mpJoin').onclick = () => mp.join($('mpCode').value);
@@ -336,6 +343,8 @@
         L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);
         addChat('System', m.result === 'escape' ? nameOf(from) + ' ist entkommen' : nameOf(from) + ' ist gestorben', true);
         renderLobby(); break;
+      case 'coins': if (L.gotCoins) L.gotCoins(m.n, nameOf(from)); break;
+      case 'vcust': { const v = L.byId.get('v' + m.id); if (v && L.applyCustom) L.applyCustom(v, m.c, false); if (host) forward(from, m); break; }
       case 'gift': {
         const it = m.it || {}, d = L.ITEMS[it.type]; if (!d) break;
         const left = L.giveItem(it.type, it.count, it.mag === null ? undefined : it.mag);
@@ -432,7 +441,7 @@
       round: { code: Rd.code, found: Rd.found, bossT: Rd.bossT, gate: Rd.gate, radio: Rd.radio, bunkerOpen: Rd.bunkerOpen },
       env: { time: L.env.time, weather: L.env.weather },
       items: E.items.map((it) => [it.id, it.type, r2(it.x), r2(it.z), it.count, it.mag === undefined ? null : it.mag, it.note === undefined ? null : it.note]),
-      veh: E.vehicles.map((v) => [v.id, v.type, r2(v.x), r2(v.z), r2(v.yaw), Math.round(v.hp)]),
+      veh: E.vehicles.map((v) => [v.id, v.type, r2(v.x), r2(v.z), r2(v.yaw), Math.round(v.hp), v.cust || null]),
       mon: E.monsters.map((m) => [m.id, m.kind, m.variant || null, r1(m.x), r1(m.z), r2(m.yaw)]),
       walk: E.walkers.map((w) => [w.id, r1(w.x), r1(w.z), r2(w.yaw)]),
       npc: E.npcs.map((n) => [n.id, r1(n.x), r1(n.z), n.app, n.weapon])
@@ -467,7 +476,7 @@
     L._bulk = true;
     for (const a of d.items) L.spawnItem(a[1], a[2], a[3], a[4], a[5] === null ? undefined : a[5], a[6] === null ? undefined : a[6], a[0]);
     L._bulk = false;
-    for (const a of d.veh) g.spawnVehicle({ id: a[0], type: a[1], x: a[2], z: a[3], yaw: a[4], hp: a[5] });
+    for (const a of d.veh) g.spawnVehicle({ id: a[0], type: a[1], x: a[2], z: a[3], yaw: a[4], hp: a[5], cust: a[6] || undefined });
     for (const a of d.mon) { const m = g.spawnMonster(a[1], a[3], a[4], a[2] || undefined, a[0]); m.yaw = a[5]; m.rig.root.visible = false; }
     for (const a of d.walk) { const w = g.spawnWalker(a[1], a[2], a[0]); w.yaw = a[3]; g.initGait(w, w.rig); }
     for (const a of d.npc) { const n = g.spawnNpc(a[1], a[2], false, a[0], a[3], a[4]); n.rig.root.visible = false; }

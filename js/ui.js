@@ -396,7 +396,7 @@
       if (!endItems.length) list.innerHTML = '<p class="small">Du hattest nichts dabei.</p>';
     };
     render();
-    $('endInfo').textContent = (P.safe ? `🔒 Im Tresor sicher: ${L.ITEMS[P.safe.type].name}. ` : '') + (result === 'escape' ? `Versteck: ${L.save.stash.length}/${MAX_STASH} belegt.` : '');
+    $('endInfo').textContent = (L.coinEndText ? L.coinEndText() + ' ' : '') + (P.safe ? `🔒 Im Tresor sicher: ${L.ITEMS[P.safe.type].name}. ` : '') + (result === 'escape' ? `Versteck: ${L.save.stash.length}/${MAX_STASH} belegt.` : '');
     show('endScreen');
   };
   $('endOk').onclick = () => {
