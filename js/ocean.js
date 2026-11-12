@@ -156,7 +156,7 @@
   // Ortswechsel am Ende des Kurzfilms (oder sofort, wenn er übersprungen wurde)
   function doTravel() {
     const toDim = pending.toDim; pending = null;
-    const c = toDim ? L.dimCheckpoint() : { x: 1540, z: 200 };
+    const c = toDim ? L.dimCheckpoint() : { x: 1490, z: 200 };
     P.x = c.x; P.z = c.z; P.y = toDim ? 0.5 : 0; P.vx = P.vz = P.vy = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 15);
     L.msg(toDim ? '🌌 Willkommen in der Dimension. Fall nicht in die Leere!' : '🏠 Du bist wieder in der Heimat.', 6000);
   }

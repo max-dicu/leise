@@ -709,7 +709,7 @@
   }
   function nearestVehicle() {
     let best = null, bd = 3.8;
-    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z); if (d < bd && v.hp > 0 && seatFor(v) >= 0) { bd = d; best = v; } }
+    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z) - (v.t.len > 6 ? 3.5 : 0); if (d < bd && v.hp > 0 && seatFor(v) >= 0) { bd = d; best = v; } }
     return best;
   }
   L.interactHint = function () {
@@ -2579,7 +2579,7 @@
     }
     for (const v of L.vehSpots) spawnVehicle(v);
     // U-Boot im Wasser vor dem Oststrand (auf der Karte markiert)
-    spawnVehicle({ type: 'uboot', x: 1585, z: 200, yaw: Math.PI / 2 });
+    spawnVehicle({ type: 'uboot', x: 1546, z: 200, yaw: Math.PI / 2 });
     // genau ein Flugzeug, irgendwo auf freiem Land
     for (let i = 0; i < 80; i++) {
       const x = L.rand(-1300, 1300), z = L.rand(-1300, 1300);
