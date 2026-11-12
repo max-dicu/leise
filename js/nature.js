@@ -94,11 +94,14 @@
     }
     // neuer Tornado: bei Gewitter öfter
     if (!isClient() && L.round && !L.round.over) {
-      L.round.torT = (L.round.torT === undefined ? L.rand(200, 320) : L.round.torT) - dt * (L.env.weather === 'gewitter' ? 3 : 1);
-      if (L.round.torT <= 0 && tors.length < 2) {
-        L.round.torT = L.rand(300, 480);
-        const a = Math.random() * 6.28, d = L.rand(350, 700);
-        L.spawnTornado(L.clamp(P.x + Math.sin(a) * d, -1400, 1400), L.clamp(P.z + Math.cos(a) * d, -1400, 1400));
+      L.round.torT = (L.round.torT === undefined ? L.rand(90, 180) : L.round.torT) - dt * (L.env.weather === 'gewitter' ? 3 : 1);
+      if (L.round.torT <= 0 && tors.length < 3) {
+        L.round.torT = L.rand(150, 300);
+        for (let i = 0; i < 30; i++) {
+          const x = L.rand(-1400, 1400), z = L.rand(-1400, 1400);
+          if (L.dist(x, z, P.x, P.z) < 250 || (L.inTower && L.inTower(x, z, 40))) continue;
+          L.spawnTornado(x, z); break;
+        }
       }
     }
   }
@@ -119,7 +122,7 @@
     g.rotation.y = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : Math.PI;
     tsu = { side, t: -TSU_WARN, g, wall, front, foam, hitT: 0 };
     const name = ['Westen', 'Osten', 'Süden'][side];
-    L.banner('🌊 TSUNAMI-WARNUNG', `Eine Riesenwelle kommt aus dem ${name}! Weg von der Küste – ins Landesinnere, in den Turm oder hoch hinaus!`);
+    L.banner('🌊 TSUNAMI-WARNUNG', `Eine Riesenwelle rollt aus dem ${name} über die ganze Karte! Rette dich in den 🗼 Turm, flieg mit dem T10 hoch oder setz dich ins Auto!`);
     for (let k = 0; k < 6; k++) setTimeout(() => L.snd.alarm({ x: P.x, y: 5, z: P.z }), k * 1300);
     if (send && isHost()) L.mp.send({ t: 'tsu', side });
   };
@@ -137,15 +140,15 @@
     }
     const S = tsu; S.t += dt;
     const fp = frontPos(Math.max(0, S.t));
-    const stopAt = 1500 - TSU_INLAND, tStop = (L.FAR - stopAt) / TSU_SPEED;
+    const stopAt = -1520, tStop = (L.FAR - stopAt) / TSU_SPEED;
     const front = S.t < tStop ? fp : stopAt;
-    // Höhe: rollt mit voller Höhe übers Meer, schrumpft an Land, dann läuft sie aus
-    const landK = L.clamp((1500 - front) / TSU_INLAND, 0, 1);
-    let h = TSU_H * (1 - landK * 0.45);
+    // Höhe: volle Höhe übers Meer, wird über das Land langsam etwas kleiner, läuft am anderen Ende aus
+    const landK = L.clamp((1500 - front) / 3000, 0, 1);
+    let h = TSU_H * (1 - landK * 0.5);
     if (S.t >= tStop) h *= Math.max(0, 1 - (S.t - tStop) / 6);
     if (S.t < 0) h = 0;
     // Mesh: Welle steht quer zur Seite, Wasser dahinter bis zum Meer
-    const depthBehind = L.FAR + 300 - front;
+    const depthBehind = Math.min(L.FAR + 300 - front, front > 1500 ? 1e9 : 90);
     const g = S.g;
     g.visible = S.t > -2;
     const cx = S.side === 0 ? -front : S.side === 1 ? front : 0, cz = S.side === 2 ? front : 0;
@@ -167,7 +170,7 @@
       const v = P.vehicle;
       if (v && !(P.seat > 0)) { v.x += dir[0] * 14 * dt; v.z += dir[1] * 14 * dt; v.speed *= 0.9; }
       else if (!v) { P.vx = dir[0] * 14; P.vz = dir[1] * 14; P.knockT = 0.5; }
-      L.hurtPlayer(22 * dt * (L.md ? L.md.dmg : 1), 'Vom Tsunami mitgerissen');
+      L.hurtPlayer(30 * dt * (P.vehicle ? 0.5 : 1) * (L.md ? L.md.dmg : 1), 'Vom Tsunami mitgerissen');
       if (!(S.msgT > 0)) { S.msgT = 4; L.msg('🌊 Die Welle reißt dich mit!', 2500); }
     }
     S.msgT = (S.msgT || 0) - dt;

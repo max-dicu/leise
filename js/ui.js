@@ -226,6 +226,15 @@
   const MODE_TXT = { idle: '🧍 Stehen', walk: '🚶 Gehen', run: '🏃 Rennen', crouch: '🧎 Schleichen', crawl: '🐛 Kriechen' };
   ui.hud = function (dt) {
     hudT -= dt;
+    // Wegweiser zum Turm, solange MAMA IVA da ist
+    const tn = $('towerNav');
+    tn.hidden = !L.towerCall;
+    if (L.towerCall) {
+      const dx = L.TOWER.x - P.x, dz = L.TOWER.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
+      const fwd = dx * sy + dz * cy, right = dx * -cy + dz * sy;
+      $('tnArrow').style.transform = 'rotate(' + Math.atan2(right, fwd).toFixed(2) + 'rad)';
+      $('tnDist').textContent = Math.round(Math.hypot(dx, dz)) + ' m';
+    }
     // Bildrauschen (Der Gesichtslose)
     const sf = $('staticFx'), sa = L.staticAmt || 0;
     sf.style.opacity = sa > 0.02 ? Math.min(0.85, sa).toFixed(2) : '0';

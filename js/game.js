@@ -1409,8 +1409,8 @@
     if (v === P) {
       const sneaking = P.stance !== 'stand' && !P.vehicle;
       const D = MK[m.kind];
-      let dmg = sneaking ? D.dmg * dmul : 999;
-      if (P.vehicle) dmg = D.veh * dmul;
+      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.5 : 1) : 999;
+      if (P.vehicle) dmg = D.veh * dmul * (L.frenzy ? 1.5 : 1);
       const k = D.knock;
       L.blood(P.x, 1.3, P.z, 25, true);
       L.snd.splat({ x: P.x, y: 1, z: P.z });
@@ -1422,8 +1422,8 @@
     } else if (isRemote(v)) {
       const sneaking = v.stance !== 'stand' && !v.inVeh;
       const D = MK[m.kind];
-      let dmg = sneaking ? D.dmg * dmul : 999;
-      if (v.inVeh) dmg = D.veh * dmul;
+      let dmg = sneaking ? D.dmg * dmul * (L.frenzy ? 1.5 : 1) : 999;
+      if (v.inVeh) dmg = D.veh * dmul * (L.frenzy ? 1.5 : 1);
       const k = D.knock;
       hurtRemote(v, dmg, m.kind === 'viktor' ? 'Viktor hat dich erwischt' : D.cause, dx / d * k, dz / d * k, D.up, sneaking);
       L.blood(v.x, 1.3, v.z, 20, true); L.snd.splat({ x: v.x, y: 1, z: v.z });
@@ -2224,6 +2224,9 @@
     updateSmoke(dt);
     updateCyls(dt);
     L.updateNature(dt);
+    // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
+    L.towerCall = !!(L.boss && !L.boss.dead && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
+    L.setTowerGlow(L.towerCall);
     L.updateFusion(dt);
     L.updateTower(dt);
     // Musik je nach Lage

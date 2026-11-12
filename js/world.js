@@ -280,7 +280,19 @@
     B(-hf, -hf, hf, -hf + 0.8); B(-hf, -hf, -hf + 0.8, hf); B(hf - 0.8, -hf, hf, hf); B(-hf, hf - 0.8, -3, hf); B(3, hf - 0.8, hf, hf);
     L.mapRects.push({ x: cx, z: cz, w: hf * 2, d: hf * 2, c: '#2a6ad0' });
     sign('TURM · SICHERER ORT', cx, 6.4, cz + hf + 0.12, 10, 1.4, 0, '#123', '#7cf');
+    // rotes Leuchten: Hülle um den Turm und eine Lichtsäule in den Himmel (nur wenn MAMA IVA da ist)
+    const glowM = { color: 0xff2020, transparent: true, opacity: 0, blending: T.AdditiveBlending, depthWrite: false };
+    const shell = new T.Mesh(new T.BoxGeometry(hf * 2 + 1.5, H + 1, hf * 2 + 1.5), new T.MeshBasicMaterial(glowM)); shell.position.set(cx, H / 2, cz);
+    const beam = new T.Mesh(new T.CylinderGeometry(7, 12, 500, 16, 1, true), new T.MeshBasicMaterial(Object.assign({ side: T.DoubleSide, fog: false }, glowM))); beam.position.set(cx, H + 250, cz);
+    shell.visible = beam.visible = false; L.scene.add(shell); L.scene.add(beam);
+    L.tower.glow = { shell, beam };
   }
+  L.setTowerGlow = function (on) {
+    const G0 = L.tower.glow; if (!G0) return;
+    const k = 0.6 + Math.sin(performance.now() / 250) * 0.4;
+    G0.shell.visible = G0.beam.visible = on;
+    if (on) { G0.shell.material.opacity = 0.25 + k * 0.3; G0.beam.material.opacity = 0.45 + k * 0.4; }
+  };
   L.towerDestroy = function () {
     const TW = L.tower; if (TW.down) return;
     TW.down = true;
