@@ -297,6 +297,20 @@
       if (s === -1) hand = grp(elbow, 0, -0.36, 0.03);
     }
 
+    // extremer Muskel-Körperbau: Bizeps, Schultern, Brust, Nacken, Bauchmuskeln
+    if (A.build === 'extrem') {
+      for (const a of arms) {
+        part(sph, sleeve === 'long' ? slc : skin, 0.11, 0.13, 0.12, 0, -0.14, 0.05, a.arm);
+        part(sph, sleeve === 'long' ? slc : skin, 0.13, 0.12, 0.13, 0, -0.02, 0, a.arm);
+        part(sph, skin, 0.09, 0.12, 0.09, 0, -0.08, 0.03, a.elbow);
+      }
+      const chest = TP === 'tanktop' ? coat : coat;
+      for (const s2 of [-1, 1]) {
+        part(sph, chest, 0.17 * bw * 0.6, 0.12, 0.08, s2 * 0.1 * bw, 0.45, fz + 0.02, torso);
+        part(sph, skin, 0.09, 0.07, 0.12, s2 * 0.13 * bw, 0.62, -0.02, torso);
+      }
+      if (TP === 'tanktop') for (let k = 0; k < 3; k++) for (const s2 of [-1, 1]) part(box, shade(coat, 0.8), 0.07, 0.05, 0.02, s2 * 0.045, 0.28 - k * 0.08, fz + 0.012, torso, { noShadow: true });
+    }
     // ---- Kopf und Gesicht ----
     const neck = grp(torso, 0, 0.62, 0);
     part(box, skin, 0.1, 0.08, 0.1, 0, 0.02, 0, neck);
@@ -874,49 +888,67 @@
 
   // ---------- GIGA-CAPY: riesiges, aufrecht stehendes Capybara, das MAMA IVA in die Tiefe zieht ----------
   L.buildGigaCapy = function () {
-    const root = new T.Group(), sph = G().sph, box = G().box;
-    const FUR = '#8b5e3c', DARK = '#6a4429', LIGHT = '#a87a52', NOSE = '#3a2416';
+    const root = new T.Group(), sph = G().sph, box = G().box, cone = G().cone;
+    const FUR = '#7d5434', DARK = '#5a3a22', LIGHT = '#a07450', NOSE = '#3a2416', PLATE = '#3e2a1c';
     const body = grp(root);
-    // kräftige Hinterbeine mit großen Füßen
+    // Säulenbeine mit dicken Oberschenkeln und Krallenfüßen
     for (const s of [-1, 1]) {
-      part(sph, DARK, 9, 12, 10, s * 9, 11, -1, body);
-      part(box, DARK, 8, 3.5, 15, s * 9, 1.6, 3, body);
-      for (let k = -1; k <= 1; k++) part(box, '#2a1a10', 1.4, 1.6, 2.2, s * 9 + k * 2.4, 1.2, 10.8, body, { noShadow: true });
+      part(sph, DARK, 11, 15, 12, s * 10, 18, -2, body);
+      part(sph, DARK, 7.5, 11, 8, s * 11, 7, 0, body);
+      part(box, DARK, 9, 3.5, 14, s * 11, 1.6, 4, body);
+      for (let k = -1; k <= 1; k++) part(cone, '#20140c', 1.3, 3, 1.3, s * 11 + k * 3, 1.5, 11.5, body, { noShadow: true }).rotation.x = Math.PI / 2;
     }
-    // fassförmiger Körper mit hellem Bauch und dunklen Fellbüscheln
+    // langer, schwerer Schwanz, der hinten über den Boden schleift
+    const tail = grp(body, 0, 16, -10);
+    let ty = 0, tz = 0;
+    for (let i = 0; i < 8; i++) {
+      const r = 9 - i * 0.95;
+      part(sph, i % 2 ? FUR : DARK, r, r * 0.9, r * 1.4, 0, ty, tz, tail);
+      part(cone, PLATE, r * 0.35, r * 0.9, r * 0.12, 0, ty + r * 0.95, tz, tail, { noShadow: true });
+      tz -= r * 1.9; ty -= 1.7;
+    }
+    // aufrechter, massiger Oberkörper, leicht nach vorne gebeugt
     const torso = grp(body, 0, 0, 0);
-    part(sph, FUR, 17, 26, 15, 0, 34, 0, torso);
-    part(sph, LIGHT, 12, 19, 5, 0, 31, 10.5, torso, { noShadow: true });
-    for (const [x, y, z] of [[-9, 44, -10], [8, 38, -12], [0, 26, -13], [-11, 28, -8], [11, 48, -6]]) part(sph, DARK, 4, 5, 3, x, y, z, torso, { noShadow: true });
-    // Kopf: groß, eckig, stumpfe Schnauze
-    const head = grp(torso, 0, 57, 4);
+    part(sph, FUR, 17, 25, 15, 0, 36, 0, torso);
+    part(sph, LIGHT, 12, 20, 6, 0, 33, 10, torso, { noShadow: true });
+    for (let k = 0; k < 6; k++) part(box, DARK, 13 - k * 0.6, 0.6, 1, 0, 22 + k * 4.2, 15.4 - Math.abs(k - 2.5) * 0.4, torso, { noShadow: true });
+    // gezackte Rückenplatten in drei Reihen
+    for (let i = 0; i < 9; i++) {
+      const y = 18 + i * 4.6, h = 4 + Math.sin(i / 8 * Math.PI) * 5;
+      for (const x of [-3.5, 0, 3.5]) {
+        const p = part(cone, PLATE, 1.6, h * (x === 0 ? 1.25 : 0.85), 0.5, x, y, -13.5 - h * 0.25, torso, { noShadow: true });
+        p.rotation.x = -0.9;
+      }
+    }
+    // dicker Hals, Capybara-Kopf weit vorne
+    part(sph, FUR, 11, 10, 11, 0, 56, 3, torso);
+    const head = grp(torso, 0, 62, 9);
     part(sph, FUR, 12, 11, 13, 0, 0, 0, head);
     part(box, FUR, 15, 12, 12, 0, -2, 9, head);
     part(box, NOSE, 13, 6, 2, 0, -2, 15.2, head, { noShadow: true });
     for (const s of [-1, 1]) part(box, '#120a06', 2, 2.6, 1, s * 3.2, -1.5, 16.4, head, { noShadow: true });
     part(box, '#2a1a10', 6, 1.2, 1, 0, -6.5, 15.2, head, { noShadow: true });
-    // ruhige schwarze Augen mit Glanzpunkt
+    for (let k = -2; k <= 2; k++) part(box, '#f0e6d0', 1.6, 2.4, 0.8, k * 2.2, -6.2, 15.6, head, { noShadow: true });
     for (const s of [-1, 1]) {
       part(sph, '#120a06', 1.6, 1.8, 1.2, s * 7.2, 3.5, 6.5, head, { noShadow: true });
-      part(sph, '#ffffff', 0.45, 0.45, 0.3, s * 7.4, 4.2, 7.6, head, { basic: true, noShadow: true });
-      part(sph, DARK, 2.8, 2.2, 1.6, s * 7.5, 9.5, -3, head);   // kleine Ohren
+      part(sph, '#ffdd55', 0.55, 0.55, 0.3, s * 7.4, 4.0, 7.6, head, { basic: true, noShadow: true });
+      part(sph, DARK, 2.8, 2.2, 1.6, s * 7.5, 9.5, -3, head);
     }
-    // Markenzeichen: eine Yuzu-Frucht auf dem Kopf
     part(sph, '#f2a81d', 3.6, 3.4, 3.6, 0, 12.5, 1, head);
     part(box, '#3d7a2a', 2.6, 0.5, 1.4, 1.2, 16, 1, head, { noShadow: true });
-    // Arme mit Krallenpfoten
+    // kräftige Arme mit Krallen
     const arms = [];
     for (const s of [-1, 1]) {
-      const arm = grp(torso, s * 15, 47, 4);
-      part(sph, FUR, 5.2, 12, 5.2, 0, -10, 0, arm);
+      const arm = grp(torso, s * 15.5, 49, 5);
+      part(sph, FUR, 6, 12, 6, 0, -10, 0, arm);
       const elbow = grp(arm, 0, -20, 0);
-      part(sph, FUR, 4.4, 10, 4.4, 0, -9, 0, elbow);
-      part(box, DARK, 6.5, 4.5, 7, 0, -19.5, 1, elbow);
-      for (let k = -1; k <= 1; k++) part(box, '#1a0f08', 1.2, 3.2, 1.2, k * 2.2, -22.5, 3.5, elbow, { noShadow: true });
+      part(sph, FUR, 5, 10, 5, 0, -9, 0, elbow);
+      part(box, DARK, 7, 5, 7.5, 0, -19.5, 1, elbow);
+      for (let k = -1; k <= 1; k++) part(cone, '#1a0f08', 1, 3.6, 1, k * 2.3, -23, 3, elbow, { noShadow: true }).rotation.x = Math.PI;
       arms.push({ arm, elbow });
     }
     root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    return { root, body, torso, head, arms };
+    return { root, body, torso, head, arms, tail };
   };
 
   // ---------- Fahrzeuge ----------
@@ -929,6 +961,7 @@
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6 },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95 },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5 },
+    flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55 },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65 }
   };
@@ -945,7 +978,28 @@
       wheels.push(wm); return piv;
     };
     let seat, seats, glassZ = 0;
-    if (t.kind === 'car') {
+    if (t.plane) {
+      // kleines Propellerflugzeug: Rumpf, Flügel, Leitwerk, Propeller, drei Räder, vier Sitze
+      const pc = L.pick(['#e8e8e8', '#c02a2a', '#2a6ac0', '#e8c020']);
+      part(G().cyl, pc, 0.95, 8, 0.95, 0, 1.5, 0, root).rotation.x = Math.PI / 2;
+      part(G().sph, pc, 0.95, 0.95, 1.3, 0, 1.5, 4, root);
+      part(G().sph, pc, 0.6, 0.6, 1.6, 0, 1.6, -4.2, root);
+      part(box, '#1d2228', 1.3, 0.6, 2.6, 0, 2.3, 1.2, root, { opacity: 0.8 });
+      part(box, pc, 11, 0.16, 1.7, 0, 2.1, 0.8, root);
+      for (const s of [-1, 1]) part(box, '#c01010', 0.4, 0.17, 1.7, s * 5.4, 2.1, 0.8, root, { basic: true, noShadow: true });
+      part(box, pc, 3.6, 0.12, 1, 0, 1.8, -4.4, root);
+      part(box, pc, 0.14, 1.6, 1.2, 0, 2.5, -4.4, root);
+      part(box, '#c01010', 0.16, 0.5, 0.6, 0, 3.1, -4.6, root, { noShadow: true });
+      // Propeller (dreht sich mit dem Tempo)
+      const pp = grp(root, 0, 1.5, 5.25); pp.rotation.y = Math.PI / 2;
+      const prop = grp(pp); part(box, '#222', 0.08, 2.6, 0.25, 0, 0, 0, prop); part(box, '#222', 0.08, 0.25, 2.6, 0, 0, 0, prop);
+      wheels.push(prop);
+      steer.push(mkWheel(0, 0.32, 3.2, 0.32, 0.18));
+      for (const s of [-1, 1]) mkWheel(s * 1.4, 0.38, 0.2, 0.38, 0.22);
+      seat = { x: 0.35, y: 1.05, z: 1.8 };
+      seats = [seat, { x: -0.35, y: 1.05, z: 1.8 }, { x: 0.35, y: 1.05, z: 0.5 }, { x: -0.35, y: 1.05, z: 0.5 }];
+      glassZ = 2.5;
+    } else if (t.kind === 'car') {
       const L2 = t.len, W = t.wid, low = type === 'sportwagen';
       part(box, color, W, low ? 0.55 : 0.7, L2, 0, low ? 0.55 : 0.7, 0, root);
       if (type === 'pickup') {

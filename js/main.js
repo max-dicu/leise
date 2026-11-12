@@ -164,7 +164,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     let fp = false;
     let dist, h, py = P.camPitch;
     if (v) {
-      dist = (v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
+      dist = (v.t.plane ? 16 : v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
       piv.set(v.x, 1.6 + (v.alt || 0), v.z);
     } else {
       const ph = !P.alive ? 0.4 : P.stance === 'crawl' ? 0.6 : P.stance === 'crouch' ? 1.1 : 1.6;

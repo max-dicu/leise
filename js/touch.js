@@ -153,8 +153,8 @@
     $('tCar').hidden = !inV; $('tAct').hidden = inV; $('tFoot').hidden = inV;
     $('tBelt').hidden = !inV || P.vehicle.t.kind !== 'car';
     $('tTele').hidden = !inV || !P.vehicle.t.teleport || P.seat > 0;
-    $('tDown').hidden = !inV || !P.vehicle.t.fly || P.seat > 0;
-    $('tUp').hidden = !inV || !P.vehicle.t.fly || P.seat > 0;
+    $('tDown').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane) || P.seat > 0;
+    $('tUp').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane) || P.seat > 0;
     $('tChat').hidden = !(L.net && L.net.connected);
     const it = L.selType ? L.selType() : null;
     $('tFire').textContent = it ? L.ITEMS[it].icon : '✋';

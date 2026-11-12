@@ -172,7 +172,8 @@
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); if (x > 0 && x < S && y > 0 && y < S) g.fillRect(x - 2, y - 2, 4, 4); }
     for (const w of L.ents.walkers) { if (w.dead || L.dist(w.x, w.z, P.x, P.z) > 220) continue; const [x, y] = toM(w.x, w.z); g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fill(); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
-    if (L.wboss) { const [x, y] = toM(L.clamp(L.wboss.x, P.x - 200, P.x + 200), L.clamp(L.wboss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('🦭', x, y); }
+    if (L.wboss) { const [x, y] = toM(L.clamp(L.wboss.x, P.x - 200, P.x + 200), L.clamp(L.wboss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
+    for (const v of L.ents.vehicles) if (v.t.plane) { const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText('✈️', x, y); }
     if (L.TOWER) { const big = L.boss && !L.boss.dead, [x, y] = toM(L.clamp(L.TOWER.x, P.x - 200, P.x + 200), L.clamp(L.TOWER.z, P.z - 200, P.z + 200)); g.font = (big ? 22 + Math.sin(performance.now() / 200) * 4 : 14) + 'px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
     for (const t of L.tornados || []) { const [x, y] = toM(L.clamp(t.x, P.x - 200, P.x + 200), L.clamp(t.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('🌪️', x, y); }
@@ -206,7 +207,8 @@
     g.fillStyle = '#ccc';
     for (const v of L.ents.vehicles) { const [x, y] = toM(v.x, v.z); g.fillRect(x - 1.5, y - 1.5, 3, 3); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.boss.x, L.boss.z); g.font = '26px sans-serif'; g.fillText('👹', x, y); }
-    if (L.wboss) { const [x, y] = toM(L.wboss.x, L.wboss.z); g.font = '26px sans-serif'; g.fillText('🦭', x, y); }
+    if (L.wboss) { const [x, y] = toM(L.wboss.x, L.wboss.z); g.font = '26px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
+    for (const v of L.ents.vehicles) if (v.t.plane) { const [x, y] = toM(v.x, v.z); g.font = '26px sans-serif'; g.fillText('✈️', x, y); g.font = 'bold 12px sans-serif'; g.fillStyle = '#fff'; g.fillText('FLUGZEUG', x, y + 20); }
     for (const t of L.tornados || []) { const [x, y] = toM(t.x, t.z); g.font = '26px sans-serif'; g.fillText('🌪️', x, y); }
     drawTsu(g, toM);
     if (L.TOWER) { const [x, y] = toM(L.TOWER.x, L.TOWER.z); g.font = '28px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); g.font = 'bold 13px sans-serif'; g.fillStyle = L.towerSafe() ? '#7cf' : '#f66'; g.fillText(L.towerSafe() ? 'SICHERER TURM' : 'TURM ZERSTÖRT', x, y + 22); }
@@ -254,7 +256,8 @@
     const h = Math.floor(E.time), m = Math.floor((E.time - h) * 60);
     $('clock').textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     $('weather').textContent = (E.day < 0.3 ? '🌙 Nacht · ' : '') + (E.label || '');
-    $('bossTimer').textContent = L.wboss ? (L.wboss.rootY < -0.5 ? '🦭 Das Riesen-Walross erscheint …' : `🦭 RIESEN-WALROSS (Stufe ${(L.wboss.lvl || 0) + 1}) ist da – noch ${L.fmt(Math.max(0, L.wboss.life))}`) : L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA (Stufe ${(L.boss.lvl || 0) + 1}) ist da – noch ${L.fmt(L.boss.life)}` : (L.boss.capy ? '🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!' : '👹 MAMA IVA versinkt …')) : `${(R.nextBoss || 'MAMA IVA') === 'MAMA IVA' ? '👹 MAMA IVA' : '🦭 RIESEN-WALROSS'} in ${L.fmt(R.bossT)}`;
+    const GW = L.wboss && L.GBT[L.wboss.type || 'walross'];
+    $('bossTimer').textContent = L.wboss ? (L.wboss.rootY < -0.5 ? GW.icon + ' ' + GW.short + ' erscheint …' : `${GW.icon} ${GW.short} (Stufe ${(L.wboss.lvl || 0) + 1}) ist da – noch ${L.fmt(Math.max(0, L.wboss.life))}`) : L.boss ? (L.boss.dead ? '' : (L.boss.rootY || 0) < -0.5 ? '👹 MAMA IVA erscheint …' : L.boss.life > 0 ? `👹 MAMA IVA (Stufe ${(L.boss.lvl || 0) + 1}) ist da – noch ${L.fmt(L.boss.life)}` : (L.boss.capy ? '🦫 GIGA-CAPY zieht MAMA IVA in die Tiefe!' : '👹 MAMA IVA versinkt …')) : `${(R.nextBoss || 'MAMA IVA') === 'MAMA IVA' ? '👹 MAMA IVA' : ((L.GBT[R.nextBossType] || {}).icon || '👹') + ' ' + R.nextBoss} in ${L.fmt(R.bossT)}`;
     const nf = R.found.filter(Boolean).length;
     $('codes').textContent = nf ? '🔒 Bunker-Code: ' + R.code.map((c, i) => (R.found[i] ? c : '_')).join(' ') : '';
     let obj = '';
@@ -295,7 +298,8 @@
       else { belt.textContent = (L.save.char || {}).hat === 'helm' ? '🪖 Helm auf' : '⚠️ Ohne Helm'; belt.className = ''; }
       $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`
         + (v.t.teleport ? (P.tpCd > 0 ? ` · 🌀 Teleport in ${Math.ceil(P.tpCd)} s` : ' · 🌀 T: Teleport bereit') : '')
-        + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (E hoch, C/Shift runter, Leertaste driften)` : '');
+        + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (E hoch, C/Shift runter, Leertaste driften)` : '')
+        + (v.t.plane ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m – ab 80 km/h: E steigen, C/Shift sinken` : '');
     }
     $('hint').textContent = L.uiBlock ? '' : L.interactHint();
     $('cross').className = P.aiming ? 'aim' : '';

@@ -196,7 +196,9 @@
     } else if (e.kind === 'walker') {
       out.push([e.x, e.hy, e.z, 6.5, 1], [e.x + Math.sin(e.yaw) * 7, e.hy - 0.3, e.z + Math.cos(e.yaw) * 7, 1.3, 3]);
     } else if (e.kind === 'wboss') {
-      out.push([e.x, (e.rootY || 0) + WB_S * 1.1, e.z, WB_S * 1.4, 1], [e.x + Math.sin(e.yaw) * WB_S * 2.4, (e.rootY || 0) + WB_S * 1.6, e.z + Math.cos(e.yaw) * WB_S * 2.4, WB_S * 0.8, 2]);
+      const S = e.S || 9, y0 = e.rootY || 0;
+      if (e.type === 'walross' || !e.type) out.push([e.x, y0 + S * 1.1, e.z, S * 1.4, 1], [e.x + Math.sin(e.yaw) * S * 2.4, y0 + S * 1.6, e.z + Math.cos(e.yaw) * S * 2.4, S * 0.8, 2]);
+      else out.push([e.x, y0 + S * 1.2, e.z, S * 0.5, 1], [e.x, y0 + S * 1.9, e.z, S * 0.55, 1], [e.x, y0 + S * GBT[e.type].top, e.z, S * 0.3, 2]);
     } else if (e.kind === 'boss') {
       out.push([e.x, e.hy, e.z, 6, 1], [e.x, e.hy + 8, e.z, 7, 1], [e.x, e.hy + 20, e.z, 2.6, 2]);
     }
@@ -247,7 +249,7 @@
   function killPlayer(cause) {
     P.alive = false; P.deathT = 0; P.cause = cause;
     // Tod: MAMA IVA fängt wieder bei Stufe 1 an
-    L.save.ivaLvl = 0; L.save.walLvl = 0; L.persist();
+    L.save.ivaLvl = 0; L.save.walLvl = 0; L.save.vikLvl = 0; L.save.danLvl = 0; L.persist();
     if (P.vehicle) leaveVehicle(true);
     L.blood(P.x, 1, P.z, 40, true); L.decal(P.x, P.z, 2.4); L.snd.splat({ x: P.x, y: 1, z: P.z });
     L.music.set('night');
@@ -915,6 +917,7 @@
     }
     if (!block && L.hit('KeyT') && t.teleport) { if (P.tpCd > 0) L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); else teleportVehicle(v); }
     if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
+    if (t.plane) updatePlane(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
     driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
     if (!P.vehicle) return;
     P.x = v.x; P.z = v.z; P.y = v.alt || 0;
@@ -1024,7 +1027,7 @@
       e.x += fx * 3; e.z += fz * 3;
     }
     L.clampWorld(v, true);
-    if (!t.fly && L.waterDepth(v.x, v.z) > 0.9) {
+    if (!t.fly && !(t.plane && alt > 0.5) && L.waterDepth(v.x, v.z) > 0.9) {
       v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0;
       if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('🌊 Zu tief für das Fahrzeug – nur der fliegende JOYOR T10 kommt übers Meer.', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
     }
@@ -1038,6 +1041,7 @@
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     if (alt > 0.5 && v.vy) v.rig.root.rotateX(-L.clamp(v.vy / 40, -0.3, 0.3));
+    if (t.plane && alt > 0.5) v.rig.root.rotateZ(-v.steer * 0.45);
   }
   // ---------- JOYOR T10: Fliegen ----------
   // Boden unter dem Fahrzeug: Berg oder Dach
@@ -1058,10 +1062,25 @@
     if (v.alt <= floor) { v.alt = floor; vy = Math.max(0, vy); }
     v.vy = vy;
   }
+  // Flugzeug: braucht Tempo zum Abheben, ohne Tempo sackt es durch
+  function updatePlane(v, dt, up, down) {
+    if ((v.alt || 0) > 0.5 && v.speed < 0) v.speed = 0;
+    const floor = flyFloor(v.x, v.z), spd = Math.abs(v.speed), lift = spd > 22;
+    let vy = v.vy || 0;
+    if (v.hp <= 0) { up = false; down = true; }
+    let want = 0;
+    if (up && lift) want = 9; else if (down) want = -12;
+    if (!lift && v.alt > floor + 0.3) { want = -10; if (!(v.stallT > 0)) { v.stallT = 3; L.msg('⚠️ Zu langsam – das Flugzeug sackt durch! Gas geben (W)!', 2500); } }
+    v.stallT = (v.stallT || 0) - dt;
+    vy += (want - vy) * Math.min(1, dt * 2);
+    v.alt = Math.min(400, (v.alt || 0) + vy * dt);
+    if (v.alt <= floor) { if (vy < -9) { crash(v, -vy * 0.8, true); } v.alt = floor; vy = Math.max(0, vy); }
+    v.vy = vy;
+  }
   // geparkte Fahrzeuge in der Luft sinken langsam auf den Boden
   function settleVehicle(v, dt) {
     if (!(v.alt > 0)) return;
-    const floor = v.t.fly ? flyFloor(v.x, v.z) : 0;
+    const floor = v.t.fly || v.t.plane ? flyFloor(v.x, v.z) : 0;
     v.vy = Math.max(-15, (v.vy || 0) - 12 * dt);
     v.alt = Math.max(floor, v.alt + v.vy * dt);
     if (v.alt <= floor) v.vy = 0;
@@ -1754,7 +1773,7 @@
   }
   // ---------- GIGA-CAPY gegen MAMA IVA: Aufstieg, Brüllen, ein Kampf (jedes Mal anders), dann zieht es sie in die Tiefe ----------
   // Zeitplan (s): 0–5 aufsteigen · 5–7 brüllen · 7–14,8 drei Kampf-Aktionen · 14,8–16,8 packen · 16,8–22,3 MAMA IVA versinkt · ab 17,8 taucht GIGA-CAPY hinterher
-  const C_RISE = 5, C_ROAR = 7, C_MOVE = 2.6, C_NM = 3, C_FIGHT = C_ROAR + C_MOVE * C_NM, C_GRAB = C_FIGHT + 2;
+  const C_RISE = 5, C_ROAR = 7, C_MOVE = 2.6, C_NM = 5, C_FIGHT = C_ROAR + C_MOVE * C_NM, C_GRAB = C_FIGHT + 2;
   const CAPY_MOVES = ['schlag', 'strahl', 'stampfer', 'biss', 'rammen', 'peitsche'];
   function seededRng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   L.capyStart = function (b, seed) {
@@ -1764,7 +1783,7 @@
     const rnd = seededRng(seed);
     // drei verschiedene Kampf-Aktionen in zufälliger Reihenfolge, jede mit eigener Stärke und Seite
     const pool = CAPY_MOVES.slice(), moves = [];
-    for (let i = 0; i < C_NM; i++) moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], s: rnd() < 0.5 ? -1 : 1, pow: 0.75 + rnd() * 0.5, hit: false });
+    for (let i = 0; i < C_NM; i++) { if (!pool.length) pool.push(...CAPY_MOVES); moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], s: rnd() < 0.5 ? -1 : 1, pow: 0.75 + rnd() * 0.5, hit: false }); }
     // neben MAMA IVA, etwas zum Spieler hin – damit man GIGA-CAPY ganz sieht
     const a = Math.atan2(P.x - b.x, P.z - b.z) + (rnd() < 0.5 ? 1 : -1) * (0.7 + rnd() * 0.6);
     const x = b.x + Math.sin(a) * 60, z = b.z + Math.cos(a) * 60;
@@ -1780,7 +1799,7 @@
   // ---------- Daniel reitet auf GIGA-CAPY. Danach springt er ab, kämpft gegen Riesen-Viktor, und beide gehen weg ----------
   const DUEL_MOVES = ['schlag', 'kratzen', 'ringen', 'tritt', 'anspringen'], DUEL_ENDS = ['wuergen', 'suplex', 'wurf'];
   const J0 = C_GRAB + 0.8, V0 = J0 + 1.4, D_FIGHT = V0 + 2.6, D_MOVE = 2.6, D_NM = 2, D_END = D_FIGHT + D_MOVE * D_NM, D_ENDLEN = 4, W0 = D_END + D_ENDLEN + 1;
-  L.CAPY_TOTAL = W0 + 5;
+  L.CAPY_TOTAL = J0 + 1.6 + 7;
   function duelStart(c, b) {
     const rnd = c.rnd;
     const sv = 7 + rnd() * 7, sd = 6 + rnd() * 3;
@@ -1788,7 +1807,7 @@
     vik.root.scale.setScalar(sv); dan.root.scale.setScalar(sd);
     L.scene.add(vik.root); vik.root.visible = false;
     // Daniel sitzt GIGA-CAPY auf den Schultern
-    c.rig.torso.add(dan.root); dan.root.position.set(0, 49, -12);
+    c.rig.torso.add(dan.root); dan.root.position.set(0, 58, -9);
     const pool = DUEL_MOVES.slice(), moves = [];
     for (let i = 0; i < D_NM; i++) moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], hit: false });
     const end = DUEL_ENDS[Math.floor(rnd() * DUEL_ENDS.length)];
@@ -1834,7 +1853,19 @@
       return;
     }
     if (!D.landed) { D.landed = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 1); L.fx('#6a5a40', D.x + ax * dOff0, gy + 1, D.z + az * dOff0, 30, 14, { size: 1.2, life: 1.8 }); }
-    // 3) Viktor steigt aus dem Boden
+    // 3) Daniel bleibt allein: brüllt und geht weg (Viktor ist ein eigener Boss)
+    {
+      vik.root.visible = false;
+      const tw = t - (J0 + 1.6), wd = Math.max(0, tw - 1.8) * sd * 1.1;
+      if (!D.roar2) { D.roar2 = true; L.snd.daniel({ x: D.x, y: 20, z: D.z }); }
+      if (tw > 1.8 && !D.leave) { D.leave = true; L.msg('💪 Daniel geht weg …', 3000); }
+      L.animDaniel(dan, { mode: tw < 1.8 ? 'alert' : 'walk', phase: D.ph });
+      if (tw < 1.8) for (const a of dan.arms) { a.arm.rotation.x = -2.6; a.elbow.rotation.x = -0.6; }
+      dan.root.position.set(D.x + ax * dOff0 + Math.sin(D.walkA) * wd, gy, D.z + az * dOff0 + Math.cos(D.walkA) * wd);
+      dan.root.rotation.set(0, tw < 1.8 ? dYaw : D.walkA, 0);
+      return;
+    }
+    // (alt) Viktor steigt aus dem Boden
     let vRise = 0;
     if (t < V0 + 2.6) { vRise = -(1 - ease3(L.clamp((t - V0) / 2.4, 0, 1))) * sv * 3.2; if (t > V0 && !D.rose) { D.rose = true; L.snd.viktor({ x: D.x, y: 20, z: D.z }); L.msg('👁️ Riesen-Viktor stellt sich Daniel!', 3000); } if (Math.random() < dt * 14) L.fx('#5a4630', D.x - ax * D.gap / 2 + L.rand(-8, 8), gy + 1, D.z - az * D.gap / 2 + L.rand(-8, 8), 3, 10, { size: 1, life: 2 }); }
     vik.root.visible = t > V0;
@@ -1917,7 +1948,7 @@
     let armX = [0, 0], elbowX = [0, 0], lean = 0, headX = 0.1, headY = 0, headZ = Math.sin(t * 0.8) * 0.06, adv = 0;
     const fp = { tilt: 0, side: 0, push: 0, dip: 0, armUp: 0, whip: 0, beam: 0 };
     const capyChest = () => V2.set(r.root.position.x, r.root.position.y + 38, r.root.position.z);
-    const atIva = (n, col) => L.fx(col || '#ffb040', b.x + L.rand(-6, 6), b.hy + L.rand(0, 18), b.z + L.rand(-6, 6), n, 10, { basic: true, size: 0.7, life: 0.8 });
+    const atIva = (n, col) => { L.fx(col || '#ffb040', b.x + L.rand(-6, 6), b.hy + L.rand(0, 18), b.z + L.rand(-6, 6), n, 10, { basic: true, size: 0.7, life: 0.8 }); L.env.bolt = Math.max(L.env.bolt, 0.7); L.snd.thunder(0.1); };
     const atCapy = (n, col) => { const p = capyChest(); L.fx(col || '#ffb040', p.x + L.rand(-6, 6), p.y + L.rand(-8, 8), p.z + L.rand(-6, 6), n, 10, { basic: true, size: 0.7, life: 0.8 }); };
     if (t >= C_RISE && t < C_ROAR) {
       const k = ease3((t - C_RISE) / 0.8); armX = [-2.5 * k, -2.5 * k]; elbowX = [-0.5 * k, -0.5 * k]; lean = -0.12 * k; headX = -0.35;
@@ -1978,6 +2009,7 @@
     for (let i = 0; i < 2; i++) { r.arms[i].arm.rotation.set(armX[i] + Math.sin(t * 3 + i) * 0.05, 0, (i ? -1 : 1) * 0.18); r.arms[i].elbow.rotation.x = elbowX[i]; }
     r.torso.rotation.x = lean;
     r.head.rotation.set(headX, headY, headZ);
+    if (r.tail) r.tail.rotation.y = Math.sin(t * 0.9) * 0.18 + headY * 0.3;
     if (t >= C_RISE && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
     // Beben, Staub und Steine beim Auf- und Abtauchen
     duelUpdate(c, t, dt);
@@ -2167,22 +2199,45 @@
   }
 
 
-  // ---------- Zweiter Boss: DAS RIESEN-WALROSS (wechselt sich mit MAMA IVA ab) ----------
-  // Steigt aus dem Boden, hört alle, die nicht schleichen, hüpft hin und macht Bauchklatscher. Am Ende kommt Richard und besiegt es.
-  const WB_S = 9;
+  // ---------- Riesen-Bosse: DAS RIESEN-WALROSS, RIESEN-VIKTOR, RIESEN-DANIEL (wechseln sich mit MAMA IVA ab) ----------
+  // Steigen aus dem Boden, hören alle, die nicht schleichen, und greifen mit einem Bodenschlag an. Am Ende kommt jemand und besiegt sie.
   function wbVoice(p) { for (let k = 0; k < 3; k++) { L.tn({ f: 70, fTo: 52, dur: 0.45, type: 'sawtooth', vol: 0.45, pos: p, delay: k * 0.5, rev: true, ref: 60 }); L.nz({ dur: 0.4, f: 240, type: 'bandpass', q: 2, vol: 0.35, pos: p, delay: k * 0.5, ref: 60 }); } }
   L.wbVoice = wbVoice;
-  function spawnWalrusBoss(left) {
-    const rig = L.buildWalross(); rig.root.scale.setScalar(WB_S); L.scene.add(rig.root);
+  const GBT = {
+    walross: { name: 'DAS RIESEN-WALROSS', short: 'RIESEN-WALROSS', icon: '🦭', lvl: 'walLvl', S: 9, speed: 7, hp: 7000, front: 2, top: 1.3,
+      build: () => L.buildWalross(), voice: wbVoice, cause: 'Vom Riesen-Walross platt gemacht' },
+    viktor: { name: 'RIESEN-VIKTOR', short: 'RIESEN-VIKTOR', icon: '👁️', lvl: 'vikLvl', S: 18, speed: 9, hp: 6000, front: 0.7, top: 2.4,
+      build: () => L.buildViktor('grey'), voice: (p) => { L.snd.viktor(p); L.snd.viktor(Object.assign({}, p, { y: p.y + 5 })); }, cause: 'Von Riesen-Viktor zerquetscht' },
+    daniel: { name: 'RIESEN-DANIEL', short: 'RIESEN-DANIEL', icon: '💪', lvl: 'danLvl', S: 17, speed: 6.5, hp: 9000, front: 0.8, top: 2.2,
+      build: () => L.buildDaniel(), voice: (p) => { L.snd.daniel(p); L.snd.daniel(Object.assign({}, p, { y: p.y + 5 })); }, cause: 'Von Riesen-Daniel zertrümmert' }
+  };
+  L.GBT = GBT;
+  // Aussehen je Typ: gehen/rennen, Bodenschlag (u = 0 … 1)
+  function gbPose(w, moving, slamU) {
+    const G0 = GBT[w.type], rig = w.rig;
+    if (w.type === 'walross') {
+      const ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
+      if (moving) { ws.hop = Math.abs(Math.sin(w.ph)) * 0.25; ws.rear = -Math.sin(w.ph) * 0.12; ws.flip = Math.sin(w.ph) * 0.5; }
+      else { ws.headY = Math.sin(w.ph * 0.3) * 0.5; ws.headX = -0.2; }
+      if (slamU > 0) { ws.rear = slamU < 0.6 ? -0.8 * (slamU / 0.6) : -0.8 + (slamU - 0.6) / 0.4 * 1.05; ws.hop = slamU < 0.6 ? slamU * 0.4 : 0; }
+      L.animWalross(rig, w.ph, ws);
+    } else {
+      const fn = w.type === 'viktor' ? L.animViktor : L.animDaniel;
+      if (slamU > 0) fn(rig, { mode: 'attack', phase: w.ph, atk: slamU });
+      else fn(rig, { mode: moving ? (w.type === 'viktor' ? 'crawl' : 'run') : 'alert', phase: w.ph * 1.5 });
+    }
+  }
+  function spawnGiantBoss(type, left) {
+    const G0 = GBT[type], rig = G0.build(); rig.root.scale.setScalar(G0.S); L.scene.add(rig.root);
     let x = P.x + 260, z = P.z;
     for (let k = 0; k < 40; k++) {
       const a = Math.random() * 6.28, d = L.rand(220, 330), tx = P.x + Math.sin(a) * d, tz = P.z + Math.cos(a) * d;
       if (Math.abs(tx) < 1400 && Math.abs(tz) < 1400 && L.mountainH(tx, tz) === 0 && !L.inTower(tx, tz, 60)) { x = tx; z = tz; break; }
     }
-    const lvl = Math.min(10, L.save.walLvl || 0);
-    L.save.walLvl = lvl + 1; L.persist();
-    const w = { kind: 'wboss', key: 'wboss', rig, x, z, yaw: Math.atan2(P.x - x, P.z - z), hp: 7000 * (1 + lvl * 0.3), life: Math.max(30, (left || 600) - 8), lvl,
-      spdMul: 1 + lvl * 0.15, dmgMul: 1 + lvl * 0.25, emerge: 0, rootY: -WB_S * 3, tx: x, tz: z, slamT: 0, slamCd: 3, roarT: 4, ph: 0, leaving: true, towerAtk: false, smashT: 0, smashed: false, dead: false, hy: WB_S * 1.2 };
+    const lvl = Math.min(10, L.save[G0.lvl] || 0);
+    L.save[G0.lvl] = lvl + 1; L.persist();
+    const w = { kind: 'wboss', key: 'wboss', type, rig, S: G0.S, x, z, yaw: Math.atan2(P.x - x, P.z - z), hp: G0.hp * (1 + lvl * 0.3), life: Math.max(30, (left || 600) - 8), lvl,
+      spdMul: 1 + lvl * 0.15, dmgMul: 1 + lvl * 0.25, emerge: 0, rootY: -G0.S * 3.2, tx: x, tz: z, slamT: 0, slamCd: 3, roarT: 4, ph: 0, leaving: true, towerAtk: false, dead: false, hy: G0.S * 1.2 };
     L.byId.set('wboss', w);
     L.wboss = w; L.frenzy = true;
     L.wbossAppear(w);
@@ -2190,41 +2245,48 @@
   }
   // Auftritt (auch auf den Geräten der Mitspieler)
   L.wbossAppear = function (w) {
+    const G0 = GBT[w.type || 'walross'];
     L.towerRestore();
     const lv = (w.lvl || 0) + 1;
-    L.banner('DAS RIESEN-WALROSS – STUFE ' + lv, (lv > 1 ? 'Schneller und stärker als letztes Mal! ' : '') + 'Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte!');
-    wbVoice({ x: w.x, y: 10, z: w.z });
+    L.banner(G0.name + ' – STUFE ' + lv, (lv > 1 ? 'Schneller und stärker als letztes Mal! ' : '') + 'Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte!');
+    G0.voice({ x: w.x, y: 10, z: w.z });
     const a0 = Math.atan2(P.x - w.x, P.z - w.z);
-    if (L.startCine) L.startCine('DAS RIESEN-WALROSS', 7.5, (t) => {
+    if (L.startCine) L.startCine(G0.name, 8, (t) => {
       const W = L.wboss; if (!W) return null;
-      const a = a0 + 0.5 - t * 0.07, d = 120 - t * 5, gx = W.x + Math.sin(a) * d, gz = W.z + Math.cos(a) * d;
-      return { x: gx, y: L.mountainH(gx, gz) + 22 + t, z: gz, lx: W.x, ly: (W.rootY || 0) + WB_S * 1.3, lz: W.z };
+      const a = a0 + 0.5 - t * 0.07, d = G0.S * 13 - t * 5, gx = W.x + Math.sin(a) * d, gz = W.z + Math.cos(a) * d;
+      if (Math.random() < 0.02) { L.env.bolt = 0.8; }
+      return { x: gx, y: L.mountainH(gx, gz) + G0.S * 2.4 + t, z: gz, lx: W.x, ly: (W.rootY || 0) + G0.S * G0.top * 0.7, lz: W.z };
     });
   };
   function wbEnd(w) {
-    // Richard kommt und besiegt das Walross (Kurzfilm)
     const rs = Math.floor(Math.random() * 1e9);
     L.scene.remove(w.rig.root); L.byId.delete('wboss'); L.wboss = null;
-    L.startRichard(w.x, w.z, rs, { win: true, ws: WB_S });
-    if (NET() !== 'solo') L.mp.send({ t: 'richard', x: w.x, z: w.z, seed: rs, win: 1, ws: WB_S });
+    if (w.type === 'walross') {
+      // Richard kommt und besiegt das Walross
+      L.startRichard(w.x, w.z, rs, { win: true, ws: w.S });
+      if (NET() !== 'solo') L.mp.send({ t: 'richard', x: w.x, z: w.z, seed: rs, win: 1, ws: w.S });
+    } else {
+      // der andere Riese kommt und besiegt ihn
+      L.startDuel(w.x, w.z, rs, w.type, w.S);
+      if (NET() !== 'solo') L.mp.send({ t: 'duel', x: w.x, z: w.z, seed: rs, loser: w.type, s: w.S });
+    }
     L.ivaDone = w.idx; calmMonsters();
     L.round.bossT = ivaClock().left;
   }
   function updateWalrusBoss(dt) {
-    const w = L.wboss, rig = w.rig;
+    const w = L.wboss, rig = w.rig, G0 = GBT[w.type], S = w.S;
     w.ph += dt * 4; w.roarT -= dt; w.slamCd -= dt;
-    const ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
     if (w.emerge < 6) {
       w.emerge += dt; const k = 1 - Math.pow(1 - Math.min(1, w.emerge / 6), 3);
-      w.rootY = -WB_S * 3 * (1 - k);
+      w.rootY = -S * 3.2 * (1 - k);
       if (Math.random() < dt * 14) L.fx('#5a4630', w.x + L.rand(-20, 20), 1, w.z + L.rand(-20, 20), 3, 10, { size: 1, life: 2 });
       L.shake = Math.max(L.shake, L.clamp((350 - L.dist(P.x, P.z, w.x, w.z)) / 350, 0, 0.7));
-      if (w.emerge >= 6) { w.leaving = false; w.rootY = 0; L.msg('🦭 Das Riesen-Walross ist da!', 4000); }
+      if (w.emerge >= 6) { w.leaving = false; w.rootY = 0; L.msg(G0.icon + ' ' + G0.short + ' ist da!', 4000); }
     } else {
       w.life -= dt;
       if (w.life <= 0 || w.hp <= 0 || w.dead) { wbEnd(w); return; }
     }
-    if (w.roarT <= 0) { w.roarT = L.rand(12, 22); wbVoice({ x: w.x, y: 10, z: w.z }); }
+    if (w.roarT <= 0) { w.roarT = L.rand(12, 22); G0.voice({ x: w.x, y: 10, z: w.z }); }
     // Ziel: wer nicht schleicht, wird gehört – im Turm ist man sicher, solange man leise ist
     const TW = L.TOWER;
     if (w.towerAtk && !L.towerSafe()) w.towerAtk = false;
@@ -2244,22 +2306,21 @@
       moving = true;
       const want = Math.atan2(w.tx - w.x, w.tz - w.z);
       w.yaw += L.clamp(L.angDiff(w.yaw, want), -0.8 * dt, 0.8 * dt);
-      const sp = 7 * w.spdMul * (0.6 + Math.abs(Math.sin(w.ph)) * 0.8);
+      const sp = G0.speed * w.spdMul * (w.type === 'walross' ? 0.6 + Math.abs(Math.sin(w.ph)) * 0.8 : 1);
       w.x += Math.sin(w.yaw) * sp * dt; w.z += Math.cos(w.yaw) * sp * dt; L.clampWorld(w);
-      ws.hop = Math.abs(Math.sin(w.ph)) * 0.25; ws.rear = -Math.sin(w.ph) * 0.12; ws.flip = Math.sin(w.ph) * 0.5;
-      if (Math.sin(w.ph) < -0.97 && Math.random() < 0.5) { L.snd.stomp({ x: w.x, y: 0, z: w.z }); L.shake = Math.max(L.shake, L.clamp((200 - L.dist(P.x, P.z, w.x, w.z)) / 200, 0, 0.6)); }
+      if (Math.sin(w.ph * (w.type === 'walross' ? 1 : 1.5)) < -0.97 && Math.random() < 0.5) { L.snd.stomp({ x: w.x, y: 0, z: w.z }); L.shake = Math.max(L.shake, L.clamp((200 - L.dist(P.x, P.z, w.x, w.z)) / 200, 0, 0.6)); }
     }
-    // Bauchklatscher: aufbäumen und auf den Boden krachen lassen
+    // Bodenschlag (Walross: Bauchklatscher, Viktor: Krallenhieb, Daniel: Faust in den Boden)
     const [nearP, dNear] = nearestPlayer(w.x, w.z);
-    const wantSlam = (w.towerAtk && dT <= 42) || (nearP && dNear < 34 && !safeIn(nearP.x, nearP.z));
-    if (!w.leaving && wantSlam && w.slamCd <= 0 && w.slamT <= 0) { w.slamT = 1.6 / Math.min(1.6, w.spdMul); w.slamDur = w.slamT; wbVoice({ x: w.x, y: 10, z: w.z }); }
+    const wantSlam = (w.towerAtk && dT <= 42) || (nearP && dNear < 34 && !safeIn(nearP.x, nearP.z) && !(nearP === P && P.spawnProt > 0));
+    if (!w.leaving && wantSlam && w.slamCd <= 0 && w.slamT <= 0) { w.slamT = 1.6 / Math.min(1.6, w.spdMul); w.slamDur = w.slamT; G0.voice({ x: w.x, y: 10, z: w.z }); }
+    let slamU = 0;
     if (w.slamT > 0) {
       w.slamT -= dt;
-      const u = 1 - w.slamT / w.slamDur;
-      ws.rear = u < 0.6 ? -0.8 * (u / 0.6) : -0.8 + (u - 0.6) / 0.4 * 1.05; ws.hop = u < 0.6 ? u * 0.4 : 0;
+      slamU = 1 - w.slamT / w.slamDur;
       if (w.slamT <= 0) {
-        w.slamCd = 6 / w.spdMul;
-        const sx = w.x + Math.sin(w.yaw) * WB_S * 2, sz = w.z + Math.cos(w.yaw) * WB_S * 2;
+        slamU = 0; w.slamCd = 6 / w.spdMul;
+        const sx = w.x + Math.sin(w.yaw) * S * G0.front, sz = w.z + Math.cos(w.yaw) * S * G0.front;
         L.snd.stomp({ x: sx, y: 0, z: sz }); L.snd.crash(1, { x: sx, y: 5, z: sz }); L.shake = Math.max(L.shake, 1.5);
         L.fx('#6a5a40', sx, 1, sz, 40, 16, { size: 1.3, life: 1.8 });
         L.makeNoise(sx, sz, 200, null);
@@ -2269,46 +2330,42 @@
           for (const rp of RPs()) if (L.inTower(rp.x, rp.z, 1)) hurtRemote(rp, 45 * L.md.dmg, 'Vom einstürzenden Turm erschlagen');
         }
         const dd = L.dist(P.x, P.z, sx, sz);
-        if (dd < 30 && P.alive && !safeIn(P.x, P.z)) {
+        if (dd < 30 && P.alive && !safeIn(P.x, P.z) && !(P.spawnProt > 0)) {
           const sneaking = P.stance !== 'stand' && !P.vehicle;
-          L.hurtPlayer((sneaking ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - dd / 42), 'Vom Riesen-Walross platt gemacht');
+          L.hurtPlayer((sneaking ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - dd / 42), G0.cause);
           if (P.alive && !P.vehicle) { const k = 15; P.vx = (P.x - sx) / (dd || 1) * k; P.vz = (P.z - sz) / (dd || 1) * k; P.vy = 7; P.air = true; P.tumble = 0.01; P.knockT = 1.5; }
         }
-        for (const rp of RPs()) { const d2 = L.dist(rp.x, rp.z, sx, sz); if (d2 < 30 && !safeIn(rp.x, rp.z)) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - d2 / 42), 'Vom Riesen-Walross platt gemacht', (rp.x - sx) / (d2 || 1) * 15, (rp.z - sz) / (d2 || 1) * 15, 7, sn); } }
+        for (const rp of RPs()) { const d2 = L.dist(rp.x, rp.z, sx, sz); if (d2 < 30 && !safeIn(rp.x, rp.z)) { const sn = rp.stance !== 'stand' && !rp.inVeh; hurtRemote(rp, (sn ? 35 : 75) * L.md.dmg * w.dmgMul * (1 - d2 / 42), G0.cause, (rp.x - sx) / (d2 || 1) * 15, (rp.z - sz) / (d2 || 1) * 15, 7, sn); } }
         for (const n of E.npcs) if (!n.dead && L.dist(n.x, n.z, sx, sz) < 30) L.damageEnt(n, 200, sx, sz, w);
       }
     }
-    if (!moving && w.slamT <= 0) { ws.headY = Math.sin(w.ph * 0.3) * 0.5; ws.headX = -0.2; }
-    w.ws = ws;
-    L.animWalross(rig, w.ph, ws);
+    w.slamU = slamU; w.moving = moving;
+    gbPose(w, moving, slamU);
     rig.root.position.set(w.x, w.rootY + L.mountainH(w.x, w.z), w.z); rig.root.rotation.set(0, w.yaw, 0);
   }
-  // Mitspieler: Walross-Boss nach den Daten vom Host
+  // Mitspieler: Riesen-Boss nach den Daten vom Host
   L.applyWboss = function (a) {
     if (!a) { if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.byId.delete('wboss'); L.wboss = null; } return; }
     let w = L.wboss;
     if (!w) {
-      const rig = L.buildWalross(); rig.root.scale.setScalar(WB_S); L.scene.add(rig.root);
-      w = L.wboss = { kind: 'wboss', key: 'wboss', rig, x: a[0], z: a[1], yaw: a[2], rootY: a[3], lvl: a[5], life: a[6], ph: 0, puppet: true, hy: WB_S * 1.2, hp: 1 };
+      const type = a[7] || 'walross', G0 = GBT[type];
+      const rig = G0.build(); rig.root.scale.setScalar(G0.S); L.scene.add(rig.root);
+      w = L.wboss = { kind: 'wboss', key: 'wboss', type, S: G0.S, rig, x: a[0], z: a[1], yaw: a[2], rootY: a[3], lvl: a[5], life: a[6], ph: 0, puppet: true, hy: G0.S * 1.2, hp: 1 };
       L.byId.set('wboss', w);
       L.wbossAppear(w);
     }
     w.nx = a[0]; w.nz = a[1]; w.nyaw = a[2]; w.rootY = a[3]; w.slam = a[4]; w.lvl = a[5]; w.life = a[6];
   };
-  L.wbossState = () => { const w = L.wboss; return w ? [Math.round(w.x), Math.round(w.z), Math.round(w.yaw * 100) / 100, Math.round(w.rootY * 10) / 10, w.slamT > 0 ? Math.round((1 - w.slamT / w.slamDur) * 100) / 100 : 0, w.lvl, Math.round(w.life)] : 0; };
+  L.wbossState = () => { const w = L.wboss; return w ? [Math.round(w.x), Math.round(w.z), Math.round(w.yaw * 100) / 100, Math.round(w.rootY * 10) / 10, w.slamT > 0 ? Math.round((1 - w.slamT / w.slamDur) * 100) / 100 : 0, w.lvl, Math.round(w.life), w.type] : 0; };
   function puppetWboss(dt) {
     const w = L.wboss; if (!w || !w.puppet) return;
     const k = Math.min(1, dt * 5), ox = w.x, oz = w.z;
     w.x += ((w.nx === undefined ? w.x : w.nx) - w.x) * k; w.z += ((w.nz === undefined ? w.z : w.nz) - w.z) * k; w.yaw += L.angDiff(w.yaw, w.nyaw || w.yaw) * k;
     const mv = L.dist(ox, oz, w.x, w.z) / Math.max(dt, 0.001) > 1;
     w.ph += dt * 4;
-    const ws = { rear: 0, hop: 0, headX: 0, headY: 0, flip: 0, roll: 0 };
-    if (mv) { ws.hop = Math.abs(Math.sin(w.ph)) * 0.25; ws.rear = -Math.sin(w.ph) * 0.12; ws.flip = Math.sin(w.ph) * 0.5; }
-    if (w.slam > 0) { const u = w.slam; ws.rear = u < 0.6 ? -0.8 * (u / 0.6) : -0.8 + (u - 0.6) / 0.4 * 1.05; }
-    L.animWalross(w.rig, w.ph, ws);
+    gbPose(w, mv, w.slam || 0);
     w.rig.root.position.set(w.x, w.rootY + L.mountainH(w.x, w.z), w.z); w.rig.root.rotation.set(0, w.yaw, 0);
   }
-
   // ---------- NPCs (andere Überlebende) ----------
   function spawnNpc(x, z, hostile, id, app, wpn) {
     const appearance = app || L.randomAppearance();
@@ -2424,7 +2481,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard();
+    clearCyls(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2508,6 +2565,12 @@
       L.spawnItem('note', s.x - 0.6, s.z + 0.3, 1, undefined, ni); ni++;
     }
     for (const v of L.vehSpots) spawnVehicle(v);
+    // genau ein Flugzeug, irgendwo auf freiem Land
+    for (let i = 0; i < 80; i++) {
+      const x = L.rand(-1300, 1300), z = L.rand(-1300, 1300);
+      if (L.queryBoxes(x, z, 14).length || L.mountainH(x, z) > 0 || L.inTower(x, z, 40) || L.dist(x, z, P.x, P.z) < 150) continue;
+      spawnVehicle({ type: 'flugzeug', x, z, yaw: Math.random() * 6.28 }); break;
+    }
     // Monster
     // Alle Monster sind von Anfang an auf der Karte verteilt (es kommen keine neuen dazu)
     const cm = Math.min(L.md.count, 1.2);
@@ -2524,11 +2587,13 @@
         made++;
       }
     };
-    place('viktor', Math.round(115 * cm));
-    place('daniel', Math.round(38 * cm));
-    place('langer', Math.round(24 * cm));
-    place('rufer', Math.round(14 * cm));
-    place('starrende', Math.round(16 * cm));
+    // jede Monsterart gleich oft (Blocklinge kommen zu dritt, Marsianer zusätzlich bei den Stelzern)
+    const NK = Math.round(20 * cm);
+    place('viktor', NK);
+    place('daniel', NK);
+    place('langer', NK);
+    place('rufer', NK);
+    place('starrende', NK);
     for (const k of ['rufer', 'langer', 'starrende']) {
       for (let i = 0; i < 30; i++) {
         const a = Math.random() * 6.28, d = L.rand(150, 240), x = P.x + Math.sin(a) * d, z = P.z + Math.cos(a) * d;
@@ -2536,16 +2601,17 @@
         spawnMonster(k, x, z); break;
       }
     }
-    place('blockling', Math.round(9 * cm)); // je 3 zusammen
-    place('schwelle', Math.round(18 * cm));
-    place('greifer', Math.round(10 * cm));
-    place('flieger', Math.round(6 * cm));
-    place('walross', Math.round(14 * cm));
+    place('blockling', Math.round(NK / 3)); // je 3 zusammen
+    place('schwelle', NK);
+    place('greifer', NK);
+    place('flieger', NK);
+    place('walross', NK);
+    place('marsianer', Math.round(NK / 2));
     L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.clearNature(); L.round.cylT = L.rand(60, 90);
     for (let i = 0; i < Math.max(6, Math.round(20 * L.md.count)); i++) {
       const [x, z] = farSpot(400); spawnWalker(x, z);
       // um jeden Stelzer kriechen Marsianer herum
-      for (let k = 0; k < 2; k++) { const mx = x + L.rand(-25, 25), mz = z + L.rand(-25, 25); if (!L.queryBoxes(mx, mz, 1).length && !L.inTower(mx, mz, 4)) spawnMonster('marsianer', L.clamp(mx, -1480, 1480), L.clamp(mz, -1480, 1480)); }
+      for (let k = 0; k < 1; k++) { const mx = x + L.rand(-25, 25), mz = z + L.rand(-25, 25); if (!L.queryBoxes(mx, mz, 1).length && !L.inTower(mx, mz, 4)) spawnMonster('marsianer', L.clamp(mx, -1480, 1480), L.clamp(mz, -1480, 1480)); }
     }
     for (let i = 0; i < S.npcCount; i++) {
       const [x, z] = farSpot(80);
@@ -2553,7 +2619,7 @@
       spawnNpc(x, z, hostile);
     }
     // Richard in normaler Größe: kämpft auf deiner Seite gegen Monster
-    for (let i = 0; i < 2; i++) { const [x, z] = farSpot(120); const n = spawnNpc(x, z, false, undefined, L.RICHARD_APP, 'schrotflinte'); n.hp = 400; n.richard = true; }
+    for (let i = 0; i < 12; i++) { const [x, z] = farSpot(120); const n = spawnNpc(x, z, false, undefined, L.RICHARD_APP, 'schrotflinte'); n.hp = 400; n.richard = true; }
     L.env.time = L.rand(6.5, 10); L.randomWeather();
     L.state = 'game'; L.paused = false;
     L.music.set('calm');
@@ -2603,7 +2669,7 @@
       L.bossShowT -= dt;
       if (L.bossShow === 1 && L.bossShowT <= 0) { spawnBoss(60); L.boss.idx = -1; L.boss.life = 20; L.bossShow = 2; }
       else if (L.bossShow === 2 && !L.boss) { L.bossShow = 3; L.bossShowT = 4; }
-      else if (L.bossShow === 3 && L.bossShowT <= 0) { const w = spawnWalrusBoss(60); w.idx = -2; w.life = 20; L.bossShow = 4; }
+      else if (L.bossShow === 3 && L.bossShowT <= 0) { const w = spawnGiantBoss('walross', 60); w.idx = -2; w.life = 20; L.bossShow = 4; }
       else if (L.bossShow === 4 && !L.wboss && !L.richardFight()) {
         L.bossShow = 0; P.spawnProt = 25; L.ivaEpoch = Date.now(); L.ivaDone = undefined;
         if (L.showLv) { L.save.ivaLvl = L.showLv[0]; L.save.walLvl = L.showLv[1]; L.persist(); }
@@ -2613,13 +2679,16 @@
     } else if (!L.boss && !L.wboss && !isClient()) {
       const K = ivaClock();
       const nIdx = K.pause ? K.idx : K.idx + 1;
-      R.nextBoss = nIdx % 2 === 1 ? 'DAS RIESEN-WALROSS' : 'MAMA IVA';
+      const BOSSES = ['iva', 'viktor', 'walross', 'daniel'];
+      R.nextBossType = BOSSES[nIdx % 4];
+      R.nextBoss = R.nextBossType === 'iva' ? 'MAMA IVA' : GBT[R.nextBossType].name;
       if (K.pause) {
         R.bossT = K.left;
         if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt ' + R.nextBoss + '.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
       } else if (L.ivaDone !== K.idx && K.left > 25) {
         R.warned = false;
-        if (K.idx % 2 === 1 && !L.ivaInstant) { const w = spawnWalrusBoss(K.left); w.idx = K.idx; }
+        const bt = ['iva', 'viktor', 'walross', 'daniel'][K.idx % 4];
+        if (bt !== 'iva' && !L.ivaInstant) { const w = spawnGiantBoss(bt, K.left); w.idx = K.idx; }
         else { spawnBoss(K.left); L.boss.idx = K.idx; }
       }
       else R.bossT = K.left + K.C; // diesmal ist sie schon weg – nächster Auftritt nach der Pause
@@ -2645,6 +2714,7 @@
     updateCyls(dt);
     L.updateNature(dt);
     L.updateRichard(dt);
+    L.updateDuel(dt);
     // solange MAMA IVA da ist, leuchtet der Turm rot – bis man drin ist
     L.towerCall = !!(((L.boss && !L.boss.dead) || L.wboss) && L.towerSafe() && P.alive && !P.gone && !L.inTower(P.x, P.z));
     L.setTowerGlow(L.towerCall);

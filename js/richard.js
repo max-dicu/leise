@@ -15,15 +15,27 @@
   // ---------- Riesen-Walross (eigener Entwurf): massiger Körper, lange Stoßzähne, Flossen, Schnurrhaare ----------
   L.buildWalross = function () {
     const root = new T.Group(), body = grp(root, 0, 1.1, 0), sph = G().sph, box = G().box, cone = G().cone;
-    const sk = '#7a5646', lt = '#a07a64', dk = '#4e362c';
+    const sk = '#7a5a4c', lt = '#b08a78', dk = '#4e362c', pale = '#c8a89a';
     part(sph, sk, 1.5, 1.15, 2.3, 0, 0, 0, body);
     part(sph, lt, 1.25, 0.8, 1.9, 0, -0.35, 0.1, body);
     for (let i = 0; i < 6; i++) part(box, dk, 2.6, 0.05, 0.08, 0, 0.2 + (i % 3) * 0.3, -1 + i * 0.35, body, { noShadow: true }).rotation.z = (i % 2 ? 0.2 : -0.2);
+    // fleckige, blasse, kranke Haut
+    for (let i = 0; i < 16; i++) { const a = i * 2.39, y = Math.sin(i * 1.7) * 0.7; part(sph, i % 3 ? pale : '#8a5a50', 0.35 + (i % 4) * 0.1, 0.25, 0.35, Math.cos(a) * 1.35, y, Math.sin(a) * 1.9, body, { noShadow: true }); }
     const head = grp(body, 0, 0.55, 2.0);
     part(sph, sk, 0.95, 0.85, 0.95, 0, 0.1, 0, head);
     const snout = part(sph, lt, 0.75, 0.5, 0.55, 0, -0.2, 0.7, head);
+    // zu breites Maul mit stumpfen, fast menschlichen Zähnen
+    part(box, '#1a0606', 1.1, 0.22, 0.2, 0, -0.62, 1.05, head, { noShadow: true });
+    for (let k = -4; k <= 4; k++) part(box, '#e8dcc0', 0.1, 0.13, 0.06, k * 0.115, -0.55, 1.15, head, { noShadow: true });
+    for (let k = -3; k <= 3; k++) part(box, '#d8c8a8', 0.1, 0.1, 0.06, k * 0.12, -0.7, 1.13, head, { noShadow: true });
     for (const s of [-1, 1]) {
-      part(sph, '#0a0806', 0.13, 0.13, 0.08, s * 0.42, 0.45, 0.72, head, { noShadow: true });
+      // blutunterlaufene, fast menschliche Augen mit hängenden Lidern
+      part(sph, '#f2ece0', 0.2, 0.17, 0.1, s * 0.42, 0.42, 0.78, head, { noShadow: true });
+      part(sph, '#4a3020', 0.08, 0.08, 0.05, s * 0.42, 0.4, 0.86, head, { noShadow: true });
+      part(sph, '#050505', 0.04, 0.04, 0.03, s * 0.42, 0.4, 0.9, head, { basic: true, noShadow: true });
+      for (let v = 0; v < 3; v++) part(box, '#b01818', 0.12, 0.012, 0.01, s * (0.34 + v * 0.06), 0.36 + v * 0.05, 0.86, head, { basic: true, noShadow: true }).rotation.z = s * (0.4 - v * 0.3);
+      part(sph, sk, 0.23, 0.1, 0.12, s * 0.42, 0.52, 0.8, head, { noShadow: true });
+      part(sph, '#2a1010', 0.12, 0.06, 0.06, s * 0.42, 0.25, 0.82, head, { noShadow: true });
       const tusk = part(cone, '#f2ead8', 0.12, 1.9, 0.12, s * 0.22, -1.2, 0.95, head); tusk.rotation.x = Math.PI + 0.12;
       for (let k = 0; k < 4; k++) { const w = part(box, '#e8e0d0', 0.6, 0.015, 0.015, s * 0.5, -0.15 - k * 0.07, 1.05, head, { noShadow: true }); w.rotation.y = s * (0.2 + k * 0.05); }
     }
@@ -61,11 +73,11 @@
   // ---------- Sounds ----------
   const sndWalross = (p) => { for (let k = 0; k < 3; k++) { L.tn({ f: 95, fTo: 70, dur: 0.35, type: 'sawtooth', vol: 0.3, pos: p, delay: k * 0.42, rev: true, ref: 40 }); L.nz({ dur: 0.3, f: 300, type: 'bandpass', q: 2, vol: 0.25, pos: p, delay: k * 0.42, ref: 40 }); } };
   const sndRichard = (p) => { L.tn({ f: 160, fTo: 230, dur: 0.25, type: 'sawtooth', vol: 0.2, pos: p, ref: 40 }); L.tn({ f: 230, fTo: 140, dur: 0.5, type: 'sawtooth', vol: 0.22, pos: p, delay: 0.25, ref: 40 }); L.nz({ dur: 0.7, f: 900, type: 'bandpass', vol: 0.12, pos: p, ref: 40 }); };
-  const sndHit = (p, v) => { L.snd.heavy(p, v || 1); L.nz({ dur: 0.25, f: 1800, fTo: 300, vol: 0.4, pos: p, ref: 40 }); };
+  const sndHit = (p, v) => { L.snd.heavy(p, v || 1); L.nz({ dur: 0.25, f: 1800, fTo: 300, vol: 0.4, pos: p, ref: 40 }); if ((v || 1) >= 1.2) { L.env.bolt = 1; L.snd.thunder(0.05); } L.fx('#ffd080', p.x, p.y, p.z, 20, 12, { basic: true, size: 0.8, life: 0.7 }); };
 
   // ---------- Ablauf ----------
   const MOVES = ['faust', 'aufwaerts', 'stoss', 'klatscher', 'tritt', 'bruellen'], ENDS = ['schleudern', 'ko', 'platt'];
-  const T_IN = 3.5, T_MOVE = 2.8, N_MOVE = 4, T_FIN = T_IN + T_MOVE * N_MOVE, T_FINLEN = 4.5, T_SINK = T_FIN + T_FINLEN + 2, T_TOTAL = T_SINK + 3;
+  const T_IN = 3.5, T_MOVE = 2.8, N_MOVE = 7, T_FIN = T_IN + T_MOVE * N_MOVE, T_FINLEN = 4.5, T_SINK = T_FIN + T_FINLEN + 2, T_TOTAL = T_SINK + 3;
   let F = null;
   L.richardFight = () => F;
   // opts.win: Richard gewinnt sicher (wenn er das Boss-Walross besiegt) · opts.ws: Größe des Walrosses

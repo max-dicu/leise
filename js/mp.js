@@ -318,6 +318,7 @@
       case 'boss': if (!host && L.state === 'game') bossPuppet(m); break;
       case 'tower': if (!host) { if (m.down) L.towerDestroy(); else L.towerRestore(); } break;
       case 'richard': if (!host) { if (m.win && L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; } L.startRichard(m.x, m.z, m.seed, { win: !!m.win, ws: m.ws }); } break;
+      case 'duel': if (!host) { if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; } L.startDuel(m.x, m.z, m.seed, m.loser, m.s); } break;
       case 'tsu': if (!host) L.startTsunami(m.side, false); break;
       case 'cyl': if (!host) L.cylinderFall(m.x, m.z, false); break;
       case 'smoke': if (!host) L.dropSmoke(m.x, m.z, false); break;
