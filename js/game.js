@@ -898,8 +898,8 @@
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     if (!block && L.hit('KeyT') && t.teleport) { if (P.tpCd > 0) L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); else teleportVehicle(v); }
-    if (t.fly) updateFlight(v, dt, !block && L.keys.Space, !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
-    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space && !t.fly, true);
+    if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
+    driveVehicle(v, dt, block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), block ? 0 : (L.keys.KeyA ? 1 : 0) - (L.keys.KeyD ? 1 : 0), !block && L.keys.Space, true);
     if (!P.vehicle) return;
     P.x = v.x; P.z = v.z; P.y = v.alt || 0;
     // Gurtwarner
@@ -1034,7 +1034,7 @@
     const floor = flyFloor(v.x, v.z);
     let vy = v.vy || 0;
     if (v.hp <= 0) { up = false; down = true; }
-    // Leertaste = hoch, C oder Shift = schnell runter, nichts drücken = langsam sinken
+    // E = hoch, C oder Shift = schnell runter, nichts drücken = langsam sinken (Leertaste = driften)
     if (up) vy += (14 - vy) * Math.min(1, dt * 3);
     else if (down) vy += (-20 - vy) * Math.min(1, dt * 3);
     else vy += ((v.alt > floor + 0.3 ? -6 : 0) - vy) * Math.min(1, dt * 2);
@@ -1731,7 +1731,7 @@
   // ---------- GIGA-CAPY gegen MAMA IVA: Aufstieg, Brüllen, ein Kampf (jedes Mal anders), dann zieht es sie in die Tiefe ----------
   // Zeitplan (s): 0–5 aufsteigen · 5–7 brüllen · 7–14,8 drei Kampf-Aktionen · 14,8–16,8 packen · 16,8–22,3 MAMA IVA versinkt · ab 17,8 taucht GIGA-CAPY hinterher
   const C_RISE = 5, C_ROAR = 7, C_MOVE = 2.6, C_NM = 3, C_FIGHT = C_ROAR + C_MOVE * C_NM, C_GRAB = C_FIGHT + 2;
-  L.CAPY_TOTAL = C_GRAB + 7;
+  L.CAPY_TOTAL = C_GRAB + 15;
   const CAPY_MOVES = ['schlag', 'strahl', 'stampfer', 'biss', 'rammen', 'peitsche'];
   function seededRng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   L.capyStart = function (b, seed) {
@@ -1747,20 +1747,115 @@
     const x = b.x + Math.sin(a) * 60, z = b.z + Math.cos(a) * 60;
     b.capy = { rig, x, z, yaw: Math.atan2(b.x - x, b.z - z), y: -85, roared: false, rumbleT: 0, seed, rnd, moves, cam: [rnd(), rnd(), rnd(), rnd(), rnd()] };
     b.fp = null;
+    duelStart(b.capy, b);
     rig.root.position.set(x, -85, z); rig.root.rotation.y = b.capy.yaw;
     L.banner('GIGA-CAPY ERWACHT', 'Ein riesiges Capybara bricht aus dem Boden – und greift MAMA IVA an!');
     if (L.cineCapy) L.cineCapy(b);
   };
   const ease3 = (k) => 1 - Math.pow(1 - L.clamp(k, 0, 1), 3);
   const bump = (u, a, b) => (u < a || u > b ? 0 : Math.sin((u - a) / (b - a) * Math.PI));
+  // ---------- Im Hintergrund: Riesen-Daniel gegen Riesen-Viktor (jedes Mal andere Größe, andere Kampfaktionen, anderes Ende) ----------
+  const DUEL_MOVES = ['schlag', 'kratzen', 'ringen', 'tritt', 'anspringen'], DUEL_ENDS = ['wuergen', 'suplex', 'wurf'];
+  const D_START = 1, D_FIGHT = 5, D_MOVE = 2.6, D_NM = 3, D_END = D_FIGHT + D_MOVE * D_NM, D_ENDLEN = 4;
+  const C_PULL2 = C_GRAB + 5.5; // danach holt GIGA-CAPY auch die beiden
+  function duelStart(c, b) {
+    const rnd = c.rnd;
+    const sv = 9 + rnd() * 15, sd = 8 + rnd() * 12;
+    const vik = L.buildViktor(['grey', 'red', 'blue', 'lange'][Math.floor(rnd() * 4)]), dan = L.buildDaniel();
+    vik.root.scale.setScalar(sv); dan.root.scale.setScalar(sd);
+    L.scene.add(vik.root); L.scene.add(dan.root);
+    const pool = DUEL_MOVES.slice(), moves = [];
+    for (let i = 0; i < D_NM; i++) moves.push({ k: pool.splice(Math.floor(rnd() * pool.length), 1)[0], hit: false });
+    const end = DUEL_ENDS[Math.floor(rnd() * DUEL_ENDS.length)];
+    // hinter dem Kampf, vom Spieler aus gesehen, etwas zur Seite
+    const mx = (c.x + b.x) / 2, mz = (c.z + b.z) / 2, away = Math.atan2(mx - P.x, mz - P.z) + (rnd() - 0.5) * 1.2;
+    const dd = 70 + rnd() * 25, x = mx + Math.sin(away) * dd, z = mz + Math.cos(away) * dd;
+    const axis = away + Math.PI / 2, gap = (sv * 0.45 + sd * 0.45);
+    c.duel = { vik, dan, sv, sd, moves, end, x, z, axis, gap, ph: 0, endHit: false, roared: false, pulled: false };
+  }
+  function duelUpdate(c, t, dt) {
+    const D = c.duel; if (!D) return;
+    const { vik, dan, sv, sd } = D, ax = Math.sin(D.axis), az = Math.cos(D.axis);
+    D.ph += dt * 6;
+    const gy = L.mountainH(D.x, D.z);
+    // Grundstellung: einander gegenüber
+    let vOff = -D.gap / 2, dOff = D.gap / 2, vY = 0, dY = 0, vRx = 0, vRz = 0, dRx = 0, vYaw = D.axis, dYaw = D.axis + Math.PI;
+    let vMode = 'alert', dMode = 'alert', vAtk = 0, dAtk = 0;
+    const rise = L.clamp((t - D_START) / 3.5, 0, 1), sinkY = -Math.max(sv, sd) * 3.2 * (1 - (1 - Math.pow(1 - rise, 3)));
+    const pose = [];
+    if (t >= D_FIGHT && t < D_END) {
+      const i = Math.floor((t - D_FIGHT) / D_MOVE), u = (t - D_FIGHT - i * D_MOVE) / D_MOVE, mv = D.moves[i];
+      if (mv.k === 'schlag') { dMode = 'attack'; dAtk = u; vOff -= bump(u, 0.45, 1) * sv * 0.5; vRx = -bump(u, 0.45, 1) * 0.4; if (u > 0.5 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 10, z: D.z }, 0.9); L.snd.viktor({ x: D.x, y: 15, z: D.z }); } }
+      else if (mv.k === 'kratzen') { vMode = 'attack'; vAtk = u; dOff += bump(u, 0.45, 1) * sd * 0.5; dRx = -bump(u, 0.45, 1) * 0.3; if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); } }
+      else if (mv.k === 'ringen') {
+        vMode = dMode = 'walk'; const k = bump(u, 0, 1); vOff += k * D.gap * 0.3; dOff -= k * D.gap * 0.3; vRx = dRx = 0.3 * k;
+        const spin = u * Math.PI * 0.6; vYaw += spin; dYaw += spin; D.axis += dt * 0.5;
+        pose.push(() => { for (const a of vik.arms) a.arm.rotation.x = -1.5 * k; for (const a of dan.arms) a.arm.rotation.x = -1.4 * k; });
+        if (u > 0.5 && !mv.hit) { mv.hit = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); }
+      } else if (mv.k === 'tritt') {
+        const k = bump(u, 0.3, 0.7); vOff -= bump(u, 0.45, 1) * sv * 0.4;
+        pose.push(() => { dan.legs[0].leg.rotation.x = -1.6 * k; dan.legs[0].knee.rotation.x = 0.3 * k; vik.torso.rotation.x = 0.7 * bump(u, 0.45, 1); });
+        if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 8, z: D.z }, 1); L.snd.viktor({ x: D.x, y: 15, z: D.z }); }
+      } else {
+        // Viktor springt Daniel an
+        vMode = 'crawl'; const k = bump(u, 0.1, 0.8); vY = k * sv * 1.1; vOff += k * D.gap * 0.6; dRx = -bump(u, 0.45, 1) * 0.35;
+        if (u > 0.45 && !mv.hit) { mv.hit = true; L.snd.heavy({ x: D.x, y: 10, z: D.z }, 0.8); L.snd.daniel({ x: D.x, y: 10, z: D.z }); }
+      }
+    } else if (t >= D_END) {
+      // Ende: Daniel gewinnt – würgen, Suplex oder Wurf
+      const u = L.clamp((t - D_END) / D_ENDLEN, 0, 1);
+      if (D.end === 'wuergen') {
+        const lift = ease3(u / 0.35); vOff = -D.gap * 0.22; vY = lift * sd * 1.2;
+        const kick = Math.max(0, 1 - u * 1.3);
+        pose.push(() => {
+          for (const a of dan.arms) { a.arm.rotation.x = -1.9; a.elbow.rotation.x = -0.3; }
+          vik.arms.forEach((a, i) => { a.arm.rotation.set(-2.4 * kick, 0, (i ? -1 : 1) * (0.2 + (1 - kick) * 0.3)); a.elbow.rotation.x = -1.2 * kick; });
+          vik.legs.forEach((l, i) => { l.leg.rotation.x = Math.sin(D.ph * 2 + i * 2) * 0.6 * kick; l.knee.rotation.x = 0.6 * kick; });
+          vik.neck.rotation.z = vik.tilt + (1 - kick) * 0.8;
+        });
+        if (u > 0.2 && !D.endHit) { D.endHit = true; L.snd.viktor({ x: D.x, y: 15, z: D.z }); }
+      } else if (D.end === 'suplex') {
+        // Daniel packt Viktor und wirft ihn rückwärts über sich auf den Kopf
+        const k = ease3(L.clamp((u - 0.15) / 0.45, 0, 1)), arc = k * Math.PI;
+        const r = sd * 1.3;
+        vOff = D.gap / 2 - Math.cos(arc) * r - r * 0.2; vY = Math.sin(arc) * sd * 1.6; vRx = arc * 1.05;
+        const arch = bump(u, 0.15, 0.95);
+        pose.push(() => { for (const a of dan.arms) a.arm.rotation.x = -2.2 * bump(u, 0.05, 0.9); dan.torso.rotation.x = -1.0 * arch; dan.neck.rotation.x = -0.4 * arch; });
+        if (u > 0.6 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.7); L.fx('#6a5a40', D.x, 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
+        if (u > 0.6) { vMode = 'dead'; }
+      } else {
+        // Daniel stemmt Viktor über den Kopf und schmettert ihn auf den Boden
+        const up = ease3(L.clamp(u / 0.4, 0, 1)), down = ease3(L.clamp((u - 0.55) / 0.12, 0, 1));
+        vOff = D.gap * 0.15 - down * D.gap * 0.5; vY = up * sd * 2.4 * (1 - down); vRz = up * Math.PI / 2;
+        pose.push(() => { for (const a of dan.arms) a.arm.rotation.x = -2.9 * up * (1 - down * 0.6); });
+        if (u > 0.67 && !D.endHit) { D.endHit = true; L.snd.stomp({ x: D.x, y: 0, z: D.z }); L.shake = Math.max(L.shake, 0.8); L.fx('#6a5a40', D.x, 1, D.z, 30, 14, { size: 1.2, life: 1.8 }); }
+        if (u > 0.67) vMode = 'dead';
+      }
+      if (u > 0.85) { dMode = 'alert'; if (!D.roared) { D.roared = true; L.snd.daniel({ x: D.x, y: 10, z: D.z }); } }
+      if (D.end === 'wuergen' && u > 0.85) vMode = 'dead';
+    } else { vMode = 'search'; dMode = 'search'; }
+    // GIGA-CAPY holt die beiden: sie versinken im Boden
+    let pull = 0;
+    if (t > C_PULL2) { pull = ease3((t - C_PULL2) / 4.5); if (!D.pulled) { D.pulled = true; L.msg('🦫 GIGA-CAPY zieht auch Viktor und Daniel in die Tiefe!', 4000); L.snd.daniel({ x: D.x, y: 10, z: D.z }); } if (Math.random() < dt * 12) L.fx('#5a4630', D.x + L.rand(-20, 20), 0.5, D.z + L.rand(-20, 20), 3, 10, { size: 1, life: 2 }); }
+    const down = pull * Math.max(sv, sd) * 4;
+    L.animViktor(vik, { mode: vMode, phase: D.ph, atk: vAtk });
+    L.animDaniel(dan, { mode: dMode, phase: D.ph, atk: dAtk });
+    for (const f of pose) f();
+    vik.root.position.set(D.x + ax * vOff, gy + sinkY + vY - down, D.z + az * vOff);
+    dan.root.position.set(D.x + ax * dOff, gy + sinkY + dY - down, D.z + az * dOff);
+    vik.root.rotation.set(0, vYaw, 0); vik.root.rotateX(vRx); vik.root.rotateZ(vRz);
+    dan.root.rotation.set(0, dYaw, 0); dan.root.rotateX(dRx);
+    vik.root.visible = dan.root.visible = t > D_START && pull < 0.99;
+  }
+
   // gibt zurück, wie weit MAMA IVA schon im Boden ist (0 … 1)
   L.capyUpdate = function (b, dt) {
     const c = b.capy; if (!c) return Math.min(1, b.sinking / 7);
     const t = b.sinking, r = c.rig;
     // Höhe
     if (t < C_RISE) c.y = -85 * (1 - ease3(t / C_RISE));
-    else if (t < C_GRAB + 1) c.y = 0;
-    else c.y = -90 * ease3((t - C_GRAB - 1) / 5.5);
+    else if (t < C_PULL2 + 3.5) c.y = 0;
+    else c.y = -90 * ease3((t - C_PULL2 - 3.5) / 5.5);
     // Pose von GIGA-CAPY und Wirkung auf MAMA IVA
     let armX = [0, 0], elbowX = [0, 0], lean = 0, headX = 0.1, headY = 0, headZ = Math.sin(t * 0.8) * 0.06, adv = 0;
     const fp = { tilt: 0, side: 0, push: 0, dip: 0, armUp: 0, whip: 0, beam: 0 };
@@ -1812,6 +1907,10 @@
         armX = [-0.8 * bump(u, 0.4, 1), -0.8 * bump(u, 0.4, 1)];
         if (u > 0.42 && !mv.hit) { mv.hit = true; L.snd.screech({ x: c.x, y: 40, z: c.z }, 0.4); atCapy(30); L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); }
       }
+    } else if (t >= C_PULL2) {
+      // dreht sich zu Viktor und Daniel und greift nach ihnen
+      const D = c.duel; if (D) c.yaw += L.angDiff(c.yaw, Math.atan2(D.x - c.x, D.z - c.z)) * Math.min(1, dt * 1.5);
+      const k = ease3((t - C_PULL2) / 1.2); adv = 0; armX = [-1.4 * k, -1.4 * k]; elbowX = [-0.6 * k, -0.6 * k]; lean = 0.3 * k;
     } else if (t >= C_FIGHT) {
       // packen und festhalten
       const k = ease3((t - C_FIGHT) / 1.2); adv = 12 + k * 10;
@@ -1828,7 +1927,8 @@
     r.head.rotation.set(headX, headY, headZ);
     if (t >= C_RISE && !c.roared) { c.roared = true; L.snd.capyRoar({ x: c.x, y: 50, z: c.z }); L.shake = Math.max(L.shake, 0.9); }
     // Beben, Staub und Steine beim Auf- und Abtauchen
-    if (t < C_RISE || t > C_GRAB) {
+    duelUpdate(c, t, dt);
+    if (t < C_RISE || t > C_PULL2 + 3.5) {
       const d = L.dist(P.x, P.z, c.x, c.z);
       L.shake = Math.max(L.shake, L.clamp((450 - d) / 450, 0, 0.9));
       if (Math.random() < dt * 14) L.fx(Math.random() < 0.5 ? '#5a4630' : '#3a3a36', c.x + L.rand(-18, 18), 0.5, c.z + L.rand(-18, 18), 3, 10, { size: 0.9, life: 2 });
@@ -1852,7 +1952,7 @@
       rig.beam.g.visible = true; L.setBeam(rig.beam, chest, V2.set(p.x, p.y + 36, p.z), 1.3);
     }
   };
-  L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); b.capy = null; } };
+  L.capyRemove = function (b) { if (b && b.capy) { L.scene.remove(b.capy.rig.root); const D = b.capy.duel; if (D) { L.scene.remove(D.vik.root); L.scene.remove(D.dan.root); } b.capy = null; } };
 
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {

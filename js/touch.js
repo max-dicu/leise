@@ -33,7 +33,7 @@
     </div>
     <div id="tCar" hidden>
       <button id="tZoomC" data-act="zoom" title="Kamera">🎥</button>
-      <button id="tTele" data-k="KeyT" title="Teleport">🌀</button><button id="tDown" data-k="KeyC" title="Sinken">⬇️</button>
+      <button id="tTele" data-k="KeyT" title="Teleport">🌀</button><button id="tUp" data-k="KeyE" title="Steigen">⬆️</button><button id="tDown" data-k="KeyC" title="Sinken">⬇️</button>
       <button id="tBrake" class="big" data-k="Space" title="Handbremse / Driften">🛑</button>
       <button id="tBelt" data-k="KeyB" title="Anschnallen">🔒</button>
       <button id="tHorn" data-k="KeyH" title="Hupe">📯</button>
@@ -154,7 +154,7 @@
     $('tBelt').hidden = !inV || P.vehicle.t.kind !== 'car';
     $('tTele').hidden = !inV || !P.vehicle.t.teleport || P.seat > 0;
     $('tDown').hidden = !inV || !P.vehicle.t.fly || P.seat > 0;
-    $('tBrake').textContent = inV && P.vehicle.t.fly ? '⬆️' : '🛑';
+    $('tUp').hidden = !inV || !P.vehicle.t.fly || P.seat > 0;
     $('tChat').hidden = !(L.net && L.net.connected);
     const it = L.selType ? L.selType() : null;
     $('tFire').textContent = it ? L.ITEMS[it].icon : '✋';

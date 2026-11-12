@@ -120,8 +120,11 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       const a = side + off + dir * t * 0.03, d = [125, 95, 110, 85, 120][seg] - (t % 2.6) * 3;
       const x = mx + Math.sin(a) * d, z = mz + Math.cos(a) * d;
       const y = Math.max(groundY(x, z) + 14, gy + [34, 22, 40, 18, 30][seg] - Math.max(0, t - 17) * 2);
-      const ly = gy + (t < 17 ? 32 : 32 - (t - 17) * 5);
-      return { x, y, z, lx: mx, ly, lz: mz };
+      let ly = gy + (t < 17 ? 32 : Math.max(8, 32 - (t - 17) * 5)), lx = mx, lz = mz;
+      // zum Schluss: GIGA-CAPY holt auch Viktor und Daniel
+      const D0 = c.duel;
+      if (D0 && t > 21.5) { const k = Math.min(1, (t - 21.5) / 1.5); lx = L.lerp(mx, (c.x + D0.x) / 2, k); lz = L.lerp(mz, (c.z + D0.z) / 2, k); ly = L.lerp(ly, gy + 20, k); }
+      return { x, y, z, lx, ly, lz };
     });
   };
   function cineCamera(dt) {
