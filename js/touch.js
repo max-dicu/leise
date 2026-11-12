@@ -32,7 +32,7 @@
       <button id="tVeh" data-k="KeyF" title="Einsteigen">🚗</button>
     </div>
     <div id="tCar" hidden>
-      <button data-act="zoom" title="Kamera">🎥</button>
+      <button id="tZoomC" data-act="zoom" title="Kamera">🎥</button>
       <button id="tTele" data-k="KeyT" title="Teleport">🌀</button><button id="tDown" data-k="KeyC" title="Sinken">⬇️</button>
       <button id="tBrake" class="big" data-k="Space" title="Handbremse / Driften">🛑</button>
       <button id="tBelt" data-k="KeyB" title="Anschnallen">🔒</button>

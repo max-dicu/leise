@@ -176,6 +176,9 @@ body.touch { touch-action: none; -webkit-tap-highlight-color: transparent; }
 #tAim, #tHorn { right: 112px; bottom: 78px; }
 #tUse, #tExit { right: 26px; bottom: 116px; font-weight: 700; }
 #tVeh { right: 84px; bottom: 140px; }
+#tDown { right: 172px; bottom: 26px; }
+#tTele { right: 172px; bottom: 86px; }
+#tZoomC { right: 92px; bottom: 150px; }
 #rotateHint { display: none; position: fixed; inset: 0; z-index: 40; background: #050506; color: var(--text); font-size: 26px; text-align: center; align-items: center; justify-content: center; line-height: 1.6; }
 @media (orientation: portrait) { body.touch.ingame #rotateHint { display: flex; } }
 body.touch #tl { font-size: 12px; }

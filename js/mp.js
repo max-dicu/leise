@@ -575,7 +575,9 @@
       m.phase += dt * (m.anim === 'crawl' ? 9 : m.anim === 'run' ? 6 : m.anim === 'walk' ? 3.2 : 2);
       if (m.anim === 'alert' && m.lastAnim !== 'alert' && dP < 120) D.voice({ x: m.x, y: 2.5, z: m.z });
       m.lastAnim = m.anim;
-      if (dP < 45 && Math.random() < dt * 0.35) D.idle({ x: m.x, y: 2.6, z: m.z });
+      if (dP < 80 && Math.random() < dt * 0.3) D.idle({ x: m.x, y: 2.6, z: m.z });
+      m.voiceT = (m.voiceT || 0) - dt;
+      if ((m.anim === 'run' || m.anim === 'crawl') && dP < 110 && m.voiceT <= 0) { m.voiceT = L.rand(4, 7); D.voice({ x: m.x, y: 2.5, z: m.z }); }
       if (!rig.root.visible) continue;
       D.anim(rig, { mode: m.fly ? 'fly' : m.anim, phase: m.phase, atk: m.atk, fast: m.anim === 'run' });
       rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;

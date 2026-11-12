@@ -213,12 +213,25 @@
     },
     langerIdle(pos) { for (let i = 0; i < 4; i++) L.nz({ dur: 0.06 + Math.random() * 0.12, f: 1800 + Math.random() * 2000, type: 'bandpass', q: 0.5, vol: 0.12, pos, delay: i * 0.15 + Math.random() * 0.1 }); },
     // Der Rufer: tiefer, zweistimmiger Ruf wie ein Nebelhorn, der anschwillt und abbricht
+    // Der Rufer: heulende Sirene – auf und ab, leicht verzerrt
     rufer(pos) {
-      [[73, 69], [110, 104]].forEach(([f, t2], i) => { L.tn({ f, fTo: t2, dur: 2.6, type: 'square', vol: 0.16 - i * 0.04, pos, at: 0.9, rev: true }); L.tn({ f: f * 1.01, fTo: t2 * 1.01, dur: 2.6, type: 'sawtooth', vol: 0.1, pos, at: 0.9 }); });
-      L.tn({ f: 92, fTo: 60, dur: 1.2, type: 'square', vol: 0.18, pos, delay: 2.7, rev: true });
-      L.nz({ dur: 2.4, f: 180, type: 'bandpass', q: 3, vol: 0.2, pos, at: 1 });
+      for (let k = 0; k < 3; k++) {
+        const d = k * 1.6;
+        [[330, 880, 'sawtooth', 0.13], [334, 888, 'square', 0.06]].forEach(([a, b, ty, vol]) => {
+          L.tn({ f: a, fTo: b, dur: 0.8, type: ty, vol, pos, delay: d, at: 0.15, rev: true });
+          L.tn({ f: b, fTo: a, dur: 0.8, type: ty, vol, pos, delay: d + 0.8, rev: true });
+        });
+      }
+      L.nz({ dur: 4.6, f: 900, type: 'bandpass', q: 2, vol: 0.08, pos, at: 0.5 });
     },
+    ruferIdle(pos) { L.tn({ f: 300, fTo: 620, dur: 0.6, type: 'sawtooth', vol: 0.08, pos, rev: true }); L.tn({ f: 620, fTo: 280, dur: 0.7, type: 'sawtooth', vol: 0.06, pos, delay: 0.6 }); L.nz({ dur: 0.6, f: 2000, type: 'bandpass', vol: 0.06, pos, delay: 0.2 }); },
     ruferStep(pos) { L.tn({ f: 38, fTo: 22, dur: 0.6, vol: 0.7, pos }); L.nz({ dur: 0.4, f: 160, vol: 0.5, pos }); L.nz({ dur: 0.15, f: 1200, type: 'bandpass', q: 4, vol: 0.1, pos, delay: 0.05 }); },
+    // Marsianer: heulendes „Ulla, ulla“ und nasses Gurgeln
+    marsianer(pos) {
+      for (let k = 0; k < 2; k++) { L.tn({ f: 210, fTo: 160, dur: 0.55, type: 'sawtooth', vol: 0.14, pos, delay: k * 0.75, at: 0.1, rev: true }); L.tn({ f: 160, fTo: 120, dur: 0.25, type: 'triangle', vol: 0.12, pos, delay: k * 0.75 + 0.5 }); }
+      L.nz({ dur: 1.4, f: 500, type: 'bandpass', q: 4, vol: 0.12, pos, at: 0.2 });
+    },
+    marsianerIdle(pos) { for (let i = 0; i < 4; i++) L.nz({ dur: 0.12, f: 300 + Math.random() * 400, type: 'bandpass', q: 5, vol: 0.12, pos, delay: i * 0.13 }); },
     // Blockling: piepsige Alien-Sprache
     blockling(pos) { for (let i = 0; i < 6; i++) { const f = L.pick([660, 880, 990, 1320, 1180, 740]); L.tn({ f, fTo: f * (Math.random() < 0.5 ? 1.5 : 0.7), dur: 0.09, type: 'square', vol: 0.07, pos, delay: i * 0.1 }); } },
     blocklingIdle(pos) { const f = 900 + Math.random() * 500; L.tn({ f, fTo: f * 1.6, dur: 0.08, type: 'square', vol: 0.05, pos }); L.tn({ f: f * 1.2, dur: 0.06, type: 'square', vol: 0.04, pos, delay: 0.12 }); },
@@ -372,6 +385,26 @@
     night: { bpm: 44, play(t, s) {
       if (s % 16 === 0) [45, 52].forEach((m) => mn({ t, m, dur: 9, vol: 0.035, type: 'sine', at: 3 }));
       if (Math.random() < 0.1) mn({ t, m: L.pick([76, 81, 84, 88]), dur: 3, vol: 0.022, type: 'sine', rev: true });
+    } },
+    // weitere ruhige Stücke, die sich alle 30 Sekunden abwechseln
+    wander: { bpm: 70, play(t, s) {
+      const ch = CH[['Am', 'Em', 'F', 'C'][Math.floor(s / 16) % 4]];
+      if (s % 2 === 0) mn({ t, m: ch[(s / 2) % 3] + 12, dur: 1.6, vol: 0.04, type: 'triangle', rev: true });
+      if (s % 16 === 0) mn({ t, m: ch[0] - 12, dur: 6, vol: 0.035, type: 'sine', at: 0.5 });
+    } },
+    drift: { bpm: 40, play(t, s) {
+      if (s % 8 === 0) CH[['Dm', 'Am', 'F', 'Em'][Math.floor(s / 8) % 4]].forEach((m) => mn({ t, m, dur: 6.5, vol: 0.022, type: 'sine', at: 2.2, rev: true }));
+      if (Math.random() < 0.18) mn({ t, m: L.pick([74, 76, 79, 81, 84]), dur: 2.2, vol: 0.025, type: 'triangle', rev: true });
+    } },
+    lonely: { bpm: 58, play(t, s) {
+      const mel = [69, -1, 67, 64, -1, 62, 64, -1, 60, -1, 62, -1, 64, -1, -1, -1];
+      const n = mel[s % 16]; if (n > 0) mn({ t, m: n, dur: 1.4, vol: 0.045, type: 'triangle', rev: true });
+      if (s % 16 === 0) [45, 52].forEach((m) => mn({ t, m, dur: 7, vol: 0.03, type: 'sine', at: 1 }));
+    } },
+    nightB: { bpm: 36, play(t, s) {
+      if (s % 12 === 0) [40, 47, 52].forEach((m) => mn({ t, m, dur: 8, vol: 0.025, type: 'sine', at: 3 }));
+      if (Math.random() < 0.08) mn({ t, m: L.pick([71, 74, 76, 83]), dur: 3.5, vol: 0.02, type: 'sine', rev: true });
+      if (s % 24 === 12) mn({ t, m: 35, dur: 2, vol: 0.05, type: 'triangle', lp: 300 });
     } },
     tension: { bpm: 76, play(t, s) {
       if (s % 2 === 0) mn({ t, m: 33, dur: 0.5, vol: 0.11, type: 'sawtooth', lp: 280 });

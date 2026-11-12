@@ -205,8 +205,49 @@
     }
   };
 
+  // ---------- Marsianer (wie im Buch „Krieg der Welten“): Körper wie ein großer Kopf, 16 peitschende Tentakel ----------
+  L.buildMarsianer = function () {
+    const root = new T.Group(), body = grp(root), hipY = 0.75, hips = grp(body, 0, hipY, 0), sph = G().sph, box = G().box, cone = G().cone;
+    const sk = '#7a6e5c', dk = '#4e4538', wet = { metal: 0.2, rough: 0.6 };
+    const torso = grp(hips);
+    part(sph, sk, 0.85, 0.8, 0.9, 0, 0.55, 0, torso, wet);
+    part(sph, dk, 0.6, 0.35, 0.7, 0, 0.05, -0.1, torso, wet);
+    for (let i = 0; i < 5; i++) part(box, dk, 0.06, 0.4, 0.04, (i - 2) * 0.25, 1.0, -0.35, torso, { noShadow: true }).rotation.x = 0.6;
+    const head = grp(torso, 0, 0.55, 0.62);
+    for (const s of [-1, 1]) {
+      part(sph, '#0c0c0a', 0.22, 0.26, 0.12, s * 0.3, 0.12, 0.05, head, { metal: 0.6, rough: 0.2 });
+      part(sph, '#c8ff6a', 0.05, 0.05, 0.03, s * 0.27, 0.18, 0.15, head, glow);
+    }
+    const beak = part(cone, '#3a3228', 0.12, 0.3, 0.12, 0, -0.2, 0.12, head); beak.rotation.x = Math.PI / 2 + 0.4;
+    // zwei Bündel mit je acht Tentakeln
+    const arms = [];
+    for (const s of [-1, 1]) for (let i = 0; i < 8; i++) {
+      const a = (i / 7 - 0.5) * 1.6, g = grp(torso, s * 0.35 + Math.sin(a) * 0.15, 0.05, 0.45 + Math.cos(a) * 0.1);
+      g.rotation.set(0, s * 0.5 + a * 0.6, s * 0.5);
+      const l = limb(g, 0, 0, 0, 0.05, 0.55, 0.55, sk, dk);
+      arms.push(l);
+    }
+    return rigOut(root, body, hips, torso, head, [], arms, hipY, { kind: 'marsianer', tent: true });
+  };
+  function animMarsianer(r, st) {
+    const m = st.mode, ph = st.phase || 0, fast = m === 'run' || m === 'crawl';
+    const sp = fast ? 2.2 : m === 'walk' ? 1 : 0.5;
+    r.body.position.y = 0; r.body.rotation.set(0, 0, 0);
+    if (m === 'dead') { r.body.position.y = -0.7; r.body.rotation.z = 0.6; for (const a of r.arms) { a.arm.rotation.x = 1.2; a.elbow.rotation.x = 0.3; } return; }
+    r.hips.position.y = r.hipY + Math.sin(ph * sp) * 0.08;
+    r.torso.scale.set(1 + Math.sin(ph * 1.3) * 0.04, 1 - Math.sin(ph * 1.3) * 0.04, 1);
+    r.torso.rotation.x = fast ? 0.25 : 0;
+    r.arms.forEach((a, i) => {
+      const w = Math.sin(ph * sp * 1.4 + i * 0.8);
+      a.arm.rotation.x = -0.35 + w * (fast ? 0.5 : 0.25); a.elbow.rotation.x = 0.5 + Math.sin(ph * sp * 2 + i) * 0.4;
+    });
+    if (m === 'attack') { const k = st.atk || 0; r.arms.forEach((a, i) => { a.arm.rotation.x = -1.2 + k * 2.6 + (i % 3) * 0.1; a.elbow.rotation.x = -0.6; }); }
+    if (m === 'alert') r.head.rotation.x = -0.3 + Math.sin(ph * 8) * 0.05; else r.head.rotation.x = 0;
+  }
+
   // ---------- Bewegung für alle neuen Monster ----------
   L.animBeast = function (r, st) {
+    if (r.tent) return animMarsianer(r, st);
     const m = st.mode, ph = st.phase || 0, sc = r.root.scale.x;
     r.body.rotation.set(0, 0, 0); r.body.position.set(0, 0, 0);
     r.hips.position.y = r.hipY; r.torso.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0);
@@ -265,7 +306,7 @@
     const gy = L.mountainH ? L.mountainH(x, z) : 0, g = new T.Group(); L.scene.add(g);
     const list = [
       [L.buildViktor('grey'), 3.2], [L.buildViktor('red'), 3.2], [L.buildDaniel(), 3], [L.buildLanger(), 2.6], [L.buildRufer(), 1.1],
-      [L.buildBlockling(), 4.5], [L.buildSchwelle(), 3.5], [L.buildGreifer(), 1.8], [L.buildFlieger(), 0.9], [L.buildWalker(), 0.32]
+      [L.buildBlockling(), 4.5], [L.buildSchwelle(), 3.5], [L.buildMarsianer(), 3.5], [L.buildGreifer(), 1.8], [L.buildFlieger(), 0.9], [L.buildWalker(), 0.32]
     ];
     // vom Stelzer nur der Rumpf (die Beine werden sonst erst beim Laufen ausgerichtet)
     const wk = list[list.length - 1][0];
