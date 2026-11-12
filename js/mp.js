@@ -577,7 +577,7 @@
       m.lastAnim = m.anim;
       if (dP < 45 && Math.random() < dt * 0.35) D.idle({ x: m.x, y: 2.6, z: m.z });
       if (!rig.root.visible) continue;
-      D.anim(rig, { mode: m.fly ? 'fly' : m.anim, phase: m.phase, atk: m.atk });
+      D.anim(rig, { mode: m.fly ? 'fly' : m.anim, phase: m.phase, atk: m.atk, fast: m.anim === 'run' });
       rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
     }
     for (const n of E.npcs) {

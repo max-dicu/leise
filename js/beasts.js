@@ -157,6 +157,54 @@
     return rigOut(root, body, hips, torso, head, [], [], hipY, { kind: 'flieger', ring, beamCone: beam, fly: true });
   };
 
+  // ---------- eigener Rennstil je Monster ----------
+  const RUNS = {
+    // steif, gleitend, Arme hängen reglos nach hinten, Kopf schief
+    langer(r, ph, legs, arms) {
+      for (let i = 0; i < 2; i++) { const w = Math.sin(ph * 0.8 + i * Math.PI); legs[i].leg.rotation.x = w * 0.7; legs[i].knee.rotation.x = Math.max(0, -w) * 0.35; }
+      for (let i = 0; i < 2; i++) { arms[i].arm.rotation.set(0.35, 0, (i ? -1 : 1) * 0.12); arms[i].elbow.rotation.x = 0; }
+      r.body.position.y = Math.abs(Math.sin(ph * 0.8)) * 0.03;
+      r.torso.rotation.x = 0.08; r.head.rotation.set(0, Math.sin(ph * 0.3) * 0.1, 0.45);
+    },
+    // schweres Schaukeln, lange Arme schwingen weit, das Horn nickt
+    rufer(r, ph, legs, arms) {
+      const p = ph * 0.6;
+      for (let i = 0; i < 2; i++) {
+        const w = Math.sin(p + i * Math.PI);
+        legs[i].leg.rotation.x = w * 0.6; legs[i].knee.rotation.x = Math.max(0, Math.sin(p + i * Math.PI - 1.2)) * 0.9;
+        arms[i].arm.rotation.set(-w * 0.9 - 0.2, 0, (i ? -1 : 1) * (0.25 + Math.abs(w) * 0.2)); arms[i].elbow.rotation.x = -0.5;
+      }
+      r.body.rotation.z = Math.sin(p) * 0.12; r.body.position.y = Math.abs(Math.sin(p)) * 0.4;
+      r.torso.rotation.x = 0.35; r.head.rotation.x = -0.3 + Math.sin(p * 2) * 0.25;
+    },
+    // kantig wie ein Spielzeug: Beine und Arme ganz gerade, große Schwünge
+    blockling(r, ph, legs, arms) {
+      for (let i = 0; i < 2; i++) {
+        const w = Math.sin(ph * 1.2 + i * Math.PI);
+        legs[i].leg.rotation.x = w * 0.95; legs[i].knee.rotation.x = 0;
+        arms[i].arm.rotation.set(-w * 1.1, 0, 0); arms[i].elbow.rotation.x = 0;
+      }
+      r.body.position.y = Math.abs(Math.sin(ph * 1.2)) * 0.1; r.head.rotation.z = Math.sin(ph * 1.2) * 0.08;
+    },
+    // Galopp: Hinterbeine und Vorderarme jeweils zusammen, der Rücken wippt
+    schwelle(r, ph, legs, arms) {
+      const p = ph * 1.1, wb = Math.sin(p), wf = Math.sin(p + 1.9);
+      for (let i = 0; i < 2; i++) {
+        legs[i].leg.rotation.x = wb * 0.9 + (i ? 0.1 : 0); legs[i].knee.rotation.x = Math.max(0, -wb) * 1.0;
+        arms[i].arm.rotation.x = wf * 1.0 + (i ? 0.1 : 0); arms[i].elbow.rotation.x = -Math.max(0, wf) * 0.9;
+      }
+      r.torso.rotation.x = Math.sin(p + 0.9) * 0.18; r.body.position.y = Math.max(0, Math.sin(p * 2)) * 0.15;
+      r.head.rotation.x = 0.2 + Math.sin(p) * 0.15;
+    },
+    // trippelnd: Beine im schnellen Wellentakt, Greifarme peitschen
+    greifer(r, ph, legs, arms) {
+      const p = ph * 1.6;
+      legs.forEach((l, i) => { const w = Math.sin(p + i * 2.5); l.leg.rotation.x = 0.55 + w * 0.45; l.knee.rotation.x = -0.75 + Math.max(0, -w) * 0.6; });
+      arms.forEach((a, i) => { a.arm.rotation.x = -1.1 + Math.sin(p * 1.3 + i * 2) * 0.6; a.elbow.rotation.x = -0.6 + Math.sin(p * 1.7 + i) * 0.5; });
+      r.body.position.y = Math.sin(p * 2) * 0.08; r.torso.rotation.z = Math.sin(p) * 0.06;
+    }
+  };
+
   // ---------- Bewegung für alle neuen Monster ----------
   L.animBeast = function (r, st) {
     const m = st.mode, ph = st.phase || 0, sc = r.root.scale.x;
@@ -166,6 +214,7 @@
       r.body.position.y = Math.sin(ph * 0.6) * 0.6;
       r.ring.rotation.y = ph * 0.8;
       r.torso.rotation.z = Math.sin(ph * 0.4) * 0.05;
+      r.torso.rotation.x = st.fast ? 0.22 : 0;
       r.beamCone.visible = m !== 'dead';
       if (m === 'dead') { r.body.position.y = -r.hipY + 0.5; r.torso.rotation.z = 0.4; }
       return;
@@ -182,7 +231,8 @@
     }
     const run = m === 'run' || m === 'crawl', moving = m === 'walk' || run;
     const amp = run ? 0.75 : 0.4, sp = run ? 1 : 0.7;
-    if (moving) {
+    if (run && RUNS[r.kind]) RUNS[r.kind](r, ph, legs, arms);
+    else if (moving) {
       for (let i = 0; i < n; i++) {
         const off = r.multi ? i * Math.PI * 2 / n : i * Math.PI, w = Math.sin(ph * sp + off);
         if (r.multi) { legs[i].leg.rotation.x = 0.55 + w * 0.35; legs[i].knee.rotation.x = -0.75 + Math.max(0, -w) * 0.5; }

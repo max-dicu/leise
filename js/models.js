@@ -594,16 +594,22 @@
       return;
     }
     if (m === 'crawl') {
-      r.hips.position.y = 0.9 * s;
-      r.torso.rotation.x = 1.25; r.neck.rotation.x = -1.05; r.head.rotation.z = Math.sin(ph * 0.5) * 0.3;
+      // Jagd-Sprint: weit vorgebeugt, riesige Schritte, lange Arme schleudern hinterher, Kopf zuckt
+      const b = Math.abs(Math.sin(ph));
+      r.hips.position.y = 1.4 * s + b * 0.14 * s;
+      r.torso.rotation.x = 0.5 + Math.sin(ph * 2) * 0.05;
+      r.body.rotation.z = Math.sin(ph) * 0.06;
       for (let i = 0; i < 2; i++) {
         const w = Math.sin(ph + i * Math.PI);
-        r.arms[i].arm.rotation.x = -1.25 + w * 0.45; r.arms[i].elbow.rotation.x = -1.25 + Math.max(0, w) * 0.4;
-        r.arms[i].arm.rotation.z = (i ? -1 : 1) * 0.25;
-        r.legs[i].leg.rotation.x = -0.9 - w * 0.35; r.legs[i].knee.rotation.x = 1.8;
-        r.legs[i].leg.rotation.z = (i ? -1 : 1) * 0.2;
+        r.legs[i].leg.rotation.x = -w * 0.85 - 0.1;
+        r.legs[i].knee.rotation.x = 0.2 + Math.max(0, Math.sin(ph + i * Math.PI + 1.4)) * 1.8;
+        r.arms[i].arm.rotation.x = w * 0.7 - 0.25;
+        r.arms[i].arm.rotation.z = (i ? -1 : 1) * 0.28;
+        r.arms[i].elbow.rotation.x = -0.35 - Math.max(0, -w) * 0.6;
+        for (const f of r.arms[i].fingers) f.rotation.x = -0.7;
       }
-      r.mouth.scale.y = 0.04 * s; r.teeth.visible = true;
+      r.neck.rotation.set(-0.55 + Math.sin(ph * 2) * 0.08, Math.sin(ph * 0.9) * 0.15, r.tilt + Math.sin(ph * 3.7) * 0.2);
+      r.mouth.scale.set(0.035 * s, 0.05 * s, 0.012 * s); r.teeth.visible = true;
       return;
     }
     if (m === 'alert') {
@@ -701,8 +707,23 @@
       r.mouth.scale.y = 0.06;
       return;
     }
-    if (m === 'walk' || m === 'run') {
-      const run = m === 'run', amp = run ? 0.8 : 0.38;
+    if (m === 'run') {
+      // Sprint mit Brust raus, Knie bis zum Bauch, Arme pumpen wie verrückt, großes Federn
+      const b = Math.abs(Math.sin(ph));
+      r.hips.position.y = 1.15 + b * 0.16;
+      r.torso.rotation.x = -0.06; r.body.rotation.z = Math.sin(ph) * 0.09;
+      for (let i = 0; i < 2; i++) {
+        const w = Math.sin(ph + i * Math.PI);
+        r.legs[i].leg.rotation.x = w > 0 ? -w * 1.7 : -w * 0.45;
+        r.legs[i].knee.rotation.x = w > 0 ? w * 1.9 : -w * 0.2;
+        r.arms[i].arm.rotation.x = w > 0 ? w * 0.9 : w * 2.3;
+        r.arms[i].arm.rotation.z = (i ? -1 : 1) * 0.22;
+        r.arms[i].elbow.rotation.x = -1.7;
+      }
+      r.neck.rotation.set(Math.sin(ph * 2) * 0.18, 0, Math.sin(ph) * 0.1);
+      r.mouth.scale.y = 0.055;
+    } else if (m === 'walk') {
+      const run = false, amp = 0.38;
       r.torso.rotation.x = run ? 0.32 : 0.05;
       r.body.rotation.z = Math.sin(ph) * (run ? 0.04 : 0.07);
       r.hips.position.y = 1.15 + Math.abs(Math.sin(ph)) * (run ? 0.08 : 0.03);

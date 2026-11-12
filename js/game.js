@@ -171,7 +171,7 @@
     const out = [];
     if (e.kind === 'viktor') {
       const s = e.rig.s;
-      if (e.anim === 'crawl') { out.push([e.x + Math.sin(e.yaw) * 0.6, 0.9 * s, e.z + Math.cos(e.yaw) * 0.6, 0.55 * s, 1], [e.x + Math.sin(e.yaw) * 1.3 * s, 1.2 * s, e.z + Math.cos(e.yaw) * 1.3 * s, 0.25 * s, 2]); }
+      if (e.anim === 'crawl') { const f = 0.45 * s; out.push([e.x, 1.3 * s, e.z, 0.35 * s, 1], [e.x + Math.sin(e.yaw) * f, 2.0 * s, e.z + Math.cos(e.yaw) * f, 0.35 * s, 1], [e.x + Math.sin(e.yaw) * f * 1.6, 2.5 * s, e.z + Math.cos(e.yaw) * f * 1.6, 0.24 * s, 2]); }
       else out.push([e.x, 1.3 * s, e.z, 0.35 * s, 1], [e.x, 2.1 * s, e.z, 0.35 * s, 1], [e.x, 2.8 * s, e.z, 0.24 * s, 2]);
     } else if (e.kind === 'daniel') out.push([e.x, 1.0, e.z, 0.65, 1], [e.x, 1.9, e.z, 0.8, 1], [e.x, 2.5, e.z, 0.25, 2]);
     else if (MK[e.kind]) { for (const h of MK[e.kind].hit) out.push([e.x, h[0], e.z, h[1], h[2]]); }
@@ -1249,7 +1249,7 @@
     if (dP < 60 && Math.random() < dt * 0.5) D.idle({ x: m.x, y: 16, z: m.z });
     m.anim = m.state === 'chase' ? 'run' : 'walk';
     if (!rig.root.visible) return true;
-    D.anim(rig, { mode: 'fly', phase: m.phase });
+    D.anim(rig, { mode: 'fly', phase: m.phase, fast: m.state === 'chase' });
     rig.root.position.set(m.x, 0, m.z); rig.root.rotation.y = m.yaw;
     return true;
   }
