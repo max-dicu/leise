@@ -13,7 +13,7 @@
   }
   const grp = (parent, x, y, z) => { const g = new T.Group(); g.position.set(x || 0, y || 0, z || 0); if (parent) parent.add(g); return g; };
   function shade(hex, f) {
-    const c = new T.Color(hex); c.multiplyScalar(f);
+    const c = new T.Color(hex); c.multiplyScalar(f); c.r = Math.min(1, c.r); c.g = Math.min(1, c.g); c.b = Math.min(1, c.b);
     return '#' + c.getHexString();
   }
 
@@ -24,7 +24,7 @@
   L.PALETTE = PALETTE;
   L.CHAR_OPTS = {
     skin: ['#f6dcc6', '#f1d2b6', '#e8c09c', '#e3b48f', '#d49e74', '#c98e65', '#b07a52', '#a46a45', '#7a4a2e', '#4e2f1e'],
-    hair: ['kurz', 'seitenscheitel', 'pony', 'buzz', 'stachel', 'undercut', 'irokese', 'locken', 'wellig', 'lang', 'bob', 'zopf', 'zoepfe', 'dutt', 'dreads', 'glatze'],
+    hair: ['kurz', 'fade', 'buzz', 'seitenscheitel', 'mittelscheitel', 'pony', 'tolle', 'zurueck', 'wuschel', 'stachel', 'undercut', 'irokese', 'kurzlocken', 'locken', 'wellig', 'lang', 'bob', 'wolfcut', 'mullet', 'emo', 'zopf', 'hoherzopf', 'flechtzopf', 'zoepfe', 'dutt', 'doppeldutt', 'manbun', 'cornrows', 'twists', 'dreads', 'glatze'],
     hairColor: PALETTE,
     eyes: PALETTE,
     brows: ['normal', 'duenn', 'dick', 'buschig', 'boese', 'hoch', 'traurig', 'gebogen'],
@@ -35,11 +35,11 @@
     glassesColor: PALETTE,
     hat: ['keine', 'muetze', 'beanie', 'cap', 'cap_rueck', 'helm', 'stirnband', 'bandana', 'cowboy', 'zylinder', 'sonnenhut', 'krone'],
     hatColor: PALETTE,
-    top: ['tshirt', 'tanktop', 'hemd', 'pullover', 'hoodie', 'jacke', 'lederjacke', 'regenjacke', 'weste', 'anzug', 'trikot', 'kittel'],
+    top: ['tshirt', 'oversize', 'tanktop', 'polo', 'hemd', 'flanell', 'pullover', 'hoodie', 'trainingsjacke', 'jacke', 'lederjacke', 'puffer', 'regenjacke', 'weste', 'mantel', 'anzug', 'trikot', 'kittel'],
     topColor: PALETTE,
-    pants: ['jeans', 'kurz', 'jogging', 'cargo', 'zerrissen', 'anzughose'],
+    pants: ['jeans', 'baggy', 'baggycargo', 'skinny', 'kurz', 'cargoshorts', 'jogging', 'cargo', 'camo', 'karo', 'schlag', 'latzhose', 'zerrissen', 'anzughose', 'rock'],
     pantsColor: PALETTE,
-    shoeType: ['sneaker', 'hightop', 'stiefel', 'sandale', 'lackschuh', 'barfuss'],
+    shoeType: ['sneaker', 'chunky', 'skate', 'hightop', 'stiefel', 'sandale', 'lackschuh', 'barfuss'],
     shoes: PALETTE,
     build: ['duenn', 'schmal', 'normal', 'kraeftig', 'muskuloes'],
     height: ['sehr_klein', 'klein', 'mittel', 'gross', 'sehr_gross'],
@@ -63,123 +63,227 @@
     return a;
   };
 
-  // Frisuren – liegen eng am Kopf; „covered“ = Kopfbedeckung verdeckt den Oberkopf
+  // Frisuren – mit Volumen, Strähnen und Farbschattierungen; „covered“ = Kopfbedeckung verdeckt den Oberkopf
   function buildHair(head, A, covered) {
-    const box = G().box, sph = G().sph, cone = G().cone, cyl = G().cyl, hc = A.hairColor, dk = shade(hc, 0.8);
-    const ns = { noShadow: true };
-    const top = (h) => { if (!covered) part(box, hc, 0.27, h || 0.06, 0.28, 0, 0.3 + (h || 0.06) / 2 - 0.01, -0.005, head); };
-    const back = (len) => part(box, hc, 0.27, len, 0.05, 0, 0.31 - len / 2, -0.125, head);
-    const sides = (len, depth) => { for (const s of [-1, 1]) part(box, hc, 0.03, len, depth || 0.2, s * 0.135, 0.31 - len / 2, -0.03, head); };
-    const fringe = (h, w) => part(box, hc, w || 0.26, h, 0.03, 0, 0.3 - h / 2, 0.125, head, ns);
-    // Kette aus kleinen Kugeln (für Locken, Zöpfe)
-    const chain = (x, y, z, n, r, dy, spiral, color) => {
-      for (let k = 0; k < n; k++) {
-        const a = k * 1.9, rr = r * (1 - k * 0.06);
-        part(sph, k % 2 ? (color || hc) : shade(color || hc, 0.85), rr, rr * 1.15, rr, x + Math.cos(a) * spiral, y - k * dy, z + Math.sin(a) * spiral, head);
+    const box = G().box, sph = G().sph, cone = G().cone, cyl = G().cyl, hc = A.hairColor;
+    const dk = shade(hc, 0.72), lt = '#' + new T.Color(hc).lerp(new T.Color('#ffffff'), 0.2).getHexString(), ns = { noShadow: true }, H0 = 0.295;
+    const fadeC = '#' + new T.Color(hc).lerp(new T.Color(A.skin), 0.55).getHexString();
+    let seed = 7; for (const ch of String(A.hair)) seed = (seed * 31 + ch.charCodeAt(0)) % 2147483647;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const col = () => { const r = rnd(); return r < 0.5 ? hc : r < 0.8 ? dk : lt; };
+    const B = (c, sx, sy, sz, x, y, z, rx, ry, rz, o) => { const m = part(box, c, sx, sy, sz, x, y, z, head, o); if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0); return m; };
+    const S = (c, rx, ry, rz, x, y, z) => part(sph, c, rx, ry, rz, x, y, z, head);
+    // Oberkopf: Grundmasse + viele kleine Strähnen-Büschel (gibt Struktur statt einer flachen Platte)
+    const crown = (h, o = {}) => {
+      if (covered) return;
+      const w = o.w || 0.282, d = o.d || 0.292, zc = o.z || -0.004;
+      B(hc, w, h, d, 0, H0 + h / 2 - 0.014, zc);
+      B(hc, w - 0.05, 0.022, d - 0.05, 0, H0 + h - 0.006, zc);
+      const n = o.n || 16;
+      for (let i = 0; i < n; i++) {
+        const x = (rnd() - 0.5) * (w - 0.07), z = zc + (rnd() - 0.5) * (d - 0.07);
+        B(col(), 0.045 + rnd() * 0.04, 0.026 + rnd() * (o.messy || 0.012), 0.07 + rnd() * 0.06, x, H0 + h - 0.004 + rnd() * 0.01, z, (o.sweep || 0) + (rnd() - 0.5) * 0.35, (o.yaw || 0) + (rnd() - 0.5) * 0.6, (rnd() - 0.5) * 0.35, ns);
       }
     };
+    // Seiten über den Ohren (+ Koteletten vor dem Ohr)
+    const sides = (len, o = {}) => {
+      for (const s of [-1, 1]) {
+        B(o.c || hc, 0.03, len, o.d || 0.215, s * 0.138, H0 - len / 2 + 0.006, o.z !== undefined ? o.z : -0.03);
+        if (!o.noBurn) B(o.c || hc, 0.022, 0.08, 0.03, s * 0.135, H0 - len - 0.03, 0.07, 0, 0, 0, ns);
+        if (o.strands) for (let k = 0; k < 4; k++) B(col(), 0.032, 0.04 + rnd() * 0.05, 0.045, s * 0.139, H0 - len - 0.005, -0.1 + k * 0.05, 0, 0, s * 0.08, ns);
+      }
+    };
+    // Hinterkopf mit ungleichmäßigen Spitzen
+    const back = (len, o = {}) => {
+      B(o.c || hc, o.w || 0.284, len, 0.04, 0, H0 - len / 2 + 0.008, -0.142);
+      if (o.jag !== false) for (let k = 0; k < 6; k++) B(o.c ? o.c : col(), 0.05, 0.03 + rnd() * 0.05, 0.042, -0.115 + k * 0.046, H0 - len - 0.004, -0.142, 0, 0, (rnd() - 0.5) * 0.3, ns);
+    };
+    // Stirnfransen aus einzelnen schrägen Strähnen
+    const fringe = (len, o = {}) => {
+      const n = o.n || 6, w = o.w || 0.26;
+      for (let k = 0; k < n; k++) {
+        const x = -w / 2 + (k + 0.5) * w / n + (o.shift || 0);
+        B(k % 2 ? hc : col(), w / n + 0.012, len * (0.75 + rnd() * 0.35), 0.035, x, H0 - len / 2 + 0.01, 0.13 + (o.out || 0), -0.08, 0, (o.tilt || 0) + (rnd() - 0.5) * 0.2, ns);
+      }
+    };
+    // Zopf / Strähne aus sich verjüngenden Gliedern (dir: [dx,dy,dz] je Glied)
+    const tail = (x, y, z, n, w, dir, braid) => {
+      for (let k = 0; k < n; k++) {
+        const ww = w * (1 - k * 0.07);
+        const m = B(braid ? (k % 2 ? hc : dk) : col(), ww, 0.07, ww * 0.9, x + dir[0] * k, y + dir[1] * k, z + dir[2] * k, braid ? 0 : (rnd() - 0.5) * 0.2, braid ? (k % 2 ? 0.5 : -0.5) : 0, braid ? (k % 2 ? 0.25 : -0.25) : 0);
+        if (braid) m.scale.set(ww * 1.15, 0.075, ww * 0.95);
+      }
+      B(hc, w * 0.4, 0.06, w * 0.4, x + dir[0] * n, y + dir[1] * n + 0.01, z + dir[2] * n, 0, 0, 0, ns);
+    };
+    const tie = (x, y, z, c) => part(cyl, c || '#c02a2a', 0.035, 0.025, 0.035, x, y, z, head, ns);
+    const curl = (x, y, z, r) => { S(col(), r, r * 1.1, r, x, y, z); S(dk, r * 0.55, r * 0.6, r * 0.55, x + r * 0.5, y - r * 0.4, z + r * 0.3); };
+    const partLine = (x, len) => { if (!covered) B(shade(A.skin, 0.9), 0.008, 0.004, len, x, H0 + 0.05, 0.03, 0, 0, 0, ns); };
     switch (A.hair) {
       case 'kurz':
-        top(0.06); back(0.13); sides(0.09); fringe(0.035);
+        crown(0.045); sides(0.12); back(0.17); fringe(0.04, { n: 6 });
         break;
       case 'buzz':
-        part(box, dk, 0.258, 0.05, 0.268, 0, 0.285, 0, head, ns);
-        part(box, dk, 0.258, 0.1, 0.02, 0, 0.24, -0.124, head, ns);
+        B(dk, 0.262, 0.016, 0.272, 0, H0, -0.002, 0, 0, 0, ns);
+        for (const s of [-1, 1]) B(dk, 0.008, 0.1, 0.2, s * 0.128, 0.245, -0.03, 0, 0, 0, ns);
+        B(dk, 0.258, 0.13, 0.008, 0, 0.235, -0.133, 0, 0, 0, ns);
+        B(dk, 0.2, 0.016, 0.008, 0, 0.283, 0.131, 0, 0, 0, ns);
         break;
-      case 'seitenscheitel': {
-        top(0.06); back(0.14); sides(0.1);
-        if (!covered) { const sw = part(box, hc, 0.18, 0.05, 0.28, 0.05, 0.345, 0, head); sw.rotation.z = -0.22; }
-        const f = part(box, hc, 0.17, 0.05, 0.03, 0.04, 0.275, 0.125, head, ns); f.rotation.z = -0.35;
+      case 'fade':
+        crown(0.055, { w: 0.262, d: 0.28, n: 14 }); fringe(0.035, { n: 5, w: 0.22 });
+        for (const s of [-1, 1]) { B(hc, 0.012, 0.04, 0.22, s * 0.13, 0.275, -0.03, 0, 0, 0, ns); B(dk, 0.01, 0.04, 0.22, s * 0.128, 0.235, -0.03, 0, 0, 0, ns); B(fadeC, 0.008, 0.04, 0.2, s * 0.127, 0.198, -0.04, 0, 0, 0, ns); }
+        B(hc, 0.26, 0.04, 0.012, 0, 0.275, -0.134, 0, 0, 0, ns); B(dk, 0.258, 0.04, 0.01, 0, 0.235, -0.132, 0, 0, 0, ns); B(fadeC, 0.256, 0.05, 0.008, 0, 0.19, -0.131, 0, 0, 0, ns);
         break;
-      }
+      case 'seitenscheitel':
+        crown(0.05, { yaw: 0.6 }); sides(0.13); back(0.17); partLine(-0.06, 0.2);
+        if (!covered) { B(hc, 0.2, 0.05, 0.27, 0.035, H0 + 0.055, 0.005, 0, 0, -0.18); B(lt, 0.1, 0.02, 0.24, 0.05, H0 + 0.08, 0.01, 0, 0, -0.2, ns); }
+        for (let k = 0; k < 4; k++) B(k % 2 ? hc : dk, 0.07, 0.05, 0.035, 0.09 - k * 0.055, H0 - 0.03 + k * 0.006, 0.135, -0.1, 0, -0.45, ns);
+        break;
+      case 'mittelscheitel':
+        crown(0.05); sides(0.16, { strands: true }); back(0.2); partLine(0, 0.22);
+        for (const s of [-1, 1]) { B(hc, 0.11, 0.09, 0.036, s * 0.068, H0 - 0.035, 0.134, -0.08, 0, s * 0.28, ns); B(dk, 0.04, 0.1, 0.038, s * 0.1, H0 - 0.05, 0.136, -0.08, 0, s * 0.2, ns); }
+        break;
       case 'pony':
-        top(0.06); back(0.16); sides(0.12);
-        part(box, hc, 0.27, 0.075, 0.035, 0, 0.255, 0.128, head, ns);
-        for (let k = -2; k <= 2; k++) part(box, dk, 0.012, 0.07, 0.036, k * 0.05, 0.257, 0.129, head, ns);
+        crown(0.05); sides(0.15, { strands: true }); back(0.2);
+        B(hc, 0.27, 0.06, 0.04, 0, 0.265, 0.13);
+        for (let k = 0; k < 9; k++) B(k % 2 ? hc : dk, 0.034, 0.05 + rnd() * 0.025, 0.04, -0.12 + k * 0.03, 0.225, 0.133, -0.05, 0, 0, ns);
+        break;
+      case 'tolle':
+        sides(0.1, { c: dk, d: 0.2 }); back(0.15, { c: dk, jag: false });
+        if (!covered) {
+          for (let k = 0; k < 5; k++) { const h = 0.05 + k * 0.022; B(k % 2 ? hc : lt, 0.25 - k * 0.012, h, 0.07, 0, H0 + h / 2 - 0.01, -0.12 + k * 0.06, -0.25 - k * 0.06); }
+          B(lt, 0.2, 0.05, 0.06, 0.01, H0 + 0.13, 0.13, -0.6, 0, 0.05);
+        } else fringe(0.03, { n: 5 });
+        break;
+      case 'zurueck':
+        if (!covered) { B(hc, 0.278, 0.045, 0.29, 0, H0 + 0.008, -0.006); for (let k = -3; k <= 3; k++) B(k % 2 ? lt : dk, 0.012, 0.006, 0.27, k * 0.035, H0 + 0.032, -0.01, 0, 0, 0, ns); }
+        sides(0.12, { noBurn: false }); back(0.2, { jag: false });
+        B(hc, 0.24, 0.03, 0.03, 0, H0 - 0.005, 0.128, -0.5);
+        break;
+      case 'wuschel':
+        crown(0.06, { n: 26, messy: 0.05 }); sides(0.15, { strands: true }); back(0.19);
+        for (let k = 0; k < 7; k++) B(col(), 0.045, 0.06 + rnd() * 0.05, 0.035, -0.12 + k * 0.04, H0 - 0.035, 0.135, -0.15, 0, (rnd() - 0.5) * 0.7, ns);
         break;
       case 'stachel':
-        back(0.1); sides(0.07);
+        sides(0.08); back(0.12);
         if (!covered) {
-          part(box, hc, 0.26, 0.035, 0.27, 0, 0.305, 0, head);
-          for (let i = 0; i < 11; i++) {
-            const a = i * 2.4, r = 0.03 + (i % 3) * 0.035, x = Math.cos(a) * r, z = Math.sin(a) * r - 0.01;
-            const c = part(cone, hc, 0.035, 0.11, 0.035, x, 0.36, z, head);
-            c.rotation.set(z * 3, 0, -x * 3);
+          B(hc, 0.27, 0.035, 0.28, 0, H0 + 0.01, 0);
+          for (let i = 0; i < 18; i++) {
+            const a = i * 2.39, r = 0.025 + Math.sqrt(i / 18) * 0.105, x = Math.cos(a) * r, z = Math.sin(a) * r - 0.01;
+            const c = part(cone, i % 3 ? hc : lt, 0.032, 0.09 + rnd() * 0.05, 0.032, x, H0 + 0.07, z, head); c.rotation.set(z * 3.2, 0, -x * 3.2);
           }
-        }
+        } else fringe(0.035);
         break;
       case 'undercut':
-        part(box, dk, 0.258, 0.12, 0.268, 0, 0.23, 0, head, ns);
-        if (!covered) { const t = part(box, hc, 0.2, 0.08, 0.29, 0.01, 0.33, 0.01, head); t.rotation.z = -0.08; }
+        B(dk, 0.258, 0.11, 0.268, 0, 0.235, 0, 0, 0, 0, ns);
+        if (!covered) {
+          B(hc, 0.21, 0.07, 0.29, 0.015, H0 + 0.03, 0.005, 0, 0, -0.06);
+          for (let k = 0; k < 6; k++) B(col(), 0.05, 0.03, 0.26, -0.07 + k * 0.03, H0 + 0.07, 0.01, 0, 0, -0.15, ns);
+          B(hc, 0.06, 0.14, 0.2, 0.135, 0.25, 0.04, 0, 0, -0.35);
+        }
         break;
       case 'irokese':
-        part(box, dk, 0.258, 0.04, 0.268, 0, 0.29, 0, head, ns);
-        if (!covered) for (let i = 0; i < 6; i++) part(cone, hc, 0.03, 0.14 - Math.abs(i - 2.5) * 0.015, 0.05, 0, 0.36, 0.11 - i * 0.045, head);
-        else part(box, hc, 0.05, 0.12, 0.05, 0, 0.21, -0.14, head);
+        B(dk, 0.26, 0.012, 0.27, 0, H0, 0, 0, 0, 0, ns); for (const s of [-1, 1]) B(dk, 0.006, 0.1, 0.2, s * 0.127, 0.245, -0.03, 0, 0, 0, ns);
+        if (!covered) for (let i = 0; i < 8; i++) { const h = 0.16 - Math.abs(i - 3) * 0.018; B(i % 2 ? hc : lt, 0.045, h, 0.05, 0, H0 + h / 2, 0.12 - i * 0.036, -0.25 + i * 0.07); }
+        else B(hc, 0.05, 0.14, 0.05, 0, 0.2, -0.145);
         break;
-      case 'locken': {
-        // Ringellocken: dichte kleine Locken am Oberkopf und gedrehte Strähnen, die bis zum Kinn fallen (kein Afro)
-        if (!covered) {
-          for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
-            if (Math.abs(i) + Math.abs(j) > 3) continue;
-            part(sph, (i + j) % 2 ? hc : dk, 0.042, 0.042, 0.042, i * 0.052, 0.31 + (2 - Math.abs(i)) * 0.006, j * 0.052 - 0.005, head);
-          }
-        }
-        // Locken über der Stirn
-        for (let k = -2; k <= 2; k++) part(sph, k % 2 ? hc : dk, 0.034, 0.038, 0.03, k * 0.05, 0.285, 0.12, head, ns);
-        // gedrehte Strähnen an den Seiten und hinten
-        for (let i = 0; i < 11; i++) {
-          const a = Math.PI * 0.42 + i * (Math.PI * 1.16 / 10);
-          const x = Math.sin(a) * 0.14, z = Math.cos(a) * 0.14 - 0.01;
-          chain(x, 0.27, z, 5, 0.034, 0.055, 0.012);
+      case 'kurzlocken':
+        for (const s of [-1, 1]) { B(dk, 0.01, 0.06, 0.21, s * 0.129, 0.26, -0.03, 0, 0, 0, ns); B(fadeC, 0.008, 0.05, 0.2, s * 0.127, 0.2, -0.04, 0, 0, 0, ns); }
+        B(dk, 0.258, 0.08, 0.01, 0, 0.25, -0.132, 0, 0, 0, ns);
+        if (!covered) { B(hc, 0.25, 0.04, 0.26, 0, H0 + 0.005, 0); for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { if (i * i + j * j > 11) continue; curl(i * 0.036 + (rnd() - 0.5) * 0.01, H0 + 0.035 + rnd() * 0.012, j * 0.037, 0.026); } }
+        for (let k = -2; k <= 2; k++) curl(k * 0.045, 0.285, 0.128, 0.022);
+        break;
+      case 'locken':
+        crown(0.04, { n: 0 }); B(hc, 0.282, 0.2, 0.05, 0, 0.2, -0.13);
+        if (!covered) for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) { if (i * i + j * j > 12) continue; curl(i * 0.04, H0 + 0.035 + (3 - Math.abs(i)) * 0.004, j * 0.042, 0.032); }
+        for (let k = -3; k <= 3; k++) curl(k * 0.04, 0.275, 0.128, 0.026);
+        for (let i = 0; i < 12; i++) {
+          const a = Math.PI * 0.42 + i * (Math.PI * 1.16 / 11), x = Math.sin(a) * 0.145, z = Math.cos(a) * 0.145 - 0.015;
+          for (let k = 0; k < 5; k++) curl(x + Math.cos(k * 2) * 0.008, 0.265 - k * 0.05, z + Math.sin(k * 2) * 0.008, 0.032 - k * 0.002);
         }
         break;
-      }
       case 'wellig':
-        top(0.06); fringe(0.03);
-        for (let k = 0; k < 6; k++) part(box, k % 2 ? hc : dk, 0.27, 0.07, 0.055, (k % 2 ? 1 : -1) * 0.012, 0.29 - k * 0.065, -0.128, head);
-        for (const s of [-1, 1]) for (let k = 0; k < 5; k++) part(box, k % 2 ? hc : dk, 0.035, 0.07, 0.19, s * (0.137 + (k % 2) * 0.01), 0.28 - k * 0.065, -0.03, head);
+        crown(0.05); fringe(0.035, { n: 5 });
+        for (let k = 0; k < 7; k++) B(k % 2 ? hc : dk, 0.284, 0.065, 0.05, (k % 2 ? 1 : -1) * 0.012, 0.29 - k * 0.058, -0.14 - (k % 2) * 0.01);
+        for (const s of [-1, 1]) for (let k = 0; k < 6; k++) B(k % 2 ? hc : dk, 0.04, 0.065, 0.2, s * (0.14 + (k % 2) * 0.012), 0.28 - k * 0.058, -0.03);
         break;
       case 'lang':
-        top(0.06); back(0.44); sides(0.32); fringe(0.03);
-        for (const s of [-1, 1]) part(box, hc, 0.05, 0.2, 0.05, s * 0.11, 0.0, 0.075, head);
+        crown(0.05, { sweep: 0 }); partLine(0, 0.22);
+        back(0.48); sides(0.34, { noBurn: true, strands: true });
+        for (const s of [-1, 1]) { B(hc, 0.06, 0.24, 0.05, s * 0.115, 0.0, 0.085, 0, 0, s * 0.05); B(dk, 0.03, 0.2, 0.045, s * 0.09, -0.02, 0.1, 0, 0, s * 0.08, ns); }
+        for (const s of [-1, 1]) B(hc, 0.08, 0.1, 0.035, s * 0.08, 0.25, 0.135, -0.08, 0, s * 0.6, ns);
         break;
       case 'bob':
-        top(0.065); back(0.24); sides(0.24, 0.22); fringe(0.06);
-        for (const s of [-1, 1]) part(box, dk, 0.034, 0.03, 0.22, s * 0.136, 0.08, -0.02, head, ns);
+        crown(0.06); back(0.25, { jag: false }); sides(0.26, { d: 0.235, noBurn: true });
+        for (const s of [-1, 1]) B(dk, 0.05, 0.035, 0.235, s * 0.13, 0.045, -0.02, 0, 0, s * -0.4, ns);
+        fringe(0.065, { n: 8 });
+        break;
+      case 'wolfcut':
+        crown(0.06, { n: 24, messy: 0.04 }); fringe(0.07, { n: 7 });
+        for (let k = 0; k < 3; k++) back(0.14 + k * 0.08, { w: 0.284 - k * 0.03 });
+        sides(0.18, { strands: true, noBurn: true });
+        break;
+      case 'mullet':
+        crown(0.045); sides(0.1, { c: dk }); fringe(0.035);
+        B(hc, 0.24, 0.32, 0.05, 0, 0.16, -0.14); for (let k = 0; k < 5; k++) B(col(), 0.05, 0.06, 0.05, -0.1 + k * 0.05, -0.01, -0.145, 0, 0, (rnd() - 0.5) * 0.4, ns);
+        break;
+      case 'emo':
+        crown(0.05, { yaw: -0.5 }); back(0.22); sides(0.18, { strands: true });
+        B(hc, 0.2, 0.17, 0.04, 0.03, 0.2, 0.137, -0.05, 0, -0.2); B(dk, 0.06, 0.15, 0.042, 0.09, 0.17, 0.14, -0.05, 0, -0.15, ns);
         break;
       case 'zopf':
-        top(0.06); back(0.13); sides(0.08); fringe(0.03);
-        part(sph, '#c02a2a', 0.03, 0.03, 0.03, 0, 0.23, -0.16, head, ns);
-        chain(0, 0.19, -0.175, 6, 0.042, 0.05, 0.006);
+        crown(0.04, { n: 8, sweep: 0 }); sides(0.13, { noBurn: true }); back(0.15, { jag: false }); fringe(0.03, { n: 5 });
+        tie(0, 0.2, -0.165); tail(0, 0.15, -0.18, 6, 0.07, [0, -0.055, -0.006]);
+        break;
+      case 'hoherzopf':
+        crown(0.04, { n: 8 }); sides(0.13, { noBurn: true }); back(0.15, { jag: false });
+        if (!covered) { tie(0, H0 + 0.04, -0.12); tail(0, H0 + 0.02, -0.16, 7, 0.07, [0, -0.05, -0.012]); } else { tie(0, 0.2, -0.165); tail(0, 0.15, -0.18, 6, 0.07, [0, -0.055, -0.006]); }
+        break;
+      case 'flechtzopf':
+        crown(0.04, { n: 8 }); sides(0.13, { noBurn: true }); back(0.16, { jag: false }); fringe(0.03, { n: 5 });
+        tail(0, 0.16, -0.17, 10, 0.065, [0, -0.052, -0.004], true); tie(0, 0.16 - 0.052 * 10 + 0.04, -0.17 - 0.04);
         break;
       case 'zoepfe':
-        top(0.06); back(0.12); fringe(0.035);
-        for (const s of [-1, 1]) {
-          chain(s * 0.14, 0.2, 0.0, 7, 0.03, 0.045, 0.008);
-          part(sph, '#c02a2a', 0.022, 0.022, 0.022, s * 0.14, 0.2 - 7 * 0.045, 0.0, head, ns);
-        }
+        crown(0.04, { n: 8 }); partLine(0, 0.22); back(0.13); fringe(0.035, { n: 6 });
+        for (const s of [-1, 1]) { tail(s * 0.145, 0.19, 0.0, 7, 0.055, [s * 0.004, -0.048, 0], true); tie(s * 0.15, 0.19 - 7 * 0.048 + 0.04, 0, '#2a6ac0'); }
         break;
       case 'dutt':
-        top(0.06); back(0.12); sides(0.08); fringe(0.03);
-        part(sph, hc, 0.075, 0.07, 0.075, 0, covered ? 0.2 : 0.33, covered ? -0.17 : -0.11, head);
-        part(cyl, dk, 0.06, 0.02, 0.06, 0, covered ? 0.24 : 0.29, covered ? -0.15 : -0.11, head, ns);
+        crown(0.04, { n: 8 }); sides(0.12, { noBurn: true }); back(0.15, { jag: false }); fringe(0.03, { n: 5 });
+        S(hc, 0.085, 0.075, 0.085, 0, covered ? 0.2 : H0 + 0.07, covered ? -0.17 : -0.09);
+        for (let k = 0; k < 6; k++) { const a = k * 1.05; B(dk, 0.03, 0.02, 0.07, Math.cos(a) * 0.05, (covered ? 0.2 : H0 + 0.07) + 0.03, (covered ? -0.17 : -0.09) + Math.sin(a) * 0.05, 0, a, 0.4, ns); }
+        break;
+      case 'doppeldutt':
+        crown(0.04, { n: 8 }); partLine(0, 0.22); sides(0.12, { noBurn: true }); back(0.15); fringe(0.035, { n: 6 });
+        for (const s of [-1, 1]) { S(hc, 0.065, 0.06, 0.065, s * 0.1, covered ? 0.24 : H0 + 0.05, -0.04); S(dk, 0.04, 0.035, 0.04, s * 0.1, (covered ? 0.24 : H0 + 0.05) + 0.04, -0.04); }
+        break;
+      case 'manbun':
+        B(dk, 0.258, 0.1, 0.268, 0, 0.24, 0, 0, 0, 0, ns);
+        if (!covered) { B(hc, 0.23, 0.045, 0.28, 0, H0 + 0.012, -0.004); for (let k = -2; k <= 2; k++) B(lt, 0.012, 0.006, 0.26, k * 0.04, H0 + 0.036, -0.01, 0, 0, 0, ns); }
+        S(hc, 0.06, 0.055, 0.06, 0, covered ? 0.21 : H0 + 0.03, covered ? -0.16 : -0.13); tie(0, (covered ? 0.21 : H0 + 0.03) - 0.01, covered ? -0.13 : -0.1, dk);
+        break;
+      case 'cornrows':
+        B(dk, 0.258, 0.012, 0.268, 0, H0, 0, 0, 0, 0, ns);
+        for (let k = -3; k <= 3; k++) { const m = B(k % 2 ? hc : lt, 0.022, 0.02, 0.29, k * 0.036, H0 + 0.01, -0.005, 0, 0, 0); m.rotation.z = 0; for (let j = 0; j < 6; j++) B(dk, 0.024, 0.008, 0.006, k * 0.036, H0 + 0.02, -0.12 + j * 0.05, 0, 0, 0, ns); }
+        for (let k = -3; k <= 3; k++) B(k % 2 ? hc : dk, 0.022, 0.16, 0.022, k * 0.036, 0.2, -0.142, 0.1);
+        break;
+      case 'twists':
+        crown(0.035, { n: 0 }); sides(0.1, { noBurn: true }); back(0.13, { jag: false });
+        if (!covered) for (let i = 0; i < 26; i++) { const a = i * 2.39, r = 0.02 + Math.sqrt(i / 26) * 0.11, x = Math.cos(a) * r, z = Math.sin(a) * r - 0.01; const c = part(cyl, i % 2 ? hc : dk, 0.02, 0.085, 0.02, x, H0 + 0.06, z, head); c.rotation.set(z * 2.5, 0, -x * 2.5); }
+        for (let k = -3; k <= 3; k++) { const c = part(cyl, k % 2 ? hc : dk, 0.02, 0.07, 0.02, k * 0.036, 0.275, 0.13, head); c.rotation.x = 0.6; }
         break;
       case 'dreads':
-        top(0.05);
-        for (let i = 0; i < 13; i++) {
-          const a = Math.PI * 0.4 + i * (Math.PI * 1.2 / 12);
-          const x = Math.sin(a) * 0.14, z = Math.cos(a) * 0.14 - 0.01;
-          const d = part(cyl, i % 2 ? hc : dk, 0.02, 0.32, 0.02, x * 1.05, 0.13, z * 1.05, head);
-          d.rotation.set(-z * 0.6, 0, x * 0.6);
+        crown(0.045, { n: 0 });
+        for (let i = 0; i < 16; i++) {
+          const a = Math.PI * 0.38 + i * (Math.PI * 1.24 / 15), x = Math.sin(a) * 0.148, z = Math.cos(a) * 0.148 - 0.015, len = 0.26 + rnd() * 0.12;
+          const d = part(cyl, i % 3 === 0 ? lt : i % 2 ? hc : dk, 0.024, len, 0.024, x * 1.04, 0.29 - len / 2, z * 1.04, head); d.rotation.set(-z * 0.5, 0, x * 0.5);
+          part(sph, dk, 0.026, 0.03, 0.026, x * 1.04 + x * 0.5 * len / 2 * -0.0, 0.29 - len, z * 1.04, head, ns);
         }
+        if (!covered) for (let i = 0; i < 9; i++) { const a = i * 0.7; B(i % 2 ? hc : dk, 0.03, 0.025, 0.13, Math.cos(a) * 0.06, H0 + 0.045, Math.sin(a) * 0.06, 0, a, 0); }
         break;
       default: // Glatze: nur ein kleiner Glanzpunkt
         part(box, shade(A.skin, 1.12), 0.06, 0.004, 0.06, -0.03, 0.296, 0.02, head, ns);
     }
   }
 
-  // ---------- Mensch (Spieler und NPCs) ----------
   // Exklusive Skins: Der Wächter, Viktor, Daniel, Richard
   L.GUARD_APP = { name: 'Der Wächter', skin: '#c98e65', hair: 'kurz', hairColor: '#1a1a1a', top: 'anzug', topColor: '#1a1a24', pants: 'anzughose', pantsColor: '#1a1a24', shoeType: 'stiefel', shoes: '#1a1a1a', build: 'muskuloes', height: 'gross', glasses: 'skibrille', glassesColor: '#2a2a3a', hat: 'keine', beard: 'kein', mouth: 'ernst', brows: 'boese' };
   L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard']];
@@ -199,6 +303,13 @@
     r.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     return r;
   }
+  // Muster für Camo- und Karo-Hosen
+  function patt(g, w, h, d, y, kind, s) {
+    const c0 = L.mat; const pcs = [];
+    if (kind === 'camo') for (let k = 0; k < 5; k++) { const yy = y + (k / 4 - 0.5) * h * 0.8, ww = w * (0.35 + ((k * 37 + (s > 0 ? 11 : 0)) % 5) * 0.08); pcs.push(part(G().box, k % 2 ? '#3a4a2a' : '#6a5a3a', ww, h * 0.14, d * 1.03, ((k * 13) % 3 - 1) * w * 0.2, yy, 0, g, { noShadow: true })); }
+    else { for (let k = 0; k < 4; k++) part(G().box, '#1a1a1a', w * 1.03, 0.012, d * 1.03, 0, y + (k / 3 - 0.5) * h * 0.85, 0, g, { noShadow: true }); for (const xx of [-0.3, 0.3]) part(G().box, '#1a1a1a', 0.012, h, d * 1.03, xx * w, y, 0, g, { noShadow: true }); }
+    return pcs;
+  }
   L.buildHuman = function (app) {
     if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter')) return buildSpecial(app);
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
@@ -212,12 +323,22 @@
     // ---- Beine, Hose, Schuhe ----
     for (const s of [-1, 1]) {
       const leg = grp(hips, s * 0.11 * bw, 0, 0);
-      part(box, pc, 0.16 * bw, 0.46, 0.17 * bw, 0, -0.23, 0, leg);
+      const PT = A.pants, baggy = PT === 'baggy' || PT === 'baggycargo', skinny = PT === 'skinny';
+      const lw = baggy ? 1.5 : skinny ? 0.86 : 1;
+      part(box, PT === 'rock' ? skin : pc, 0.16 * bw * lw, 0.46, 0.17 * bw * lw, 0, -0.23, 0, leg);
+      if (PT === 'camo' || PT === 'karo') patt(leg, 0.16 * bw, 0.46, 0.17 * bw, -0.23, PT, s);
+      if (PT === 'baggycargo') part(box, shade(pc, 0.72), 0.035, 0.14, 0.12, s * 0.108 * bw, -0.27, 0, leg);
+      if (baggy) for (let k = 0; k < 3; k++) part(box, shade(pc, 0.82), 0.244 * bw, 0.012, 0.258 * bw, 0, -0.08 - k * 0.13, 0, leg, ns);
       if (A.pants === 'cargo') part(box, shade(pc, 0.72), 0.03, 0.12, 0.1, s * 0.085 * bw, -0.26, 0, leg);
       if (A.pants === 'jogging') part(box, '#f2f2f2', 0.012, 0.46, 0.02, s * 0.081 * bw, -0.23, 0, leg, ns);
       if (A.pants === 'anzughose') part(box, shade(pc, 0.7), 0.008, 0.46, 0.005, 0, -0.23, 0.086 * bw, leg, ns);
       const knee = grp(leg, 0, -0.46, 0);
-      part(box, A.pants === 'kurz' ? skin : pc, 0.14 * bw, 0.44, 0.15 * bw, 0, -0.22, 0, knee);
+      const shortP = A.pants === 'kurz' || A.pants === 'rock';
+      part(box, shortP ? skin : pc, 0.14 * bw * lw, 0.44, 0.15 * bw * lw, 0, -0.22, 0, knee);
+      if (A.pants === 'camo' || A.pants === 'karo') patt(knee, 0.14 * bw, 0.44, 0.15 * bw, -0.22, A.pants, s);
+      if (A.pants === 'cargoshorts') { part(box, skin, 0.13 * bw, 0.3, 0.14 * bw, 0, -0.29, 0, knee); part(box, pc, 0.18 * bw, 0.16, 0.19 * bw, 0, -0.06, 0, knee); part(box, shade(pc, 0.72), 0.03, 0.08, 0.09, s * 0.095 * bw, -0.06, 0, knee); }
+      if (baggy) { part(box, shade(pc, 0.85), 0.25 * bw, 0.08, 0.27 * bw, 0, -0.36, 0.01, knee); part(box, pc, 0.24 * bw, 0.06, 0.28 * bw, 0, -0.43, 0.025, knee); part(box, shade(pc, 0.8), 0.215 * bw, 0.012, 0.23 * bw, 0, -0.18, 0, knee, ns); part(box, shade(pc, 0.8), 0.215 * bw, 0.012, 0.23 * bw, 0, -0.28, 0, knee, ns); }
+      if (A.pants === 'schlag') part(box, pc, 0.21 * bw, 0.14, 0.22 * bw, 0, -0.38, 0.01, knee);
       if (A.pants === 'kurz') part(box, pc, 0.15 * bw, 0.06, 0.16 * bw, 0, -0.01, 0, knee);
       if (A.pants === 'jogging') { part(box, shade(pc, 0.8), 0.15 * bw, 0.05, 0.16 * bw, 0, -0.41, 0, knee); part(box, '#f2f2f2', 0.012, 0.36, 0.02, s * 0.071 * bw, -0.2, 0, knee, ns); }
       if (A.pants === 'cargo') part(box, shade(pc, 0.72), 0.03, 0.1, 0.09, s * 0.075 * bw, -0.15, 0, knee);
@@ -227,21 +348,58 @@
       else if (st === 'sandale') { part(box, skin, 0.13 * bw, 0.06, 0.23, 0, -0.47, 0.05, knee); part(box, sc, 0.15 * bw, 0.025, 0.26, 0, -0.505, 0.05, knee); part(box, sc, 0.14 * bw, 0.02, 0.03, 0, -0.455, 0.09, knee, ns); }
       else if (st === 'stiefel') { part(box, sc, 0.155 * bw, 0.2, 0.17 * bw, 0, -0.39, 0, knee); part(box, sc, 0.15 * bw, 0.1, 0.28, 0, -0.47, 0.05, knee); part(box, shade(sc, 0.6), 0.16 * bw, 0.03, 0.29, 0, -0.51, 0.05, knee); }
       else if (st === 'hightop') { part(box, sc, 0.155 * bw, 0.16, 0.18 * bw, 0, -0.41, 0.01, knee); part(box, sc, 0.15 * bw, 0.1, 0.27, 0, -0.47, 0.05, knee); part(box, '#f2f2f2', 0.16 * bw, 0.03, 0.28, 0, -0.51, 0.05, knee); }
+      else if (st === 'chunky') { part(box, sc, 0.16 * bw, 0.11, 0.29, 0, -0.46, 0.05, knee); part(box, '#f2f2f2', 0.175 * bw, 0.07, 0.31, 0, -0.52, 0.05, knee); part(box, shade(sc, 0.7), 0.165 * bw, 0.02, 0.1, 0, -0.42, 0.12, knee, ns); }
+      else if (st === 'skate') { part(box, sc, 0.165 * bw, 0.09, 0.28, 0, -0.475, 0.05, knee); part(box, '#f2f2f2', 0.17 * bw, 0.035, 0.29, 0, -0.515, 0.05, knee); part(box, '#f2f2f2', 0.168 * bw, 0.02, 0.15, 0, -0.45, 0.0, knee, ns); }
       else if (st === 'lackschuh') { part(box, sc, 0.14 * bw, 0.08, 0.27, 0, -0.48, 0.05, knee); part(box, '#ffffff', 0.05, 0.01, 0.06, 0.02, -0.438, 0.12, knee, { basic: true, noShadow: true, opacity: 0.35 }); }
       else { part(box, sc, 0.15 * bw, 0.1, 0.27, 0, -0.47, 0.05, knee); part(box, '#f2f2f2', 0.16 * bw, 0.03, 0.28, 0, -0.51, 0.05, knee); }
       legs.push({ leg, knee });
     }
 
+    if (A.pants === 'baggy' || A.pants === 'baggycargo') { part(box, pc, 0.48 * bw, 0.2, 0.26 * bw, 0, -0.06, 0, hips); part(box, '#f2f2f2', 0.43 * bw, 0.03, 0.24 * bw, 0, 0.035, 0, hips, ns); for (let k = -2; k <= 2; k++) part(box, '#2a6ac0', 0.02, 0.031, 0.245 * bw, k * 0.07 * bw, 0.035, 0, hips, ns); }
+    if (A.pants === 'rock') { part(box, pc, 0.44 * bw, 0.32, 0.27 * bw, 0, -0.14, 0, hips); part(box, shade(pc, 0.8), 0.46 * bw, 0.04, 0.29 * bw, 0, -0.29, 0, hips); for (let k = -2; k <= 2; k++) part(box, shade(pc, 0.8), 0.01, 0.3, 0.275 * bw, k * 0.08 * bw, -0.14, 0, hips, ns); }
     // ---- Oberkörper ----
     const torso = grp(hips);
     const TP = A.top, fz = 0.126 * bw;
     const coat = TP === 'lederjacke' ? shade(tc, 0.85) : tc;
     const shirtUnder = '#e8e2d4';
-    part(box, TP === 'weste' ? shirtUnder : coat, 0.44 * bw, 0.6, 0.25 * bw, 0, 0.31, 0, torso);
+    const big = TP === 'oversize' ? 1.12 : TP === 'puffer' ? 1.16 : 1;
+    part(box, TP === 'weste' ? shirtUnder : coat, 0.44 * bw * big, TP === 'oversize' ? 0.68 : 0.6, 0.25 * bw * big, 0, TP === 'oversize' ? 0.27 : 0.31, 0, torso);
     part(box, '#1c1c1c', 0.45 * bw, 0.06, 0.26 * bw, 0, 0.03, 0, torso);
     if (A.build === 'muskuloes' && (TP === 'tanktop' || TP === 'tshirt' || TP === 'trikot')) for (const s of [-1, 1]) part(box, shade(coat, 0.85), 0.17 * bw, 0.1, 0.01, s * 0.1 * bw, 0.47, fz + 0.002, torso, ns);
     switch (TP) {
       case 'tshirt': part(box, shade(tc, 0.8), 0.14, 0.03, 0.01, 0, 0.59, fz + 0.002, torso, ns); break;
+      case 'oversize':
+        part(box, shade(tc, 0.8), 0.16, 0.03, 0.01, 0, 0.59, fz * 1.12 + 0.002, torso, ns);
+        part(box, shade(tc, 1.2), 0.16, 0.14, 0.01, 0, 0.38, fz * 1.12 + 0.003, torso, ns);
+        part(box, shade(tc, 0.7), 0.1, 0.06, 0.012, 0, 0.38, fz * 1.12 + 0.005, torso, ns);
+        break;
+      case 'polo':
+        for (const s of [-1, 1]) { const c = part(box, shade(tc, 0.85), 0.09, 0.05, 0.02, s * 0.045, 0.59, fz + 0.005, torso, ns); c.rotation.z = s * 0.45; }
+        for (let k = 0; k < 2; k++) part(box, '#f2f2f2', 0.014, 0.014, 0.01, 0, 0.53 - k * 0.06, fz + 0.004, torso, ns);
+        part(box, '#f2f2f2', 0.04, 0.03, 0.006, 0.09 * bw, 0.47, fz + 0.003, torso, ns);
+        break;
+      case 'flanell':
+        for (let k = 0; k < 5; k++) part(box, shade(tc, 0.6), 0.442 * bw, 0.025, 0.252 * bw, 0, 0.1 + k * 0.11, 0, torso, ns);
+        for (let k = -2; k <= 2; k++) part(box, shade(tc, 0.6), 0.025, 0.6, 0.252 * bw, k * 0.085 * bw, 0.31, 0, torso, ns);
+        for (const s of [-1, 1]) { const c = part(box, shade(tc, 1.15), 0.08, 0.05, 0.02, s * 0.04, 0.58, fz + 0.005, torso, ns); c.rotation.z = s * 0.5; }
+        for (let k = 0; k < 4; k++) part(box, '#e8e2d4', 0.015, 0.015, 0.01, 0, 0.5 - k * 0.11, fz + 0.006, torso, ns);
+        break;
+      case 'trainingsjacke':
+        part(box, '#c8c8c8', 0.012, 0.56, 0.01, 0, 0.32, fz + 0.002, torso, ns);
+        part(box, shade(tc, 0.8), 0.2, 0.06, 0.27 * bw, 0, 0.6, 0, torso);
+        for (const s of [-1, 1]) part(box, '#f2f2f2', 0.015, 0.6, 0.255 * bw, s * 0.205 * bw, 0.31, 0, torso, ns);
+        break;
+      case 'puffer':
+        for (let k = 0; k < 5; k++) part(box, shade(tc, 0.78), 0.45 * bw * big, 0.015, 0.255 * bw * big, 0, 0.08 + k * 0.12, 0, torso, ns);
+        part(box, shade(tc, 0.9), 0.3, 0.1, 0.3 * bw, 0, 0.62, 0, torso);
+        part(box, '#c8c8c8', 0.012, 0.56, 0.01, 0, 0.32, fz * 1.16 + 0.003, torso, ns);
+        break;
+      case 'mantel':
+        part(box, tc, 0.46 * bw, 0.42, 0.27 * bw, 0, -0.2, 0, hips);
+        for (const s of [-1, 1]) { const l = part(box, shade(tc, 0.8), 0.07, 0.3, 0.012, s * 0.08, 0.45, fz + 0.005, torso, ns); l.rotation.z = s * 0.3; }
+        for (let k = 0; k < 3; k++) for (const s of [-1, 1]) part(box, '#1a1a1a', 0.018, 0.018, 0.01, s * 0.06, 0.32 - k * 0.12, fz + 0.004, torso, ns);
+        part(box, shade(tc, 0.7), 0.46 * bw, 0.04, 0.28 * bw, 0, 0.12, 0, torso);
+        break;
       case 'tanktop':
         for (const s of [-1, 1]) part(box, skin, 0.1 * bw, 0.09, 0.26 * bw, s * 0.17 * bw, 0.565, 0, torso);
         part(box, skin, 0.12, 0.08, 0.01, 0, 0.56, fz + 0.002, torso, ns);
@@ -300,18 +458,27 @@
         break;
     }
 
+    if (A.pants === 'latzhose') {
+      part(box, pc, 0.26 * bw, 0.3, 0.02, 0, 0.2, fz + 0.012, torso);
+      part(box, shade(pc, 0.75), 0.1, 0.07, 0.01, 0, 0.24, fz + 0.024, torso, ns);
+      for (const s of [-1, 1]) { part(box, pc, 0.045, 0.32, 0.02, s * 0.1 * bw, 0.46, fz + 0.012, torso); part(box, pc, 0.045, 0.62, 0.02, s * 0.1 * bw, 0.31, -0.126 * bw - 0.01, torso); part(box, '#d8b46a', 0.03, 0.03, 0.01, s * 0.1 * bw, 0.34, fz + 0.024, torso, ns); }
+      part(box, pc, 0.45 * bw, 0.1, 0.26 * bw, 0, 0.06, 0, torso);
+    }
     // ---- Arme mit passenden Ärmeln ----
-    const sleeve = { tshirt: 'short', trikot: 'short', tanktop: 'none', weste: 'short' }[TP] || 'long';
+    const sleeve = { tshirt: 'short', trikot: 'short', tanktop: 'none', weste: 'short', oversize: 'short', polo: 'short' }[TP] || 'long';
     const slc = TP === 'weste' ? shirtUnder : coat;
     let hand = null;
     for (const s of [-1, 1]) {
       const arm = grp(torso, s * (0.22 * bw + 0.06), 0.55, 0);
       if (sleeve === 'long') part(box, slc, 0.12 * bw, 0.32, 0.13 * bw, 0, -0.16, 0, arm);
-      else if (sleeve === 'short') { part(box, slc, 0.125 * bw, 0.15, 0.135 * bw, 0, -0.075, 0, arm); part(box, skin, 0.105 * bw, 0.18, 0.115 * bw, 0, -0.23, 0, arm); }
+      else if (sleeve === 'short') { part(box, slc, (TP === 'oversize' ? 0.16 : 0.125) * bw, TP === 'oversize' ? 0.27 : 0.15, (TP === 'oversize' ? 0.17 : 0.135) * bw, 0, TP === 'oversize' ? -0.12 : -0.075, 0, arm); part(box, skin, 0.105 * bw, 0.18, 0.115 * bw, 0, -0.23, 0, arm); }
       else part(box, skin, 0.105 * bw, 0.32, 0.115 * bw, 0, -0.16, 0, arm);
       const elbow = grp(arm, 0, -0.32, 0);
       part(box, sleeve === 'long' ? slc : skin, 0.11 * bw, 0.3, 0.12 * bw, 0, -0.15, 0, elbow);
-      if (sleeve === 'long' && (TP === 'pullover' || TP === 'hoodie' || TP === 'regenjacke')) part(box, shade(slc, 0.75), 0.115 * bw, 0.04, 0.125 * bw, 0, -0.28, 0, elbow);
+      if (sleeve === 'long' && (TP === 'pullover' || TP === 'hoodie' || TP === 'regenjacke' || TP === 'trainingsjacke')) part(box, shade(slc, 0.75), 0.115 * bw, 0.04, 0.125 * bw, 0, -0.28, 0, elbow);
+      if (TP === 'trainingsjacke') { part(box, '#f2f2f2', 0.016, 0.32, 0.13 * bw, s * 0.062 * bw, -0.16, 0, arm, ns); part(box, '#f2f2f2', 0.016, 0.26, 0.125 * bw, s * 0.057 * bw, -0.13, 0, elbow, ns); }
+      if (TP === 'puffer') { part(box, slc, 0.15 * bw, 0.3, 0.16 * bw, 0, -0.16, 0, arm); for (let k = 0; k < 3; k++) part(box, shade(slc, 0.78), 0.155 * bw, 0.012, 0.165 * bw, 0, -0.05 - k * 0.1, 0, arm, ns); }
+      if (TP === 'flanell') for (let k = 0; k < 3; k++) part(box, shade(slc, 0.6), 0.123 * bw, 0.02, 0.133 * bw, 0, -0.06 - k * 0.1, 0, arm, ns);
       part(box, skin, 0.09, 0.1, 0.1, 0, -0.34, 0, elbow);
       arms.push({ arm, elbow });
       if (s === -1) hand = grp(elbow, 0, -0.36, 0.03);

@@ -545,7 +545,9 @@
     beard: 'Bart', glasses: 'Brille', glassesColor: 'Farbe Brille', hat: 'Kopfbedeckung (Helm schützt auf dem Motorrad)', hatColor: 'Farbe Kopfbedeckung',
     top: 'Oberteil', topColor: 'Farbe Oberteil', pants: 'Hose', pantsColor: 'Farbe Hose', shoeType: 'Schuhe', shoes: 'Farbe Schuhe', build: 'Statur', height: 'Größe', scar: 'Narbe'
   };
-  const WORDS = { kurz: 'kurz', seitenscheitel: 'Scheitel', pony: 'Pony', buzz: 'Buzzcut', stachel: 'Stacheln', undercut: 'Undercut', irokese: 'Irokese', locken: 'Locken', wellig: 'wellig', lang: 'lang', bob: 'Bob', zopf: 'Pferdeschwanz', zoepfe: 'Zöpfe', dutt: 'Dutt', dreads: 'Dreads', glatze: 'Glatze',
+  const WORDS = { fade: 'Fade', mittelscheitel: 'Mittelscheitel', tolle: 'Tolle', zurueck: 'zurückgegelt', wuschel: 'wuschelig', kurzlocken: 'kurze Locken', wolfcut: 'Wolfcut', mullet: 'Vokuhila', emo: 'Emo-Pony', hoherzopf: 'hoher Zopf', flechtzopf: 'Flechtzopf', doppeldutt: 'zwei Dutts', manbun: 'Männerdutt', cornrows: 'Cornrows', twists: 'Twists',
+    oversize: 'Oversize-Shirt', polo: 'Polo', flanell: 'Karohemd', trainingsjacke: 'Trainingsjacke', puffer: 'Daunenjacke', mantel: 'Mantel',
+    baggy: 'Baggy', baggycargo: 'Baggy-Cargo', skinny: 'Skinny', cargoshorts: 'Cargo-Shorts', camo: 'Camo', karo: 'Karo', schlag: 'Schlaghose', latzhose: 'Latzhose', rock: 'Rock', chunky: 'Chunky Sneaker', skate: 'Skaterschuhe', kurz: 'kurz', seitenscheitel: 'Scheitel', pony: 'Pony', buzz: 'Buzzcut', stachel: 'Stacheln', undercut: 'Undercut', irokese: 'Irokese', locken: 'Locken', wellig: 'wellig', lang: 'lang', bob: 'Bob', zopf: 'Pferdeschwanz', zoepfe: 'Zöpfe', dutt: 'Dutt', dreads: 'Dreads', glatze: 'Glatze',
     normal: 'normal', duenn: 'dünn', dick: 'dick', buschig: 'buschig', boese: 'böse', hoch: 'hoch', traurig: 'traurig', gebogen: 'gebogen',
     laecheln: 'Lächeln', grinsen: 'Grinsen', zaehne: 'Zähne', ernst: 'ernst', schmollen: 'Schmollmund', schief: 'schief', offen: 'offen', ueberrascht: 'überrascht',
     klein: 'klein', gross: 'groß', spitz: 'spitz', breit: 'breit', stups: 'Stupsnase', knubbel: 'Knubbel',
