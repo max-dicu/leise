@@ -456,7 +456,7 @@
     if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
     const S = L.S(), sens = 0.0022 * S.sens;
     P.camYaw -= L.mouse.dx * sens;
-    P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.6, 1.2);
+    P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, P.flying ? -1.4 : -0.6, P.flying ? 1.4 : 1.2);
     const block = L.uiBlock;
     if (!block) {
       if (L.hit('KeyC')) P.stance = P.stance === 'crouch' ? 'stand' : 'crouch';
@@ -584,12 +584,14 @@
   function updateFlying(dt, block) {
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
     const fast = !block && (L.keys.ShiftLeft || L.keys.ShiftRight), sp = fast ? 48 : 18;
-    const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
-    let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
-    const k = Math.min(1, dt * 3);
-    P.vx += (mx * sp * (fIn || rIn ? 1 : 0) - P.vx) * k; P.vz += (mz * sp * (fIn || rIn ? 1 : 0) - P.vz) * k;
+    // in Blickrichtung: nach oben schauen = steigen, nach unten schauen = sinken
+    const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(P.camPitch), spp = Math.sin(P.camPitch);
+    let mx = sy * cp * fIn - cy * rIn, my = -spp * fIn, mz = cy * cp * fIn + sy * rIn;
+    const ml = Math.hypot(mx, my, mz) || 1; mx /= ml; my /= ml; mz /= ml;
+    const k = Math.min(1, dt * 3), go = fIn || rIn ? 1 : 0;
+    P.vx += (mx * sp * go - P.vx) * k; P.vz += (mz * sp * go - P.vz) * k;
     const up = !block && L.keys.Space, down = !block && (L.keys.KeyC || L.keys.ControlLeft);
-    const wantVy = P.flying === 2 ? -9 : up ? 12 : down ? -14 : 0;
+    const wantVy = P.flying === 2 ? -9 : my * sp * go + (up ? 14 : 0) - (down ? 16 : 0);
     P.vy += (wantVy - P.vy) * Math.min(1, dt * 4);
     let gY = L.seaFloor(P.x, P.z); const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null; if (bf !== null) gY = bf;
     if (!L.inDim(P.x)) gY = Math.max(gY, L.WATER_Y);
@@ -993,12 +995,25 @@
     L.engine.set(v.occupied && v.hp > 0, t.electric ? rpm : (rpm * 3) % 1 * 0.5 + rpm * 0.6, t.kind === 'bike', t.electric);
     const r = P.rig, s = (v.rig.seats || [v.rig.seat])[P.seat] || v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
     r.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
+    if (v.sink > 0 || v.rig.root.position.y < L.WATER_Y - 0.5) { r.root.position.y = s.y + v.rig.root.position.y; P.y = v.rig.root.position.y; }
+    drownInVehicle(v, dt);
     r.root.rotation.set(0, v.yaw, 0); r.root.rotateZ(-v.lean);
     L.setHeld(r, null);
     P.animSt = { mode: t.scooter ? 'scooter' : t.kind === 'bike' ? 'ride' : 'sit' };
     L.animHuman(r, P.animSt);
     if (!v.occupied && !P.noDriverMsg) { P.noDriverMsg = true; L.msg('Der Fahrer ist ausgestiegen – E: selbst ans Steuer, F: aussteigen'); }
     if (v.occupied) P.noDriverMsg = false;
+  }
+  // Wer im versunkenen Fahrzeug sitzen bleibt, ertrinkt – F zum Aussteigen und Hochschwimmen
+  function drownInVehicle(v, dt) {
+    if (v.t.boat || v.t.sub || !P.alive) return;
+    const under = v.rig.root.position.y + 1.2 < L.WATER_Y && !L.inDim(v.x);
+    if (!under) { P.vehDrownT = 0; return; }
+    P.vehDrownT = (P.vehDrownT || 0) + dt;
+    if (P.vehDrownT > 2) { P.hp -= 16 * dt; P.hurtFlash = Math.min(1, P.hurtFlash + dt); }
+    if (!(P.vehDrownMsg > 0)) { P.vehDrownMsg = 3; L.msg('🌊 Du gehst mit dem Fahrzeug unter – F drücken, aussteigen und hochschwimmen!', 3000); L.nz({ dur: 0.6, f: 400, type: 'bandpass', vol: 0.3 }); }
+    P.vehDrownMsg -= dt;
+    if (P.hp <= 0) { P.hp = 0; killPlayer('Im Fahrzeug ertrunken'); }
   }
   function updateDriving(dt) {
     const v = P.vehicle, t = v.t, block = L.uiBlock;
@@ -1032,6 +1047,8 @@
     // Figur auf dem Sitz
     const r = P.rig, s = v.rig.seat, cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
     r.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
+    if (v.sink > 0) { r.root.position.y = s.y + v.rig.root.position.y; P.y = v.rig.root.position.y; }
+    drownInVehicle(v, dt);
     r.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') r.root.rotation.z = 0;
     r.root.rotateZ(-v.lean);
@@ -1138,15 +1155,18 @@
       // ins Wasser gefahren: Motor säuft ab, das Fahrzeug wird langsam und geht kaputt
       v.speed = L.clamp(v.speed, -2.5, 2.5); v.hp -= dt * 6;
       if (wd > 2.6) { v.speed = 0; v.hp = Math.min(v.hp, 0); }
+      // es geht unter: langsam bis auf den Grund
+      if (wd > 1.2) v.sink = Math.min(wd + 2, (v.sink || 0) + dt * 0.9);
       if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg(wd > 2.6 ? '🌊 Das Fahrzeug ist abgesoffen – steig aus und schwimm!' : '🌊 Der Motor säuft ab!', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
     }
     v.waterMsgT = (v.waterMsgT || 0) - dt;
+    if (!(wd > 1.2) || t.boat || t.sub || t.fly || (alt || 0) > 0.5 || L.inDim(v.x)) v.sink = Math.max(0, (v.sink || 0) - dt * 2);
     // Optik
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
     for (const s of v.rig.steer) s.rotation.y = v.steer * 0.45;
     v.lean = t.kind === 'bike' && !t.quad ? L.clamp(v.steer * v.speed / 40, -0.5, 0.5) : 0;
-    v.rig.root.position.set(v.x, t.sub || t.boat ? (alt || 0) : alt > 0 ? alt : Math.max(L.WATER_Y + 0.5, Math.max(L.seaFloor(v.x, v.z), L.inDim(v.x) ? 0 : -2.2)), v.z);
+    v.rig.root.position.set(v.x, t.sub || t.boat ? (alt || 0) : alt > 0 ? alt : v.sink > 0 ? Math.max(L.seaFloor(v.x, v.z), L.WATER_Y + 0.3 - v.sink) : Math.max(L.WATER_Y + 0.5, Math.max(L.seaFloor(v.x, v.z), L.inDim(v.x) ? 0 : -2.2)), v.z);
     v.rig.root.rotation.set(0, v.yaw, 0);
     if (t.kind === 'bike') v.rig.root.rotateZ(-v.lean);
     // Wheelie: Shift halten (Motorrad, Crossmaschine, Schattenrad, Quads) – Vorderrad hoch, hinteres Rad bleibt am Boden
