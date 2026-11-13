@@ -340,11 +340,10 @@
     if (send && L.mp && L.mp.send) L.mp.send({ t: 'vcust', id: v.id, c });
   };
   // beim Einsteigen: dein eigener Style kommt mit
-  L.onEnterVehicle = function (v) {
-    if (!canCust(v) || !L.save.cust[v.type]) return;
-    const c = L.custFor(v.type);
-    if (JSON.stringify(c) !== JSON.stringify(v.cust || null)) L.applyCustom(v, c, true);
-  };
+  // Customs gehören nur zu dem einen Fahrzeug, das man in der Werkstatt angepasst hat (kein automatisches Übertragen)
+  L.onEnterVehicle = function () {};
+  if (!Array.isArray(L.save.garage)) L.save.garage = [];
+  const GARAGE_MAX = 8;
 
   // =====================================================================
   // Die Werkstatt (Gebäude)
@@ -448,24 +447,58 @@
     for (const v of L.ents.vehicles) { if (!canCust(v) || v.occupied) continue; const d = L.dist(v.x, v.z, P.x, P.z); if (d < bd) { bd = d; best = v; } }
     return best;
   }
-  L.wsHint = function () { const v = customTarget(); return v ? 'K: 🔧 ' + v.t.name + ' customizen' : null; };
+  L.wsHint = function () { const v = customTarget(); return v ? 'K: 🔧 ' + v.t.name + ' anpassen' : (L.inWorkshop(P.x, P.z) && !P.vehicle ? 'K: 🅿️ Werkstatt & Garage' : null); };
   function buy(cat, val) {
     const v = target; if (!v) return;
-    const type = v.type, c = L.custFor(type);
+    const type = v.type, c = sanitize(type, v.cust);
     if (!owned(cat, val, type)) {
       const pr = priceOf(cat, val);
       if (L.save.coins < pr) { flash('❌ Zu wenig Münzen – du brauchst ' + pr + ' 🪙 (du hast ' + L.save.coins + ')'); return; }
       L.save.coins -= pr; L.save.owned.push(ownKey(cat, val)); if (L.snd.codeOk) L.snd.codeOk();
       flash('✅ Gekauft für ' + pr + ' 🪙');
     }
-    c[cat[0]] = val; L.save.cust[type] = c; L.persist();
+    c[cat[0]] = val; L.persist();
     L.applyCustom(v, c, true); render();
   }
   let flashT = null;
   function flash(t) { const f = panel && panel.querySelector('#wsFlash'); if (f) { f.textContent = t; clearTimeout(flashT); flashT = setTimeout(() => { f.textContent = ''; }, 2600); } }
+  let garageMode = false;
+  function garageHtml(v) {
+    let h = '<h3 style="margin:12px 0 4px">🅿️ Deine Garage <small>(' + L.save.garage.length + '/' + GARAGE_MAX + ')</small></h3>';
+    if (v) h += '<button class="btn" id="wsSave" style="margin-bottom:6px">💾 Diesen ' + v.t.name + ' in der Garage speichern</button>';
+    if (!L.save.garage.length) h += '<p class="small">Noch keine Fahrzeuge gespeichert. Pass ein Fahrzeug an und speichere es – dann kannst du es in jeder Runde hier ausparken.</p>';
+    const outNow = (L.round && L.round.garageOut) || {};
+    L.save.garage.forEach((g, i) => { const t = L.VTYPES[g.type]; if (!t) return; h += '<div class="row" style="justify-content:space-between;border-top:1px solid #333;padding-top:4px"><span>' + (t.kind === 'bike' ? '🏍️' : '🚗') + ' <b>' + t.name + '</b> <small>' + (g.cust && g.cust.body && g.cust.body !== 'orig' ? '🎨' : '') + (g.cust && g.cust.led && g.cust.led !== 'none' ? '💡' : '') + (g.cust && g.cust.decal && g.cust.decal !== 'none' ? '🖌️' : '') + (g.cust && g.cust.plate ? ' ' + g.cust.plate : '') + '</small></span><span>' + (outNow[i] ? '<small>schon ausgeparkt</small>' : '<button class="btn" data-out="' + i + '">Ausparken</button>') + ' <button class="btn" data-del="' + i + '">🗑️</button></span></div>'; });
+    return h;
+  }
+  function bindGarage() {
+    const sv = panel.querySelector('#wsSave');
+    if (sv) sv.onclick = () => {
+      const v = target; if (!v) return;
+      if (L.save.garage.length >= GARAGE_MAX) { flash('❌ Garage voll (' + GARAGE_MAX + ') – lösche erst ein Fahrzeug.'); return; }
+      L.save.garage.push({ type: v.type, cust: sanitize(v.type, v.cust) }); L.persist(); flash('💾 ' + v.t.name + ' gespeichert!'); render();
+    };
+    panel.querySelectorAll('[data-del]').forEach((b) => { b.onclick = () => { L.save.garage.splice(+b.dataset.del, 1); L.persist(); render(); }; });
+    panel.querySelectorAll('[data-out]').forEach((b) => { b.onclick = () => takeOut(+b.dataset.out); });
+  }
+  // Fahrzeug aus der Garage holen: steht auf dem Custom-Platz
+  function takeOut(i) {
+    const g = L.save.garage[i]; if (!g || !L.VTYPES[g.type]) return;
+    const R = L.round; R.garageOut = R.garageOut || {}; if (R.garageOut[i]) return;
+    for (const o of L.ents.vehicles) if (!o.occupied && Math.hypot(o.x - WS.x, o.z - (WS.z + 1)) < 4) { o.x += 6; o.rig.root.position.x = o.x; }
+    L._g.spawnVehicle({ type: g.type, x: WS.x, z: WS.z + 1, yaw: Math.PI, cust: g.cust });
+    const v = L.ents.vehicles[L.ents.vehicles.length - 1];
+    L.applyCustom(v, g.cust, true);
+    R.garageOut[i] = true; flash('🚗 ' + v.t.name + ' steht auf dem Custom-Platz!'); render();
+  }
   function render() {
-    const v = target; if (!panel || !v) return;
-    const type = v.type, c = L.custFor(type);
+    if (!panel) return;
+    const v = target;
+    if (!v) {
+      panel.innerHTML = '<h2>🔧 Werkstatt – Garage</h2><div>Deine Münzen: <span class="coins">🪙 ' + L.save.coins + '</span></div><div id="wsFlash" style="color:#7dff7d;min-height:18px;margin-top:4px"></div>' + garageHtml(null) + '<p class="small">Tipp: Fahr mit einem Fahrzeug in die Werkstatt oder stell dich daneben, um es anzupassen.</p><button class="btn primary close" id="wsClose">Fertig</button>';
+      panel.querySelector('#wsClose').onclick = closePanel; bindGarage(); return;
+    }
+    const type = v.type, c = sanitize(type, v.cust);
     const full = !!L.CUSTOM_TYPES[type];
     const cats = CATS.filter((k) => (full ? (!k[3] || (k[3] === 'quad' && isQuad(type))) : OVER_CATS.includes(k[0])));
     if (!cats.some((k) => k[0] === tab)) tab = 'body';
@@ -482,32 +515,33 @@
     h += `<div class="row">🪪 Kennzeichen: <input id="wsPlate" maxlength="9" value="${c.plate}"> <button class="btn" id="wsPlateB">Ändern (40 🪙)</button></div>`;
     const others = L.remotes ? [...L.remotes.values()] : [];
     if (others.length) h += '<div class="row">🎁 Münzen schenken: ' + others.map((r) => `<button class="btn" data-gift="${r.pid}">${String(r.name).replace(/[<>&"]/g, '')}</button>`).join('') + '</div>';
+    h += garageHtml(v);
     h += '<button class="btn primary close" id="wsClose">Fertig</button>';
-    panel.innerHTML = h;
+    panel.innerHTML = h; bindGarage();
     panel.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { tab = b.dataset.tab; render(); }; });
     panel.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => buy(cat, b.dataset.v); });
     panel.querySelector('#wsClose').onclick = closePanel;
     panel.querySelector('#wsPlateB').onclick = () => {
       const val = panel.querySelector('#wsPlate').value;
       if (L.save.coins < 40) { flash('❌ Zu wenig Münzen'); return; }
-      const c2 = L.custFor(type); c2.plate = val; const s2 = sanitize(type, c2); if (s2.plate === c.plate) return;
-      L.save.coins -= 40; L.save.cust[type] = s2; L.persist(); L.applyCustom(target, s2, true); render(); flash('✅ Neues Kennzeichen: ' + (s2.plate || '(keins)'));
+      const c2 = sanitize(type, target.cust); c2.plate = val; const s2 = sanitize(type, c2); if (s2.plate === c.plate) return;
+      L.save.coins -= 40; L.persist(); L.applyCustom(target, s2, true); render(); flash('✅ Neues Kennzeichen: ' + (s2.plate || '(keins)'));
     };
     panel.querySelectorAll('[data-gift]').forEach((b) => { b.onclick = () => { const n = prompt('Wie viele Münzen schenken? (du hast ' + L.save.coins + ')', '50'); if (n !== null && L.giftCoins(+b.dataset.gift, n)) render(); }; });
   }
   function openPanel(v) {
-    target = v;
+    target = v; garageMode = !v;
     if (!panel) { panel = document.createElement('div'); panel.id = 'wsPanel'; document.body.appendChild(panel); }
     panel.hidden = false; L.uiBlock = true; if (L.unlock) L.unlock();
     render();
   }
-  function closePanel() { if (panel) panel.hidden = true; target = null; L.uiBlock = false; if (L.state === 'game' && L.lock) L.lock(); }
+  function closePanel() { if (panel) panel.hidden = true; target = null; garageMode = false; L.uiBlock = false; if (L.state === 'game' && L.lock) L.lock(); }
   L.wsOpen = () => !!(panel && !panel.hidden);
   // Knopf zum Antippen (Handy) bzw. Klicken
   const wsBtn = document.createElement('button'); wsBtn.id = 'wsBtn'; wsBtn.hidden = true; wsBtn.textContent = '🔧 Customizen (K)';
   wsBtn.style.cssText = 'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:20;padding:10px 18px;font-size:17px;font-weight:800;border-radius:10px;border:2px solid #39ff14;background:rgba(0,0,0,.75);color:#39ff14;cursor:pointer';
   document.body.appendChild(wsBtn);
-  wsBtn.onclick = () => { const v = customTarget(); if (v) openPanel(v); };
+  wsBtn.onclick = () => { if (!L.inWorkshop(P.x, P.z)) return; openPanel(customTarget()); };
 
   // =====================================================================
   // jedes Bild
@@ -520,10 +554,10 @@
     if (inside && (!wasIn || threat !== wasThreat)) L.msg(threat ? '⚠️ Große Monster sind da – die Werkstatt schützt dich jetzt NICHT! Nur der Turm ist sicher.' : '🔧 Werkstatt – hier bist du sicher. K: Fahrzeug customizen', 4500);
     wasIn = inside; wasThreat = threat;
     if (WS.pad) WS.pad.material.color.setHex(threat ? 0xff3030 : 0x39ff14);
-    const tgt = L.wsOpen() ? null : customTarget();
-    wsBtn.hidden = !tgt || L.uiBlock;
-    if (!L.uiBlock && !L.chatOpen && L.hit('KeyK') && tgt) openPanel(tgt);
-    if (L.wsOpen()) { if (!target || !L.inWorkshop(P.x, P.z) || !P.alive) closePanel(); else { P.camYaw += dt * 0.35; P.freeLookT = 1; } }
+    const tgt = L.wsOpen() ? null : customTarget(), inWs = inside && !P.vehicle || !!tgt;
+    wsBtn.hidden = L.wsOpen() || !inWs || L.uiBlock; wsBtn.textContent = tgt ? '🔧 ' + tgt.t.name + ' anpassen (K)' : '🅿️ Werkstatt & Garage (K)';
+    if (!L.uiBlock && !L.chatOpen && L.hit('KeyK') && inWs) openPanel(tgt);
+    if (L.wsOpen()) { if ((!target && !garageMode) || !L.inWorkshop(P.x, P.z) || !P.alive) closePanel(); else if (target) { P.camYaw += dt * 0.35; P.freeLookT = 1; } }
     // LEDs, Blüten, Turbo-Flammen, Fahnen
     const tt = performance.now() / 1000;
     for (const v of L.ents.vehicles) {
