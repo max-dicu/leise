@@ -464,12 +464,12 @@
     const armM = new T.MeshPhongMaterial({ color: 0x5c4840, emissive: 0x401010, shininess: 30, fog: false }), armS = [];
     for (let k = 0; k < 34; k++) { const m = new T.Mesh(new T.SphereGeometry(1, 12, 8), armM); m.frustumCulled = false; m.visible = false; L.scene.add(m); armS.push(m); }
     const handM = new T.Group(); for (let f = 0; f < 5; f++) { const c = new T.Mesh(L.GEO.cone, new T.MeshPhongMaterial({ color: 0x2c2925, fog: false })); c.scale.set(90, 700, 90); c.rotation.z = (f - 2) * 0.35; c.position.set((f - 2) * 180, 350, 0); c.frustumCulled = false; handM.add(c); } handM.visible = false; L.scene.add(handM);
-    // ---- Teil 2 (Hauptinsel, Absturzkrater): der Kampf ----
+    // ---- Teil 2 (Hauptinsel, mitten in der Stadt Altheim): der Kampf ----
     const kr = (L.POIS || []).find((p) => p.id === 'krater') || { x: 380, z: 1050 };
     // freie Fläche suchen (kein Haus/Baum/Fels in 70 m, Kameraplatz auch frei)
     let F = { x: kr.x, z: kr.z + 200 };
     const freeR = (x, z, r) => { for (let i = -r; i <= r; i += 10) for (let j = -r; j <= r; j += 10) if (i * i + j * j <= r * r && L.queryBoxes(x + i, z + j, 1).length) return false; return Math.abs(x) < 1350 && Math.abs(z) < 1350 && L.mountainH(x, z) === 0 && L.waterDepth(x, z) < -0.3; };
-    for (let k = 0; k < 160; k++) { const a = k * 0.7, d = 120 + k * 9, x = kr.x + Math.sin(a) * d, z = kr.z + Math.cos(a) * d, ca = 0.6 + Math.atan2(46, 34); if (freeR(x, z, 70) && freeR(x + Math.sin(ca) * 340, z + Math.cos(ca) * 340, 25)) { F = { x, z }; break; } }
+    F = { x: -152, z: -76 }; // Kreuzung im Hochhausviertel – IVA ist größer als jedes Haus
     const rig = L.buildKoloss(); rig.root.children.forEach((c) => { if (c !== rig.hull) c.visible = false; });
     rig.root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false; } });
     const K = 6; rig.root.scale.setScalar(K); rig.root.rotation.set(0, 0.6, 0); rig.root.position.set(F.x, -200, F.z); L.scene.add(rig.root);
@@ -505,7 +505,7 @@
       Object.assign(V.cam, { x: cp.x, y: cp.y, z: cp.z, lx: lk.x, ly: lk.y, lz: lk.z });
       return;
     }
-    if (!V.home) { V.home = true; for (const m of V.armS) m.visible = false; V.handM.visible = false; L.banner('🌍 DIE HAUPTINSEL', 'Bernhard stürzt beim Absturzkrater ab …'); }
+    if (!V.home) { V.home = true; for (const m of V.armS) m.visible = false; V.handM.visible = false; L.banner('🌍 DIE HAUPTINSEL', 'Bernhard kracht mitten in die Stadt Altheim …'); }
     const F = V.F;
     const W = (x, y, z) => R.root.localToWorld(new T.Vector3(x, y, z));
     const qIva = R.root.quaternion, qx = (a) => new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), a), qy = (a) => new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a);
@@ -585,7 +585,10 @@
     if (V.waveT !== undefined) { V.waveT += dt; const k = V.waveT / 1.6; V.wave.scale.setScalar(K + k * K * 25); V.wave.material.opacity = Math.max(0, 0.9 - k * 0.9); }
     for (const ch of V.chunks) { ch.position.addScaledVector(ch.userData.v, dt); ch.userData.v.y -= 400 * S * dt * 6; ch.rotation.x += dt * 2; ch.rotation.y += dt; if (ch.position.y < 0) { ch.position.y = 0; ch.userData.v.set(0, 0, 0); } }
     // Kamera auf der Hauptinsel: seitlich (Absturz, Kampf, Suplex), nah am Kopf (Maul, Fressen)
-    const far = W(46, 27, 34), farLook = W(0, 13, -1), near = W(5, 22, 17), nearLook = W(0, 19.5, 1);
+    // Kamera immer so, als stünde IVA schon (sonst landet sie beim Aufsteigen/Versinken zwischen den Häusern)
+    R.root.updateMatrixWorld(true);
+    const dyC = -2 * K - R.root.position.y, WC = (x, y, z) => W(x, y, z).add(new T.Vector3(0, dyC, 0));
+    const far = WC(38, 25, 28), farLook = WC(0, 13, -1), near = WC(5, 22, 17), nearLook = WC(0, 19.5, 1);
     const k = t < 13.5 ? 0 : t < 15 ? ease((t - 13.5) / 1.5) : t < 22 ? 1 : 1 - ease((t - 22) / 2);
     const cp = new T.Vector3().lerpVectors(far, near, k), lk = new T.Vector3().lerpVectors(t < 4.6 ? b.position.clone() : farLook, nearLook, k);
     if (cp.y < 3) cp.y = 3;

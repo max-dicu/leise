@@ -146,11 +146,7 @@
       const lava = new T.PointLight(0xff5020, 3, 400, 2); lava.position.set(vx, 130, vz); g.add(lava); I.vol = { x: vx, z: vz, h: 120 };
       L.addBox(vx - 100, vz - 100, vx + 100, vz + 100, 120, 'building');
     }
-    if (I.bridge) {
-      // Regenbogenbrücke hinaus aufs Meer
-      const bc2 = ['#ff3030', '#ff9020', '#ffe020', '#30c040', '#3080ff', '#8040e0'];
-      for (let k = 0; k < 60; k++) { const d = r - 40 + k * 8, a = 2.4, bx = I.x + Math.sin(a) * d, bz = I.z + Math.cos(a) * d; for (let c = 0; c < 6; c++) addInst(mB, bx + Math.cos(a) * (c - 2.5) * 1.6, 0.2 + Math.sin(k / 59 * Math.PI) * 30, bz - Math.sin(a) * (c - 2.5) * 1.6, 1.6, 0.4, 8.2, a, bc2[c]); }
-    }
+    // (die Regenbogenbrücke nach Asgard entsteht in asgard.js)
     // Checkpoint: Obelisk mit Lichtsäule in der Mitte
     addInst(mB, I.x, 0, I.z, 3, 9, 3, 0, '#5a5a62'); addInst(mR, I.x, 9, I.z, 2.4, 2.5, 2.4, 0, '#8a8a92');
     L.addBox(I.x - 1.6, I.z - 1.6, I.x + 1.6, I.z + 1.6, 11, 'building');

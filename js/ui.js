@@ -493,6 +493,7 @@
   $('pResume').onclick = resume;
   $('pSettings').onclick = () => { backTo = 'pause'; openSettings(); };
   $('pHelp').onclick = () => { backTo = 'pause'; show('helpScreen'); };
+  $('pBeam').onclick = () => { resume(); setTimeout(() => { if (L.beamHome) L.beamHome(); }, 50); };
   $('pQuit').onclick = () => { L.paused = false; L.mpPause = false; show(null); L.endRound('death', 'Du hast aufgegeben'); };
   function startGame(loadout) {
     show(null); $('hud').hidden = false;

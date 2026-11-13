@@ -96,10 +96,12 @@
     const km = (x, z) => { const d = Math.hypot(x - P.x, z - P.z); return d > 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'; };
     const tgt = (x, z, icon, name) => { if (Math.hypot(x - P.x, z - P.z) < 40) return; put(x - P.x, z - P.z, icon + '<small>' + name + ' ' + km(x, z) + '</small>'); };
     if (L.inMoon && L.inMoon(P.x)) { for (const q of L.moonTargets()) tgt(q[0], q[1], q[2], q[3]); }
+    else if (L.inBack && L.inBack(P.x)) { /* Backrooms: kein Kompass */ }
     else if (L.inDim(P.x)) { if (L.DIM_PORTAL) tgt(L.DIM_PORTAL.x, L.DIM_PORTAL.z, '🌀', 'Heimweg'); }
     else if (L.ROCKET && !L.curIsland) tgt(L.ROCKET.x, L.ROCKET.z, '🚀', 'Rakete');
     else {
       for (const I of L.ISL || []) if (!I.dim && L.curIsland !== I) tgt(I.x, I.z, I.icon, I.name.replace('Götterinsel ', '').replace('insel', ''));
+      if (L.curIsland && L.curIsland.id === 'asgard' && L.ASGARD) tgt(L.ASGARD.x, L.ASGARD.z, '🌈', 'Bifröst → Asgard');
       if (L.curIsland && L.curIsland.shelter) tgt(L.curIsland.shelter.x, L.curIsland.shelter.z, '🛡️', 'Zuflucht');
       if (Math.max(Math.abs(P.x), Math.abs(P.z)) > 1600) tgt(0, 0, '🏠', 'Heimat');
       else if (L.TOWER) tgt(L.TOWER.x, L.TOWER.z, '🗼', 'Turm');
