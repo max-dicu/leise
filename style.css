@@ -161,7 +161,14 @@ body.touch #towerNav { top: 104px; font-size: 14px; padding: 4px 10px; }
 #chatLog div { background: rgba(0, 0, 0, .55); padding: 3px 8px; margin-top: 3px; border-radius: 3px; font-size: 15px; transition: opacity 1s; text-shadow: 0 1px 2px #000; }
 #chatLog div b { color: #8ac8ff; }
 #chatLog div.sys b, #chatLog div.sys { color: var(--amber); }
-#chatLog div.old { opacity: 0; }
+#chatLog div.old { opacity: .45; }
+#chatLog { max-height: 230px; overflow-y: auto; scrollbar-width: thin; }
+#chat.open { pointer-events: auto; }
+#chat.open #chatLog { background: rgba(0, 0, 0, .35); border-radius: 6px; }
+#chat.open #chatLog div.old { opacity: 1; }
+#chatBtn { position: fixed; left: 16px; bottom: 100px; z-index: 13; padding: 6px 12px; border-radius: 10px; border: 2px solid #8ac8ff; background: rgba(0, 0, 0, .6); color: #fff; font-weight: 700; cursor: pointer; }
+body.touch #chatBtn { bottom: auto; top: 200px; }
+@media (max-width: 600px) { #chat { width: calc(100vw - 32px); } }
 #chatIn { pointer-events: auto; width: 100%; margin-top: 6px; font: inherit; font-size: 15px; padding: 7px 9px; background: rgba(10, 10, 14, .9); color: var(--text); border: 1px solid var(--amber); border-radius: 3px; }
 .slot.friend { border-color: #5ab0ff; background: rgba(60, 110, 170, .4); }
 

@@ -306,9 +306,61 @@
     if (e.kind === 'walker' && byPlayer) walkerHear(e, src.x, src.z);
     if (e.hp <= 0) killEnt(e, src);
   };
+  // ---------- Münzen pro besiegtem Monster (je stärker, desto mehr) ----------
+  const KILL_COINS = { viktor: 10, daniel: 12, blockling: 10, marsianer: 12, rufer: 15, schwelle: 15, rollerviktor: 18, capydaniel: 18, langer: 20, starrende: 20, greifer: 25, flieger: 25, walross: 30, walker: 150, boss: 500 };
+  function killReward(e, src) {
+    const n = KILL_COINS[e.kind] || (MK[e.kind] ? 10 : 0); if (!n) return;
+    if (src === P) L.gotKillCoins(n);
+    else if (isRemote(src) && src.pid !== undefined && L.mp && L.mp.sendTo) L.mp.sendTo(src.pid, { t: 'kc', n });
+  }
+  L.gotKillCoins = function (n) {
+    n = Math.floor(+n); if (!(n > 0) || n > 1000 || !L.round || L.state !== 'game') return;
+    L.round.coins = (L.round.coins || 0) + n;
+    L.msg('🪙 +' + n + ' Münzen – Monster besiegt!', 1800); if (L.snd.pickup) L.snd.pickup();
+  };
+  // ---------- Monster kommen zurück (nur der Host bzw. allein) ----------
+  // Jedes besiegte Monster taucht nach 40–80 s woanders wieder auf (weit weg von allen Spielern).
+  // Sind alle Monster einer Welt (Stadt oder Insel) besiegt, kommen alle nach 6 s auf einmal zurück.
+  const grp = (e) => e.isl || null;
+  function queueRespawn(e) {
+    if (e.noRespawn || !MK[e.kind]) return;
+    const g = grp(e);
+    L.respawnQueue.push({ kind: e.kind, variant: e.variant, isl: g, t: L.rand(40, 80) });
+    const anyAlive = E.monsters.some((m) => !m.dead && MK[m.kind] && grp(m) === g);
+    if (!anyAlive) {
+      for (const q of L.respawnQueue) if (q.isl === g) q.t = Math.min(q.t, 6);
+      const txt = '☠️ Alle Monster ' + (g ? 'auf ' + (g.name || 'der Insel') : 'in der Stadt') + ' besiegt! In 6 Sekunden kommen sie alle zurück …';
+      L.msg(txt, 6000); if (L.mp && L.mp.send) L.mp.send({ t: 'msg', text: txt });
+    }
+  }
+  function respawnSpot(I) {
+    const pl = players();
+    for (let k = 0; k < 40; k++) {
+      let x, z;
+      if (I) { const a = Math.random() * 6.28, d = 60 + Math.sqrt(Math.random()) * Math.max(10, I.r - 90); x = I.x + Math.sin(a) * d; z = I.z + Math.cos(a) * d; }
+      else { x = L.rand(-1400, 1400); z = L.rand(-1400, 1400); if (L.inTower(x, z, 6)) continue; }
+      if (L.queryBoxes(x, z, 1.5).length) continue;
+      if (pl.some((p) => p && L.dist(x, z, p.x, p.z) < 110)) continue;
+      return [x, z];
+    }
+    return null;
+  }
+  function updateRespawn(dt) {
+    const Q = L.respawnQueue; if (!Q || !Q.length) return;
+    for (let i = Q.length - 1; i >= 0; i--) {
+      const q = Q[i]; q.t -= dt; if (q.t > 0) continue;
+      if (q.isl && !q.isl.populated) { Q.splice(i, 1); continue; }
+      const s = respawnSpot(q.isl); if (!s) { q.t = 3; continue; }
+      Q.splice(i, 1);
+      const m = spawnMonster(q.kind, s[0], s[1], q.variant);
+      if (q.isl) { m.isl = q.isl; if (q.kind !== 'walross' && q.isl.monTint) L.tintRig(m.rig.root, q.isl.monTint, 0.45); }
+    }
+  }
   function killEnt(e, src) {
+    if (e.dead) return;
     e.dead = true; e.deadT = 0;
     if (src === P) P.kills++;
+    if (!isClient()) { killReward(e, src); if (MK[e.kind]) queueRespawn(e); }
     if (MK[e.kind]) {
       if (MK[e.kind].metal) { L.fx('#ffb040', e.x, e.fly ? 16 : 2, e.z, 30, 8, { basic: true, size: 0.3, life: 1 }); L.snd.explosion({ x: e.x, y: 2, z: e.z }); }
       else { L.blood(e.x, 1.2, e.z, 30, true); L.decal(e.x, e.z, 2); L.snd.splat({ x: e.x, y: 1, z: e.z }); }
@@ -2809,6 +2861,7 @@
     const S = L.S();
     L.md = MDIFF[S.monsterDiff] || MDIFF.normal; L.nd = NDIFF[S.npcDiff] || NDIFF.normal;
     clearAll();
+    if (L.chatReset) L.chatReset();
     resetPlayer();
     for (const it of loadout || []) {
       const left = L.giveItem(it.type, it.count, it.mag);
@@ -3021,6 +3074,7 @@
     if (!P.gone) updatePlayer(dt);
     if (isClient()) { L.mp.puppets(dt); puppetWboss(dt); }
     else {
+      updateRespawn(dt);
       for (let i = E.monsters.length - 1; i >= 0; i--) if (!updateMonster(E.monsters[i], dt)) { L.byId.delete(E.monsters[i].key); L.scene.remove(E.monsters[i].rig.root); E.monsters.splice(i, 1); }
       for (const w of E.walkers) updateWalker(w, dt);
       if (L.boss) updateBoss(dt);

@@ -339,6 +339,7 @@
         L.fx('#6a5a40', m.x, 0.5, m.z, 20, 12, { size: 0.4, life: 1.5 });
         break;
       case 'msg': L.msg(String(m.text)); break;
+      case 'kc': if (!host && L.gotKillCoins) L.gotKillCoins(m.n); break;
       case 'done':
         if (R) { freeRemoteVehicle(R); R.inRound = false; R.rig.root.visible = false; }
         L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);
@@ -413,7 +414,7 @@
     const M = [], W = [], NN = [], V = [];
     for (const m of E.monsters) {
       if (L.dist(m.x, m.z, R.x, R.z) > 330) continue;
-      M.push([m.id, r1(m.x), r1(m.z), r2(m.yaw), STATES.indexOf(m.state), ANIMS.indexOf(m.anim), m.dead ? 1 : 0, m.prey === R ? 1 : 0, r2(m.atk || 0), m.kind]);
+      M.push([m.id, r1(m.x), r1(m.z), r2(m.yaw), STATES.indexOf(m.state), ANIMS.indexOf(m.anim), m.dead ? 1 : 0, m.prey === R ? 1 : 0, r2(m.atk || 0), m.kind, m.variant || 0]);
     }
     for (const w of E.walkers) W.push([w.id, r1(w.x), r1(w.z), r2(w.yaw), r1(w.hy), WSTATES.indexOf(w.state), w.rig.beam.g.visible ? 1 : 0, r1(w.aimX), r1(w.aimZ), w.dead ? 1 : 0, w.chargeT > 0 ? 1 : 0, r2(w.sweep || 0)]);
     for (const n of E.npcs) {
@@ -501,7 +502,7 @@
     const now = performance.now();
     for (const a of s.M) {
       let m = L.byId.get('m' + a[0]);
-      if (!m) { if (!a[9] || !L.MK[a[9]]) continue; m = G().spawnMonster(a[9], a[1], a[2], undefined, a[0]); m.rig.root.visible = false; }
+      if (!m) { if (!a[9] || !L.MK[a[9]]) continue; m = G().spawnMonster(a[9], a[1], a[2], a[10] || undefined, a[0]); m.rig.root.visible = false; }
       if (m.nx === undefined) { m.x = a[1]; m.z = a[2]; m.yaw = a[3]; }
       m.nx = a[1]; m.nz = a[2]; m.nyaw = a[3];
       m.state = STATES[a[4]] || 'wander'; m.anim = ANIMS[a[5]] || 'walk';
@@ -701,22 +702,57 @@
   }
 
   // ---------- Chat ----------
+  // Sprechblase über dem Kopf (eigene oder die eines Mitspielers)
+  const bubbles = new Map();
+  function bubbleTex(text) {
+    const c = document.createElement('canvas'), g = c.getContext('2d'), W = 512; g.font = 'bold 30px Arial';
+    const words = String(text).split(/\s+/), lines = []; let ln = '';
+    for (const w of words) { const t2 = ln ? ln + ' ' + w : w; if (g.measureText(t2).width > W - 50 && ln) { lines.push(ln); ln = w; } else ln = t2; }
+    if (ln) lines.push(ln); while (lines.length > 4) lines.pop();
+    const H = 30 + lines.length * 36 + 24; c.width = W; c.height = H; g.font = 'bold 30px Arial';
+    g.fillStyle = 'rgba(255,255,255,0.95)'; const r = 22; g.beginPath(); g.moveTo(r, 0); g.arcTo(W, 0, W, H - 24, r); g.arcTo(W, H - 24, 0, H - 24, r); g.lineTo(W / 2 + 16, H - 24); g.lineTo(W / 2, H); g.lineTo(W / 2 - 16, H - 24); g.arcTo(0, H - 24, 0, 0, r); g.arcTo(0, 0, W, 0, r); g.closePath(); g.fill();
+    g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'top'; lines.forEach((l, i) => g.fillText(l, W / 2, 16 + i * 36));
+    const tx = new T.CanvasTexture(c); return { tx, ratio: H / W };
+  }
+  function showBubble(pid, text) {
+    const rig = pid === N.pid ? P.rig : (RM.get(pid) && RM.get(pid).rig); if (!rig || !L.scene) return;
+    const old = bubbles.get(pid); if (old) { if (old.s.parent) old.s.parent.remove(old.s); old.s.material.map.dispose(); old.s.material.dispose(); clearTimeout(old.to); }
+    const { tx, ratio } = bubbleTex(text), s = new T.Sprite(new T.SpriteMaterial({ map: tx, depthTest: false, transparent: true }));
+    s.scale.set(2.4, 2.4 * ratio, 1); s.position.y = 2.75 + 1.2 * ratio; s.renderOrder = 999; rig.root.add(s);
+    const b = { s, to: setTimeout(() => { if (s.parent) s.parent.remove(s); tx.dispose(); s.material.dispose(); bubbles.delete(pid); }, 8000) };
+    bubbles.set(pid, b);
+  }
+  // neue Runde = leerer Chat (Wiederbeleben ist keine neue Runde, da bleibt er)
+  L.chatReset = function () {
+    const log = $('chatLog'); if (log) log.innerHTML = '';
+    for (const b of bubbles.values()) { clearTimeout(b.to); if (b.s.parent) b.s.parent.remove(b.s); }
+    bubbles.clear();
+  };
   function addChat(name, text, system, pid) {
     const log = $('chatLog'); if (!log) return;
+    if (!system && pid !== undefined) showBubble(pid, text);
     const d = document.createElement('div');
     if (system) d.className = 'sys';
     const b = document.createElement('b'); b.textContent = name + ': ';
     if (!system && pid !== undefined) b.style.color = mp.color(pid);
     d.appendChild(b); d.appendChild(document.createTextNode(text));
     log.appendChild(d);
-    while (log.children.length > 8) log.firstChild.remove();
-    setTimeout(() => d.classList.add('old'), 15000);
+    while (log.children.length > 60) log.firstChild.remove();
+    log.scrollTop = log.scrollHeight;
+    setTimeout(() => d.classList.add('old'), 20000);
     $('chat').hidden = false;
     if (!system && name !== 'Du') L.snd.key();
   }
-  function openChat() { L.chatOpen = true; L.uiBlock = true; $('chat').hidden = false; $('chatIn').hidden = false; L.unlock(); setTimeout(() => $('chatIn').focus(), 0); }
+  function openChat() { if (L.chatOpen) return; L.chatOpen = true; L.uiBlock = true; $('chat').hidden = false; $('chat').classList.add('open'); $('chatIn').hidden = false; L.unlock(); setTimeout(() => $('chatIn').focus(), 0); }
+  L.openChat = openChat;
+  // 💬-Knopf (auch für Handy/Tablet)
+  const chatBtn = document.createElement('button'); chatBtn.id = 'chatBtn'; chatBtn.textContent = '💬 Chat'; chatBtn.hidden = true;
+  chatBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); if (L.chatOpen) closeChat(); else openChat(); };
+  document.body.appendChild(chatBtn);
+  setInterval(() => { const on = !!(N.connected && L.state === 'game'); if (chatBtn.hidden === on) chatBtn.hidden = !on; }, 500);
   function closeChat() {
-    L.chatOpen = false; L.uiBlock = false;
+    if (!L.chatOpen) return;
+    L.chatOpen = false; L.uiBlock = false; $('chat').classList.remove('open');
     const i = $('chatIn'); i.value = ''; i.hidden = true; i.blur();
     if (L.state === 'game' && !L.paused) L.lock();
   }
@@ -731,6 +767,6 @@
       e.stopPropagation();
       return;
     }
-    if ((e.code === 'Enter' || e.code === 'NumpadEnter') && N.connected && L.state === 'game' && !L.uiBlock) { openChat(); e.preventDefault(); }
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash' || e.key === '/') && N.connected && L.state === 'game' && !L.uiBlock && !L.paused) { openChat(); e.preventDefault(); }
   }, true);
 })();
