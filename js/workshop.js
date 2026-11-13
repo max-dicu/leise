@@ -107,14 +107,22 @@
   function optsOf(cat) { return cat[2] === 'color' ? COLORS : cat[2]; }
   function priceOf(cat, val) { const o = optsOf(cat).find((q) => q[0] === val); return o ? o[2] : 0; }
   function ownKey(cat, val) { return cat[2] === 'color' ? 'farbe:' + val : cat[0] + ':' + val; }
+  // alle anderen Landfahrzeuge (Autos, Motorräder, Nachtfalke …): Lack, LEDs, Muster, Kennzeichen
+  const overlayOk = (t) => !!t && !t.police && !t.boat && !t.sub && !t.plane && !t.heli && (t.kind === 'car' || t.kind === 'bike');
+  const OVER_DEF = { body: 'orig', accent: '#f2f2f2', frame: '#1a1a1a', seat: '#1a1a1a', rims: '#7a7a7a', tires: 'std', rimStyle: 'std', led: 'none', ledFx: 'static', light: 'std', decal: 'none', bar: 'std', exhaust: 'std', extra: 'none', plate: '' };
+  const OVER_CATS = ['body', 'led', 'ledFx', 'decal'];
+  const defFor = (type) => DEF[type] || OVER_DEF;
+  const canCust = (v) => !!v && (!!L.CUSTOM_TYPES[v.type] || overlayOk(v.t));
+  L.canCustom = canCust;
   function owned(cat, val, type) {
-    if (DEF[type][cat[0]] === val) return true;
+    if (val === 'orig') return true;
+    if (defFor(type)[cat[0]] === val) return true;
     if (priceOf(cat, val) === 0) return true;
     return L.save.owned.includes(ownKey(cat, val));
   }
   // Sicher gegen kaputte Daten (z. B. aus dem Netz)
   function sanitize(type, c) {
-    const d = DEF[type], out = Object.assign({}, d);
+    const d = defFor(type), out = Object.assign({}, d);
     if (!c || typeof c !== 'object') return out;
     for (const cat of CATS) { const v = c[cat[0]]; if (optsOf(cat).some((q) => q[0] === v)) out[cat[0]] = v; }
     out.plate = typeof c.plate === 'string' ? c.plate.replace(/[^A-Za-z0-9ÄÖÜäöü \-]/g, '').slice(0, 9).toUpperCase() : '';
@@ -307,8 +315,24 @@
     return isQuad(type) ? buildQuad(type, c) : buildScooter(type, c);
   };
   // neues Aussehen auf ein Fahrzeug anwenden (send = an Mitspieler schicken)
+  // Lack, LEDs, Muster und Kennzeichen auf ein normales Fahrzeugmodell legen
+  function applyOverlay(v, c) {
+    const rig = v.rig, root = rig.root, ud = root.userData, t = v.t;
+    if (!ud.origMats) {
+      ud.origMats = new Map(); const col = new T.Color(t.body || rig.color || '#ffffff').getHex();
+      root.traverse((o) => { if (o.isMesh && o.material && o.material.color && !o.material.transparent && o.material.color.getHex() === col) ud.origMats.set(o, o.material); });
+    }
+    for (const [m, mat] of ud.origMats) m.material = c.body === 'orig' ? mat : L.mat(c.body);
+    if (ud.ovl) root.remove(ud.ovl);
+    const g = new T.Group(); root.add(g); ud.ovl = g;
+    const len = t.len || 4, wid = t.wid || 1.8, y = t.kind === 'bike' ? 0.8 : Math.max(0.6, (t.h || 1.4) * 0.42 + (t.lift || 0));
+    underglow(g, c, wid, len, 0.25); ud.led = g.userData.led || null;
+    if (c.decal !== 'none') for (const sd of [-1, 1]) decalPlane(g, c.decal, '#ffffff', len * (t.kind === 'bike' ? 0.5 : 0.6), t.kind === 'bike' ? 0.3 : 0.42, sd * (wid / 2 + (t.kind === 'bike' ? -0.2 : 0.03)), y, 0, sd * Math.PI / 2);
+    plate(g, c, 0, Math.max(0.5, y - 0.15), -len / 2 - 0.04, Math.PI);
+  }
   L.applyCustom = function (v, cust, send) {
-    if (!v || !L.CUSTOM_TYPES[v.type]) return;
+    if (!v || !canCust(v)) return;
+    if (!L.CUSTOM_TYPES[v.type]) { const c2 = sanitize(v.type, cust); applyOverlay(v, c2); v.cust = c2; if (send && L.mp && L.mp.send) L.mp.send({ t: 'vcust', id: v.id, c: c2 }); return; }
     const c = sanitize(v.type, cust);
     const old = v.rig.root, rig = L.buildVehicle(v.type, c);
     rig.root.position.copy(old.position); rig.root.rotation.copy(old.rotation);
@@ -317,7 +341,7 @@
   };
   // beim Einsteigen: dein eigener Style kommt mit
   L.onEnterVehicle = function (v) {
-    if (!L.CUSTOM_TYPES[v.type] || !L.save.cust[v.type]) return;
+    if (!canCust(v) || !L.save.cust[v.type]) return;
     const c = L.custFor(v.type);
     if (JSON.stringify(c) !== JSON.stringify(v.cust || null)) L.applyCustom(v, c, true);
   };
@@ -419,9 +443,9 @@
   let panel = null, target = null, tab = 'body';
   function customTarget() {
     if (!L.inWorkshop(P.x, P.z)) return null;
-    if (P.vehicle) return L.CUSTOM_TYPES[P.vehicle.type] && !(P.seat > 0) ? P.vehicle : null;
-    let best = null, bd = 4.5;
-    for (const v of L.ents.vehicles) { if (!L.CUSTOM_TYPES[v.type] || v.occupied) continue; const d = L.dist(v.x, v.z, P.x, P.z); if (d < bd) { bd = d; best = v; } }
+    if (P.vehicle) return canCust(P.vehicle) && !(P.seat > 0) ? P.vehicle : null;
+    let best = null, bd = 5.5;
+    for (const v of L.ents.vehicles) { if (!canCust(v) || v.occupied) continue; const d = L.dist(v.x, v.z, P.x, P.z); if (d < bd) { bd = d; best = v; } }
     return best;
   }
   L.wsHint = function () { const v = customTarget(); return v ? 'K: 🔧 ' + v.t.name + ' customizen' : null; };
@@ -442,12 +466,14 @@
   function render() {
     const v = target; if (!panel || !v) return;
     const type = v.type, c = L.custFor(type);
-    const cats = CATS.filter((k) => !k[3] || (k[3] === 'quad' && isQuad(type)));
+    const full = !!L.CUSTOM_TYPES[type];
+    const cats = CATS.filter((k) => (full ? (!k[3] || (k[3] === 'quad' && isQuad(type))) : OVER_CATS.includes(k[0])));
     if (!cats.some((k) => k[0] === tab)) tab = 'body';
     const cat = cats.find((k) => k[0] === tab);
     let h = `<h2>🔧 Werkstatt – ${v.t.name}</h2><div>Deine Münzen: <span class="coins">🪙 ${L.save.coins}</span> <small>(10 pro überlebter Minute – nur wer entkommt, behält sie)</small></div><div id="wsFlash" style="color:#7dff7d;min-height:18px;margin-top:4px"></div>`;
     h += '<div class="tabs">' + cats.map((k) => `<button data-tab="${k[0]}" class="${k[0] === tab ? 'on' : ''}">${k[1]}</button>`).join('') + '</div><div class="grid">';
-    for (const o of optsOf(cat)) {
+    const opts = !full && cat[0] === 'body' ? [['orig', '🚗 Original', 0]].concat(optsOf(cat)) : optsOf(cat);
+    for (const o of opts) {
       const eq = c[cat[0]] === o[0], own = owned(cat, o[0], type), afford = own || L.save.coins >= o[2];
       const sw = cat[2] === 'color' || cat[0] === 'led' ? (o[0] === 'none' ? '<span class="sw" style="background:repeating-linear-gradient(45deg,#333 0 4px,#555 4px 8px)"></span>' : `<span class="sw" style="background:${o[0]}"></span>`) : '';
       h += `<button class="opt ${eq ? 'eq' : ''} ${afford ? '' : 'no'}" data-v="${o[0]}">${sw}${o[1]}<span class="pr ${own ? 'ok' : ''}">${eq ? '✔ drauf' : own ? 'gekauft' : o[2] + ' 🪙'}</span></button>`;
