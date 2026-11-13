@@ -138,31 +138,83 @@
   let trip = null;
   const near = () => {
     if (P.vehicle || !P.alive) return null;
-    if (home && !L.inMoon(P.x) && Math.hypot(P.x - home.x, P.z - home.z) < 9) return 'up';
-    if (L.inMoon(P.x) && Math.hypot(P.x - LAND.x, P.z - LAND.z) < 9) return 'down';
+    if (home && !L.inMoon(P.x) && Math.hypot(P.x - home.x, P.z - home.z) < 18) return 'up';
+    if (L.inMoon(P.x) && Math.hypot(P.x - LAND.x, P.z - LAND.z) < 18) return 'down';
     return null;
   };
   L.moonHint = () => { const n = near(); return n === 'up' ? 'E: 🚀 Zum Mond fliegen' : n === 'down' ? 'E: 🚀 Zurück zur Erde fliegen' : null; };
+  const DUR = 17;
   L.moonInteract = function () {
     const n = near(); if (!n || trip) return false;
     const fromX = n === 'up' ? home.x : LAND.x, fromZ = n === 'up' ? home.z : LAND.z, rk = n === 'up' ? home.rocket : moonIsl.rocket;
-    trip = { n, t: 0, rk, fromX, fromZ };
+    trip = { n, t: 0, rk, fromX, fromZ, cam: { x: fromX + 70, y: 12, z: fromZ + 60, lx: fromX, ly: 15, lz: fromZ } };
     rk.userData.flame.visible = true;
     L.banner('🚀 3 … 2 … 1 … START!', n === 'up' ? 'Auf zum Mond!' : 'Zurück zur Erde!');
     L.snd.explosion && L.snd.explosion({ x: fromX, y: 0, z: fromZ });
-    L.startCine(n === 'up' ? '🚀 FLUG ZUM MOND' : '🚀 RÜCKFLUG ZUR ERDE', 7, (t) => { const y = rk.position.y + 15; return { x: fromX + 70 - t * 3, y: 12 + t * 8, z: fromZ + 60, lx: fromX, ly: y, lz: fromZ }; });
+    L.startCine(n === 'up' ? '🚀 FLUG ZUM MOND' : '🚀 RÜCKFLUG ZUR ERDE', DUR, () => trip && trip.cam);
     return true;
   };
+  function streaks(on, at) {
+    if (!trip.st) { trip.st = []; for (let k = 0; k < 40; k++) { const m = new T.Mesh(G().box, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, fog: false })); m.scale.set(0.3, 0.3, 60 + Math.random() * 80); L.scene.add(m); trip.st.push({ m, o: new T.Vector3(L.rand(-120, 120), L.rand(-80, 80), L.rand(-400, 400)) }); } }
+    for (const q of trip.st) { q.m.visible = on; if (on) { q.o.z -= 900 * 0.033; if (q.o.z < -400) q.o.z += 800; q.m.position.copy(at.p).addScaledVector(at.f, q.o.z).add(at.r.clone().multiplyScalar(q.o.x)).add(new T.Vector3(0, q.o.y, 0)); q.m.lookAt(q.m.position.clone().add(at.f)); } }
+  }
   function updateTrip(dt) {
     if (!trip) return;
-    trip.t += dt; const rk = trip.rk;
-    rk.position.y = 0.6 + Math.max(0, trip.t - 1) ** 2 * 6;
-    rk.userData.flame.scale.set(2.6, 14 + Math.random() * 6, 2.6);
-    if (Math.random() < dt * 40) L.fx('#d8d8d8', trip.fromX + L.rand(-6, 6), 1, trip.fromZ + L.rand(-6, 6), 3, 6, { size: 1.2, life: 2, g: -0.1, grow: 1 });
-    P.x = trip.fromX + 6; P.z = trip.fromZ + 6;
-    if (trip.t > 7 || !L.cine) {
-      rk.position.y = 0.6; rk.userData.flame.visible = false;
-      const up = trip.n === 'up'; trip = null;
+    trip.t += dt; const t = trip.t, up = trip.n === 'up', I = moonIsl, c = trip.cam;
+    // A: Start (0–4 s)
+    if (t < 4) {
+      const rk = trip.rk; rk.position.y = 0.6 + Math.max(0, t - 1) ** 2 * 7; rk.userData.flame.scale.set(2.6, 14 + Math.random() * 6, 2.6);
+      if (Math.random() < dt * 50) L.fx('#d8d8d8', trip.fromX + L.rand(-8, 8), 1, trip.fromZ + L.rand(-8, 8), 3, 8, { size: 1.5, life: 2.5, g: -0.1, grow: 1.2 });
+      if (t < 1.2) L.shake = Math.max(L.shake, 0.4);
+      P.x = trip.fromX + 6; P.z = trip.fromZ + 6;
+      Object.assign(c, { x: trip.fromX + 60 - t * 4, y: 6 + t * 10, z: trip.fromZ + 55, lx: trip.fromX, ly: rk.position.y + 18, lz: trip.fromZ });
+    }
+    // B: Flug durchs All (4–11 s) – vor der Kulisse beim Mond
+    else if (t < 11) {
+      if (!trip.space) {
+        trip.space = true; trip.rk.position.y = 0.6; trip.rk.userData.flame.visible = false;
+        P.x = LAND.x + 10; P.z = LAND.z + 10; P.y = 0.5; // Mond-Kulisse laden
+        trip.fly = buildRocket(); trip.fly.userData.flame.visible = true; L.scene.add(trip.fly);
+        trip.fly.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.fog = false; o.frustumCulled = false; } });
+      }
+      if (I.earth && !trip.path) {
+        const E0 = I.earth.position.clone(), M0 = new T.Vector3(LAND.x, 2500, LAND.z), dir = M0.clone().sub(E0).normalize();
+        trip.path = up ? { a: E0.clone().addScaledVector(dir, 3200), b: M0 } : { a: new T.Vector3(LAND.x, 400, LAND.z), b: E0.clone().addScaledVector(dir, 2600) };
+      }
+      if (trip.path) {
+        const u = (t - 4) / 7, e = u * u * (3 - 2 * u), p = new T.Vector3().lerpVectors(trip.path.a, trip.path.b, e), f = trip.path.b.clone().sub(trip.path.a).normalize();
+        trip.fly.position.copy(p); trip.fly.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), f);
+        trip.fly.userData.flame.scale.set(2.6, 16 + Math.random() * 8, 2.6);
+        const r = new T.Vector3().crossVectors(f, new T.Vector3(0, 1, 0)).normalize();
+        const cp = p.clone().addScaledVector(r, 70).addScaledVector(f, -90).add(new T.Vector3(0, 25, 0));
+        Object.assign(c, { x: cp.x, y: cp.y, z: cp.z, lx: p.x + f.x * 60, ly: p.y + f.y * 60, lz: p.z + f.z * 60 });
+        streaks(true, { p, f, r });
+        // Rückflug: Eintritt in die Atmosphäre glüht
+        if (!up && u > 0.7 && Math.random() < dt * 40) L.fx(Math.random() < 0.5 ? '#ff8a2a' : '#ffd040', p.x + L.rand(-6, 6), p.y + L.rand(-6, 6), p.z + L.rand(-6, 6), 2, 10, { basic: true, size: 3, life: 0.6 });
+      }
+    }
+    // C: Landung (11–17 s)
+    else {
+      if (!trip.landing) {
+        trip.landing = true; streaks(false); if (trip.fly) L.scene.remove(trip.fly);
+        const pad = up ? { x: LAND.x, z: LAND.z, rk: I.rocket } : { x: home.x, z: home.z, rk: home.rocket };
+        trip.pad = pad; if (!up) { P.x = home.x + 12; P.z = home.z + 12; P.y = 0.5; }
+        pad.rk.userData.flame.visible = true; pad.rk.position.y = 420;
+        L.msg(up ? '🌕 Landeanflug auf den Mond …' : '🌍 Landeanflug auf die Erde …', 3000);
+      }
+      const pad = trip.pad, u = Math.min(1, (t - 11) / 5.2), e = 1 - (1 - u) * (1 - u) * (1 - u);
+      pad.rk.position.y = 0.6 + (1 - e) * 420; pad.rk.userData.flame.scale.set(2.6, 6 + (1 - u) * 14 + Math.random() * 4, 2.6);
+      if (pad.rk.position.y < 40 && Math.random() < dt * 60) L.fx(up ? '#a0a0a8' : '#c8b890', pad.x + L.rand(-14, 14), 0.8, pad.z + L.rand(-14, 14), 3, 12, { size: 2, life: 2.5, g: -0.05, grow: 1.4 });
+      if (pad.rk.position.y < 3) L.shake = Math.max(L.shake, 0.3);
+      Object.assign(c, { x: pad.x + 55, y: 8 + (1 - u) * 30, z: pad.z + 45, lx: pad.x, ly: pad.rk.position.y + 12, lz: pad.z });
+      if (!up) { P.x = home.x + 12; P.z = home.z + 12; } else { P.x = LAND.x + 10; P.z = LAND.z + 10; }
+    }
+    if (t > DUR || (!L.cine && t > 0.5)) {
+      if (trip.st) for (const q of trip.st) L.scene.remove(q.m); if (trip.fly) L.scene.remove(trip.fly);
+      const pad = trip.pad || (up ? { rk: I.rocket } : { rk: home.rocket });
+      if (pad.rk) { pad.rk.position.y = 0.6; pad.rk.userData.flame.visible = false; }
+      trip.rk.position.y = 0.6; trip.rk.userData.flame.visible = false;
+      trip = null;
       if (up) { P.x = LAND.x + 10; P.z = LAND.z + 10; L.msg('🌕 Willkommen auf dem Mond! Wenig Schwerkraft – spring mal! Der 🍔 Burger ist der einzige sichere Ort.', 7000); }
       else { P.x = home.x + 12; P.z = home.z + 12; L.msg('🌍 Zurück auf der Erde.', 4000); }
       P.y = 0.5; P.vx = P.vz = P.vy = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 10);
@@ -291,7 +343,7 @@
       }
       return;
     }
-    if (!L.inMoon(P.x)) { bern.g.visible = false; bern.phase = 'gone'; for (const f of bern.frags || []) L.scene.remove(f); if (I.earth) { I.earth.visible = true; I.atmo.visible = true; } return; }
+    if (!L.inMoon(P.x)) { if (iva) endIva(); bern.g.visible = false; bern.phase = 'gone'; for (const f of bern.frags || []) L.scene.remove(f); if (I.earth) { I.earth.visible = true; I.atmo.visible = true; } return; }
     bern.t += dt; const b = bern.g, Ep = I.earth.position;
     for (const f of bern.frags || []) { f.position.addScaledVector(f.userData.v, dt); f.rotation.x += dt; f.rotation.y += dt * 0.7; }
     if (bern.phase === 'cine') {
@@ -349,12 +401,98 @@
       if (u >= 1) eatMoon();
     } else if (bern.phase === 'eat') {
       animB(dt, true);
-      if (bern.t > 2.5) { for (const m of I.surface) m.visible = true; bern.phase = 'leave'; bern.t = 0; bern.from = b.position.clone(); L.msg('🌕 Bernhard zieht satt weiter … der Mond setzt sich wieder zusammen.', 5000); }
+      if (bern.t > 2.5) { for (const m of I.surface) m.visible = true; startIvaEnd(); }
+    } else if (bern.phase === 'iva') {
+      updateIvaEnd(dt);
     } else if (bern.phase === 'leave') {
       animB(dt, false);
       const u = Math.min(1, bern.t / 10); b.position.lerpVectors(bern.from, new T.Vector3(MOON.x + 60000, 40000, MOON.z + 60000), u);
       if (u >= 1) { bern.phase = 'gone'; b.visible = false; for (const f of bern.frags) L.scene.remove(f); bern.frags = []; I.earth.visible = true; I.atmo.visible = true; L.msg('🌍 Die Erde ist wieder da. Bernhard kommt in 3 Minuten wieder.', 5000); }
     }
+  }
+  // ---------- Kurzfilm: MAMA IVA steigt aus der Erde, zieht Bernhard herunter und frisst ihn mit einem gigantischen Maul ----------
+  let iva = null;
+  function buildMaw() {
+    const g = new T.Group(), flesh = (c) => new T.MeshBasicMaterial({ color: c, fog: false, side: T.DoubleSide });
+    const throat = new T.Mesh(new T.SphereGeometry(1, 32, 24, 0, 6.283, 0, Math.PI / 2), flesh(0x2a0004)); throat.rotation.x = -Math.PI / 2; throat.scale.set(1, 1, 1.6); g.add(throat);
+    for (let r = 0; r < 5; r++) { const ring = new T.Mesh(new T.TorusGeometry(0.9 - r * 0.16, 0.05, 8, 40), flesh(r % 2 ? 0x6a0a14 : 0x4a0008)); ring.position.z = -r * 0.28; g.add(ring); }
+    const lip = new T.Mesh(new T.TorusGeometry(1, 0.16, 12, 48), new T.MeshPhongMaterial({ color: 0x8a2030, shininess: 90, fog: false })); g.add(lip);
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 26; k++) { const a = k / 26 * 6.283, rr = 0.95 - r * 0.2, t1 = new T.Mesh(L.GEO.cone, new T.MeshPhongMaterial({ color: r ? 0xd8c890 : 0xf0e8c8, shininess: 60, fog: false })); t1.scale.set(0.05, 0.22 + Math.random() * 0.12, 0.05); t1.position.set(Math.cos(a) * rr, Math.sin(a) * rr, -r * 0.18); t1.rotation.z = a + Math.PI / 2; t1.rotateX(0.5); g.add(t1); }
+    const strings = []; for (let k = 0; k < 9; k++) { const st = new T.Mesh(new T.CylinderGeometry(0.012, 0.02, 1, 6), new T.MeshPhongMaterial({ color: 0xd8e8f0, transparent: true, opacity: 0.7, shininess: 120, fog: false })); st.position.set(-0.6 + k * 0.15, 0, 0.05); g.add(st); strings.push(st); }
+    const tongue = new T.Mesh(new T.SphereGeometry(0.4, 16, 12), new T.MeshPhongMaterial({ color: 0xa02040, shininess: 80, fog: false })); tongue.scale.set(1, 0.35, 1.6); tongue.position.set(0, -0.45, -0.4); g.add(tongue);
+    g.userData = { strings, tongue };
+    g.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
+    return g;
+  }
+  function startIvaEnd() {
+    const I = moonIsl;
+    bern.phase = 'iva'; bern.t = 0; bern.from = bern.g.position.clone();
+    I.earth.visible = true; I.atmo.visible = true;
+    for (const f of bern.frags) L.scene.remove(f); bern.frags = [];
+    const E0 = I.earth.position.clone(), d = new T.Vector3(MOON.x, 0, MOON.z).sub(E0).normalize();
+    const rig = L.buildKoloss(); rig.root.children.forEach((c, i) => { if (c !== rig.hull) c.visible = false; });
+    rig.root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.fog = false; o.frustumCulled = false; } });
+    const K = 230; rig.root.scale.setScalar(K); rig.root.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); L.scene.add(rig.root);
+    const maw = buildMaw(); maw.scale.setScalar(1); maw.visible = false; L.scene.add(maw);
+    const tend = []; for (let k = 0; k < 24; k++) { const m = new T.Mesh(new T.SphereGeometry(1, 10, 8), new T.MeshPhongMaterial({ color: k % 2 ? 0x3d2f22 : 0x5c4840, shininess: 40, fog: false })); m.frustumCulled = false; m.visible = false; L.scene.add(m); tend.push(m); }
+    const glow = new T.Mesh(new T.SphereGeometry(2600, 32, 20), new T.MeshBasicMaterial({ color: 0xff1010, transparent: true, opacity: 0, side: T.BackSide, fog: false, blending: T.AdditiveBlending, depthWrite: false })); glow.position.copy(E0); L.scene.add(glow);
+    const side = new T.Vector3().crossVectors(d, new T.Vector3(0, 1, 0)).normalize();
+    iva = { rig, K, d, E0, side, maw, tend, glow, chunks: [] };
+    L.banner('👹 MAMA IVA', '… sie hat Hunger.');
+    L.startCine('👹 MAMA IVA HAT HUNGER', 15, () => iva && iva.cam);
+    iva.cam = { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0 };
+  }
+  function updateIvaEnd(dt) {
+    const V = iva, t = bern.t, b = bern.g, d = V.d, E0 = V.E0;
+    animB(dt, true);
+    // MAMA IVA steigt aus der Erde (Oberkörper), rotes Glühen, Herzschlag
+    const rise = L.clamp(t / 3, 0, 1), surf = E0.clone().addScaledVector(d, 2200);
+    V.rig.root.position.copy(surf).addScaledVector(d, -V.K * 8 + rise * V.K * 6);
+    V.glow.material.opacity = Math.min(0.35, t * 0.12);
+    if (Math.floor(t * 1.4) !== Math.floor((t - dt) * 1.4) && L.snd.heart) L.snd.heart();
+    const headW = new T.Vector3(); V.rig.head.getWorldPosition(headW);
+    const mawPos = headW.clone().addScaledVector(d, V.K * 2);
+    // Fangarm schnappt Bernhard (2–5 s) und zieht ihn herunter
+    if (t > 2 && t < 10) {
+      const grab = L.clamp((t - 2) / 1.2, 0, 1), pull = L.clamp((t - 3.5) / 4, 0, 1);
+      const bp = new T.Vector3().lerpVectors(bern.from, mawPos.clone().addScaledVector(d, 2500), pull * pull);
+      b.position.copy(bp); b.scale.setScalar(1 - pull * 0.75);
+      V.tend.forEach((m, i) => { const u = i / (V.tend.length - 1) * grab; m.visible = true; m.position.lerpVectors(headW, bp, u).add(V.side.clone().multiplyScalar(Math.sin(u * Math.PI * 3 + t * 4) * 600 * (1 - u))); m.scale.setScalar(260 - i * 6); });
+      if (t > 2 && !V.screamed) { V.screamed = true; L.snd.scream && L.snd.scream({ x: P.x, y: 5, z: P.z }); }
+    }
+    // das Maul wächst – Kopf und Brust werden zu einem gigantischen Schlund (5–9 s)
+    if (t > 5) {
+      const g2 = L.clamp((t - 5) / 4, 0, 1), sc = 200 + g2 * g2 * 3200;
+      V.maw.visible = true; V.maw.position.copy(mawPos); V.maw.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), d); V.maw.scale.setScalar(sc);
+      V.maw.userData.strings.forEach((st, i) => { st.scale.y = 0.5 + Math.sin(t * 3 + i) * 0.4 + g2 * 0.5; });
+      V.maw.userData.tongue.position.z = -0.4 + Math.sin(t * 5) * 0.15;
+      V.rig.head.visible = g2 < 0.4;
+    }
+    // Bernhard verschwindet im Schlund (9–12 s): zermalmt, Fetzen fliegen
+    if (t > 9 && t < 12.5) {
+      const u = L.clamp((t - 9) / 2.5, 0, 1);
+      b.position.lerpVectors(b.position, mawPos.clone().addScaledVector(d, -600), dt * 2.5); b.scale.setScalar(Math.max(0.02, 0.25 * (1 - u)));
+      if (u >= 1) b.visible = false;
+      if (Math.random() < dt * 14) { const ch = new T.Mesh(new T.DodecahedronGeometry(80 + Math.random() * 220), new T.MeshPhongMaterial({ color: Math.random() < 0.6 ? 0x8a0a10 : 0xd8a48a, shininess: 80, fog: false })); ch.frustumCulled = false; ch.position.copy(mawPos).add(new T.Vector3(L.rand(-900, 900), L.rand(-900, 900), L.rand(-900, 900))); ch.userData.v = d.clone().multiplyScalar(L.rand(400, 1200)).add(new T.Vector3(L.rand(-600, 600), L.rand(-600, 600), L.rand(-600, 600))); L.scene.add(ch); V.chunks.push(ch); }
+      if (Math.random() < dt * 3) { L.shake = Math.max(L.shake, 1.2); L.snd.explosion && L.snd.explosion({ x: P.x, y: 5, z: P.z }); L.snd.splat && L.snd.splat({ x: P.x, y: 2, z: P.z }); }
+    }
+    for (const ch of V.chunks) { ch.position.addScaledVector(ch.userData.v, dt); ch.userData.v.addScaledVector(d, -300 * dt); ch.rotation.x += dt * 2; }
+    // Maul schließt sich, MAMA IVA sinkt zurück (12.5–15 s)
+    if (t > 12.5) { const u = L.clamp((t - 12.5) / 2.5, 0, 1); V.maw.scale.setScalar(3400 * (1 - u) + 1); V.rig.root.position.addScaledVector(d, -V.K * 6 * dt / 2.5); V.glow.material.opacity = 0.35 * (1 - u); for (const m of V.tend) m.visible = false; }
+    // Kamera: erst weit (IVA + Bernhard), dann nah am Schlund
+    const far = E0.clone().addScaledVector(d, 19000).addScaledVector(V.side, 7000).add(new T.Vector3(0, 3500, 0));
+    const close = mawPos.clone().addScaledVector(d, 9000).addScaledVector(V.side, 3500).add(new T.Vector3(0, 1500, 0));
+    const k = t < 4.5 ? 0 : t < 6 ? (t - 4.5) / 1.5 : t < 12.5 ? 1 : 1 - L.clamp((t - 12.5) / 2, 0, 1);
+    const cp = new T.Vector3().lerpVectors(far, close, k), look = k < 0.5 ? b.position.clone().lerp(headW, 0.5) : mawPos;
+    Object.assign(V.cam, { x: cp.x, y: cp.y, z: cp.z, lx: look.x, ly: look.y, lz: look.z });
+    if (t > 15 || (!L.cine && t > 1)) endIva();
+  }
+  function endIva() {
+    const V = iva; if (!V) return;
+    L.scene.remove(V.rig.root); L.scene.remove(V.maw); L.scene.remove(V.glow); for (const m of V.tend) L.scene.remove(m); for (const c of V.chunks) L.scene.remove(c);
+    iva = null; bern.phase = 'gone'; bern.g.visible = false; bern.g.scale.setScalar(1);
+    moonIsl.earth.visible = true; moonIsl.atmo.visible = true;
+    L.msg('👹 MAMA IVA hat Bernhard gefressen … Er kommt in 3 Minuten wieder. Wenn er sich traut.', 7000);
   }
   const rings = [];
   function ring(x, z) {
@@ -380,6 +518,7 @@
     if (ph === 'aim' || ph === 'chomp') return '⚠️ BERNHARD BEISST ZU – RAUS AUS DEM ROTEN KREIS!';
     if (ph === 'hunt' || ph === 'rise') return '😈 BERNHARD jagt dich – noch ' + L.fmt(Math.max(0, bern.huntT)) + ' · nur der 🍔 Burger ist sicher';
     if (ph === 'final') return '😱 BERNHARD FRISST DEN MOND! In den 🍔 Burger! (' + Math.max(0, Math.ceil(12 - bern.t)) + ' s)';
+    if (ph === 'iva') return '👹 MAMA IVA FRISST BERNHARD';
     if (ph === 'cine' || ph === 'approach' || ph === 'eat' || ph === 'leave') return '😈 BERNHARD DER VERSCHLUCKER';
     return '🍔 Bernhard kommt in ' + L.fmt(Math.max(0, bTimer));
   };
