@@ -349,9 +349,14 @@
   const WK = 'ofaw0xb94x';
   L.waechterOk = (app) => !!(app && typeof app.wk === 'string' && L.hash53(app.wk) === WK);
   L.waechterToken = () => { const k = L.save && L.save.skinKey; return k && L.hash53(L.hash53(k)) === WK ? L.hash53(k) : null; };
+  // Bär: nur mit Code
+  const BK = '2eua4u5pmd3';
+  L.baerOk = (app) => !!(app && typeof app.bk === 'string' && L.hash53(app.bk) === BK);
+  L.baerToken = () => { const k = L.save && L.save.baerKey; return k && L.hash53(L.hash53(k)) === BK ? L.hash53(k) : null; };
+  L.baerCheck = (code) => L.hash53(L.hash53(code)) === BK;
   function buildSpecial(app, force) {
     const sp = app.special;
-    if (sp === 'baer') return buildBear(app);
+    if (sp === 'baer') return (force || L.baerOk(app)) ? buildBear(app) : L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'richard') { const r = L.buildHuman(Object.assign({}, L.RICHARD_APP || {}, { name: app.name })); r.app = Object.assign({}, r.app, { special: 'richard' }); return r; }
     if (sp === 'titan') return (force || L.titanOk(app)) ? buildTitan(app) : L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter' && !force && !L.waechterOk(app)) return L.buildHuman(Object.assign({}, app, { special: '' }));
