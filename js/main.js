@@ -208,7 +208,9 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       L.shake = Math.max(0, L.shake - dt * 1.8);
     }
     camera.lookAt(look);
-    camera.far = L.S().view + 1200;
+    // hoch oben: weiter sehen und genauere Tiefe (sonst flimmert der Boden)
+    { const alt = Math.max(0, camera.position.y - 25); camera.far = L.S().view + 1200 + alt * 3; camera.near = fp ? 0.1 : L.clamp(0.1 + alt * 0.004, 0.1, 1.5); }
+    { const zf = L.weaponZoom ? L.weaponZoom() : 1, fov = 70 / zf; camera.fov += (fov - camera.fov) * Math.min(1, dt * 10); }
     camera.updateProjectionMatrix();
   }
   L.updateCamera = updateCamera;

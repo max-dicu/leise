@@ -75,6 +75,8 @@
     const list = L.queryBoxes(x, z, r + 0.5).slice();
     for (let pass = 0; pass < 2; pass++) for (const b of list) {
       if (y !== undefined && (b.h < y + 0.35 || (b.y0 !== undefined && b.y0 > y + 1.7))) continue;
+      // Berge: wer schon auf dem Hang steht (oder fliegt), läuft über die echte Kegelform statt gegen den Kasten
+      if (b.mtn && y !== undefined && y > 0.3 && y >= L.mountainH(res.x, res.z) - 0.25) continue;
       const cx = L.clamp(res.x, b.x1, b.x2), cz = L.clamp(res.z, b.z1, b.z2);
       let dx = res.x - cx, dz = res.z - cz;
       const d2 = dx * dx + dz * dz;
@@ -628,7 +630,7 @@
       m.position.set(x, 0, z); m.castShadow = true; m.receiveShadow = true;
       L.scene.add(m);
       const c = r * 0.8;
-      L.addBox(x - c, z - c, x + c, z + c, h, 'building');
+      const mb = L.addBox(x - c, z - c, x + c, z + c, h, 'building'); mb.mtn = true;
       L.mapRects.push({ x, z, w: r * 1.7, d: r * 1.7, c: '#7a7468' });
       L.mountains.push({ x, z, r, h });
     }
@@ -776,7 +778,8 @@
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3);
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), z = pos.getZ(i), h = Math.min(-0.06, L.seaFloor(x, z));
+      // unter dem Land tief absenken – sonst flimmern Gras und Meeresboden aus der Höhe ineinander
+      const x = pos.getX(i), z = pos.getZ(i), h = (Math.abs(x) < HALF - 4 && Math.abs(z) < HALF - 4) ? -3 : Math.min(-0.06, L.seaFloor(x, z));
       pos.setY(i, h);
       const k = L.clamp(-h / 9, 0, 1);
       const north = z < -HALF && z > -HALF - 150 && Math.abs(x) <= HALF + 40;
@@ -1068,7 +1071,8 @@
     if (E.bolt > 0) cSky.lerp(cTmp.setRGB(0.8, 0.82, 0.95), E.bolt * 0.7);
     L.scene.background.copy(cSky);
     L.scene.fog.color.copy(cSky);
-    const far = S.view * (1 - E.fog * 0.82) * (1 - E.rain * 0.25) * (0.75 + day * 0.25);
+    const camAlt = Math.max(0, (L.camera ? L.camera.position.y : 0) - 30);
+    const far = S.view * (1 - E.fog * 0.82) * (1 - E.rain * 0.25) * (0.75 + day * 0.25) * (1 + camAlt / 220);
     L.scene.fog.far = Math.max(60, far); L.scene.fog.near = Math.max(10, far * 0.15);
     // Licht
     const sd = new T.Vector3(Math.cos(a) * 0.8, el, 0.35).normalize();

@@ -659,6 +659,7 @@
     let sf = L.seaFloor(P.x, P.z);
     const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null;
     if (bf !== null) sf = bf;
+    { const mh = L.mountainH(P.x, P.z); if (mh > sf) sf = mh; } // auf Bergen stehen statt hineinfallen
     const depth = L.WATER_Y - sf;
     P.swim = depth > 1.35 && !L.inDim(P.x);
     const gY = P.swim ? L.WATER_Y - 1.25 : sf;
@@ -754,10 +755,11 @@
     const wantVy = P.flying === 2 ? -9 : my * sp * go + (up ? 14 : 0) - (down ? 16 : 0);
     P.vy += (wantVy - P.vy) * Math.min(1, dt * 4);
     let gY = L.seaFloor(P.x, P.z); const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null; if (bf !== null) gY = bf;
+    gY = Math.max(gY, L.mountainH(P.x, P.z));
     if (!L.inDim(P.x)) gY = Math.max(gY, L.WATER_Y);
     P.y = Math.min(450, P.y + P.vy * dt);
     if (P.y <= gY) { P.y = gY; P.vy = Math.max(0, P.vy); if (P.flying === 2) { P.flying = 0; P.air = false; L.snd.land({ x: P.x, y: 0, z: P.z }); L.msg('🦸 Gelandet', 1200); } }
-    { const n = Math.min(60, Math.max(1, Math.ceil(Math.hypot(P.vx, P.vz) * dt / 0.5))); for (let i = 0; i < n; i++) { L.collide(P.x + P.vx * dt / n, P.z + P.vz * dt / n, 0.38, P.y, RES); P.x = RES.x; P.z = RES.z; } }
+    { const n = Math.min(60, Math.max(1, Math.ceil(Math.hypot(P.vx, P.vz) * dt / 0.5))); for (let i = 0; i < n; i++) { const nx = P.x + P.vx * dt / n, nz = P.z + P.vz * dt / n, mh = L.mountainH(nx, nz); if (P.y < mh) { P.y = mh; P.vy = Math.max(0, P.vy); } L.collide(nx, nz, 0.38, P.y, RES); P.x = RES.x; P.z = RES.z; } }
     L.clampWorld(P, true);
     const hsp = Math.hypot(P.vx, P.vz);
     if (hsp > 0.5) P.yaw += L.angDiff(P.yaw, Math.atan2(P.vx, P.vz)) * Math.min(1, dt * 6);
