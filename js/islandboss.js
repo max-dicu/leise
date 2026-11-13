@@ -26,7 +26,7 @@
     sporen: { name: 'SPORENKÖNIG', title: 'Der giftige Riese', icon: '🍄', kind: 'mush', speed: 6, abil: ['cloud', 'stomp'] },
     golem: { name: 'KRISTALLGOLEM', title: 'Wächter der Kristalle', icon: '💎', kind: 'crystal', speed: 7, abil: ['shards', 'stomp'], proj: 'splitter' }
   };
-  B.nina = { name: 'NINA', title: 'Die Walross-Oma', icon: '👵', kind: 'human', scale: 11, speed: 5, abil: ['summon', 'sweep', 'sweep'], prop: 'besen', oma: true, life: 80,
+  B.nina = { name: 'NINA', title: 'Die Walross-Oma', icon: '👵', kind: 'human', scale: 11, speed: 5, abil: ['summon', 'sweep', 'sweep'], prop: 'besen', oma: true, life: 300,
     app: { skin: '#e8c0a0', hair: 'wellig', hairColor: '#d8d8dc', beard: 'kein', brows: 'dick', mouth: 'grinsen', nose: 'knubbel', eyes: '#4a2f1c', glasses: 'rund', glassesColor: '#8a6a3a', top: 'pullover', topColor: '#a04a6a', pants: 'rock', pantsColor: '#5a4a6a', shoeType: 'lackschuh', shoes: '#3a2a2a', build: 'kraeftig', height: 'mittel', hat: 'keine' } };
   const BIG = 2.5; // alle Insel-Bosse viel größer
   const BY_ISL = { oma: ['nina'], asgard: ['thor', 'odin', 'loki'], eis: ['ymir'], wueste: ['wurm'], dschungel: ['urwald'], vulkan: ['lava'], pilz: ['sporen'], kristall: ['golem'], geist: ['geist'] };
@@ -206,7 +206,7 @@
     const a = Math.atan2(P.x - I.x, P.z - I.z) + Math.PI + L.rand(-0.6, 0.6), d = Math.min(I.r - 80, Math.max(160, Math.hypot(P.x - I.x, P.z - I.z) + 120));
     let x = P.x + Math.sin(a) * 140, z = P.z + Math.cos(a) * 140;
     if (Math.hypot(x - I.x, z - I.z) > I.r - 60) { x = I.x + Math.sin(a) * (I.r - 120); z = I.z + Math.cos(a) * (I.r - 120); }
-    boss = L.islandBoss = { id, b, m, I, x, z, yaw: Math.atan2(P.x - x, P.z - z), ph: 0, life: 50, cd: 3, active: true, rise: 0, worm: id === 'wurm' ? { under: true, path: [] } : null, tpCd: 2, hist: [] };
+    boss = L.islandBoss = { id, b, m, I, x, z, yaw: Math.atan2(P.x - x, P.z - z), ph: 0, life: 300, cd: 3, active: true, rise: 0, worm: id === 'wurm' ? { under: true, path: [] } : null, tpCd: 2, hist: [] };
     pose(0);
     L.banner(b.icon + ' ' + b.name, b.title + ' ist erwacht! Schleich oder lauf zur 🛡️ Zuflucht!');
     L.snd.boss && L.snd.boss();
@@ -376,7 +376,7 @@
     L.scene.remove(boss.m.rig.root);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; if (f.kind === 'clone') { L.scene.remove(f.m.rig.root); fx.splice(i, 1); } }
     if (msg) L.msg(msg, 5000);
-    boss.I.bossT = L.rand(170, 230);
+    boss.I.bossT = 600;
     boss = L.islandBoss = null;
   }
   function seeTarget() {

@@ -253,7 +253,7 @@
       startIvaEnd();
     }
   };
-  const HUNT = 600, CHOMP_R = 34;
+  const HUNT = 300, CHOMP_R = 34;
   const phong = (c, o) => { const m = new T.MeshPhongMaterial(Object.assign({ color: c, shininess: 60, specular: 0x554433, fog: false }, o || {})); return m; };
   function mottled(geo, base) {
     const p = geo.attributes.position, cols = new Float32Array(p.count * 3), C = new T.Color(), B0 = new T.Color(base);
@@ -368,7 +368,7 @@
       if (L.inMoon(P.x) && I.built && !L.cine && L.state === 'game') {
         bTimer -= dt;
         if (bTimer <= 12 && !bWarned) { bWarned = true; L.msg('⚠️ Etwas Gigantisches nähert sich der Erde … bleib in der Nähe vom 🍔 Burger!', 6000); }
-        if (bTimer <= 0) { bTimer = 180; bWarned = false; startBernhard(); }
+        if (bTimer <= 0) { bTimer = 600; bWarned = false; startBernhard(); }
       }
       return;
     }
@@ -380,7 +380,7 @@
       if (bern.t < 4.2) b.position.lerp(new T.Vector3(Ep.x - 2500, Ep.y - 7000, Ep.z - 9000), dt * 0.9);
       b.lookAt(Ep.x, b.position.y, Ep.z);
       if (bern.t > 4.2 && I.earth.visible) biteEarth();
-      if (bern.t > 9 || !L.cine) { bern.phase = 'approach'; bern.t = 0; bern.from = b.position.clone(); L.msg('😈 Bernhard hat DICH entdeckt! Er jagt dich jetzt 10 Minuten – nur der 🍔 Burger ist sicher!', 7000); }
+      if (bern.t > 9 || !L.cine) { bern.phase = 'approach'; bern.t = 0; bern.from = b.position.clone(); L.msg('😈 Bernhard hat DICH entdeckt! Er jagt dich jetzt 5 Minuten – nur der 🍔 Burger ist sicher!', 7000); }
     } else if (bern.phase === 'approach') {
       animB(dt, false);
       const u = Math.min(1, bern.t / 15), to = new T.Vector3(P.x - 2000, 9000, P.z - 9000);
@@ -400,7 +400,7 @@
           if (L.inBurger(P.x, P.z)) { L.msg('😤 Bernhard hämmert wütend auf den Burger – aber er kommt nicht rein!', 3000); L.shake = 0.9; }
           else { bern.phase = 'aim'; bern.st = 0; bern.tx = P.x + P.vx * 1.5; bern.tz = P.z + P.vz * 1.5; ring(bern.tx, bern.tz); L.msg('⚠️ BERNHARD BEISST ZU – RAUS AUS DEM ROTEN KREIS!', 2500); L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 5, z: P.z }); }
         }
-        if (bern.huntT <= 0) { bern.phase = 'final'; bern.t = 0; bern.from = b.position.clone(); L.msg('😱 Die 10 Minuten sind um – Bernhard frisst jetzt den GANZEN MOND! In den 🍔 Burger!', 6000); }
+        if (bern.huntT <= 0) { bern.phase = 'final'; bern.t = 0; bern.from = b.position.clone(); L.msg('😱 Die 5 Minuten sind um – Bernhard frisst jetzt den GANZEN MOND! In den 🍔 Burger!', 6000); }
       } else if (bern.phase === 'aim') {
         bern.st += dt; animB(dt, true);
         if (bern.st > 5) { bern.phase = 'chomp'; bern.st = 0; bern.chompFrom = b.position.clone(); bern.chompRot = b.rotation.y; }
@@ -436,7 +436,7 @@
     } else if (bern.phase === 'leave') {
       animB(dt, false);
       const u = Math.min(1, bern.t / 10); b.position.lerpVectors(bern.from, new T.Vector3(MOON.x + 60000, 40000, MOON.z + 60000), u);
-      if (u >= 1) { bern.phase = 'gone'; b.visible = false; for (const f of bern.frags) L.scene.remove(f); bern.frags = []; I.earth.visible = true; I.atmo.visible = true; L.msg('🌍 Die Erde ist wieder da. Bernhard kommt in 3 Minuten wieder.', 5000); }
+      if (u >= 1) { bern.phase = 'gone'; b.visible = false; for (const f of bern.frags) L.scene.remove(f); bern.frags = []; I.earth.visible = true; I.atmo.visible = true; L.msg('🌍 Die Erde ist wieder da. Bernhard kommt in 10 Minuten wieder.', 5000); }
     }
   }
   // ---------- Kurzfilm: MAMA IVA steigt aus der Erde, zieht Bernhard herunter und frisst ihn mit einem gigantischen Maul ----------
@@ -524,7 +524,7 @@
     if (!bern.killed && P.alive && !P.gone && L.inMoon(P.x) && L.bossReward) L.bossReward('bernhard', BURGER.x, BURGER.z, 0.2, 'survive');
     bern.killed = false;
     moonIsl.earth.visible = true; moonIsl.atmo.visible = true;
-    L.msg('👹 MAMA IVA hat Bernhard gefressen … Er kommt in 3 Minuten wieder. Wenn er sich traut.', 7000);
+    L.msg('👹 MAMA IVA hat Bernhard gefressen … Er kommt in 10 Minuten wieder. Wenn er sich traut.', 7000);
   }
   const rings = [];
   function ring(x, z) {

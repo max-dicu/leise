@@ -2112,14 +2112,16 @@
   // Bei Tod oder neuer Runde läuft sie einfach weiter. Im Mehrspieler bestimmt der Host die Zeit.
   function ivaClock() {
     if (L.ivaEpoch === undefined) L.ivaEpoch = Date.now();
-    const C = L.S().bossMin * 60, cyc = 2 * C, t = (Date.now() - L.ivaEpoch) / 1000, ph = ((t % cyc) + cyc) % cyc;
+    // Pause = Einstellung (Standard 10 Minuten), danach bleibt der Boss 5 Minuten
+    const C = L.S().bossMin * 60, cyc = C + L.BOSS_STAY, t = (Date.now() - L.ivaEpoch) / 1000, ph = ((t % cyc) + cyc) % cyc;
     return { pause: ph < C, left: ph < C ? C - ph : cyc - ph, idx: Math.floor(t / cyc), C };
   }
   L.ivaClock = ivaClock;
+  L.BOSS_STAY = 300;
   function spawnBoss(left) {
     const rig = L.buildKoloss(); L.scene.add(rig.root);
     // bleibt bis zum Ende ihres Zeitfensters (Fusion und Aufsteigen abgezogen)
-    const stay = Math.max(30, (left || L.S().bossMin * 60) - L.FUSION_T - 9);
+    const stay = Math.max(30, (left || L.BOSS_STAY) - L.FUSION_T - 9);
     const fromMountain = !L.curIsland && L.mountains && L.mountains.length && Math.random() < 0.5;
     let x, z;
     if (fromMountain) {
@@ -2919,7 +2921,7 @@
       L.save.towerSpawnPending = false; L.persist();
       P.x = L.TOWER.x; P.z = L.TOWER.z + 2; P.yaw = P.camYaw = 0;
       // MAMA IVA ist schon da – aber nur noch 30 Sekunden
-      const C0 = L.S().bossMin * 60; L.ivaEpoch = Date.now() - (2 * C0 - 31) * 1000; L.ivaDone = undefined; L.ivaInstant = true;
+      const C0 = L.S().bossMin * 60; L.ivaEpoch = Date.now() - (C0 + L.BOSS_STAY - 31) * 1000; L.ivaDone = undefined; L.ivaInstant = true;
       setTimeout(() => L.msg('🗼 Bonus: Du startest einmalig sicher im Turm – MAMA IVA ist nur noch 30 Sekunden da!', 7000), 500);
     }
     L.round = {
