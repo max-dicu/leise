@@ -169,74 +169,201 @@
     }
   }
 
-  // ---------- BERNHARD DER VERSCHLUCKER ----------
+  // ---------- BERNHARD DER VERSCHLUCKER (eigener Entwurf) ----------
+  // Kilometergroß, Oberkörper frei, fleckige verschwitzte Haut, Speckrollen, Haare, Adern, Sabber.
+  // Ablauf: frisst die Erde (Kurzfilm) → fliegt her → JAGT DICH 10 MINUTEN (beißt immer wieder zu) → frisst den Mond → zieht weiter.
   let bern = null, bTimer = 45, bWarned = false;
+  const HUNT = 600, CHOMP_R = 34;
+  const phong = (c, o) => { const m = new T.MeshPhongMaterial(Object.assign({ color: c, shininess: 60, specular: 0x554433, fog: false }, o || {})); return m; };
+  function mottled(geo, base) {
+    const p = geo.attributes.position, cols = new Float32Array(p.count * 3), C = new T.Color(), B0 = new T.Color(base);
+    const blot = [new T.Color('#c08070'), new T.Color('#d8b080'), new T.Color('#b0a070'), new T.Color('#e8a0a0')];
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), n = Math.sin(x * 0.004 + y * 0.003) * Math.cos(z * 0.0035 - y * 0.002) + Math.sin(x * 0.011 + z * 0.009) * 0.5;
+      C.copy(B0).lerp(blot[(Math.abs(Math.floor(n * 3)) % 4)], Math.min(0.55, Math.abs(n) * 0.5)).multiplyScalar(0.9 + Math.random() * 0.08);
+      cols[i * 3] = C.r; cols[i * 3 + 1] = C.g; cols[i * 3 + 2] = C.b;
+    }
+    geo.setAttribute('color', new T.BufferAttribute(cols, 3));
+    return geo;
+  }
+  function onSphere(parent, R, lat, lon, mesh, out) { const v = new T.Vector3(Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)); mesh.position.copy(v).multiplyScalar(R + (out || 0)); mesh.lookAt(mesh.position.clone().add(v)); parent.add(mesh); return mesh; }
   function buildBernhard() {
-    const g = new T.Group(), skin = '#e8b090', shirt = '#c02a2a';
-    const belly = new T.Mesh(new T.SphereGeometry(3000, 48, 32), new T.MeshLambertMaterial({ color: skin })); belly.material.fog = false; g.add(belly);
-    const tee = new T.Mesh(new T.SphereGeometry(3010, 48, 24, 0, 6.283, 0, 1.1), new T.MeshLambertMaterial({ color: shirt })); tee.material.fog = false; g.add(tee);
-    const navel = new T.Mesh(new T.SphereGeometry(140, 16, 12), basic(0x8a5030)); navel.position.set(0, -300, 2990); g.add(navel);
-    // normal großer Kopf (ganz oben – winzig im Verhältnis), Ärmchen und Beinchen
-    const head = new T.Group(); head.position.set(0, 3040, 0); g.add(head);
-    head.add(new T.Mesh(new T.SphereGeometry(40, 20, 14), new T.MeshLambertMaterial({ color: skin })));
-    for (const s of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(7, 10, 8), basic(0xffffff)); e.position.set(s * 14, 10, 36); head.add(e); const p2 = new T.Mesh(new T.SphereGeometry(3.5, 8, 6), basic(0x111111)); p2.position.set(s * 14, 10, 42); head.add(p2); }
-    const mouth = new T.Mesh(new T.SphereGeometry(14, 14, 10), basic(0x3a0a0a)); mouth.scale.set(1.3, 0.6, 0.4); mouth.position.set(0, -12, 36); head.add(mouth); g.userData.mouth = mouth;
-    const cap = new T.Mesh(new T.CylinderGeometry(42, 42, 14, 20), new T.MeshLambertMaterial({ color: 0x1e3a8a })); cap.position.y = 34; head.add(cap);
-    for (const s of [-1, 1]) { const arm = new T.Mesh(new T.CylinderGeometry(60, 50, 900, 12), new T.MeshLambertMaterial({ color: skin })); arm.position.set(s * 2950, 600, 200); arm.rotation.z = s * 1.2; g.add(arm); const leg = new T.Mesh(new T.CylinderGeometry(120, 90, 700, 12), new T.MeshLambertMaterial({ color: 0x2a3a6a })); leg.position.set(s * 900, -3050, 0); g.add(leg); }
-    g.traverse((o) => { if (o.isMesh) { o.material.fog = false; o.frustumCulled = false; } });
-    L.scene.add(g); return g;
+    const g = new T.Group(), body = new T.Group(); g.add(body);
+    const skin = '#d8a48a', skinM = new T.MeshPhongMaterial({ vertexColors: true, shininess: 70, specular: 0x665544, fog: false });
+    const BR = 3400;
+    // Riesenbauch (fleckig, glänzend vor Schweiß)
+    const belly = new T.Mesh(mottled(new T.SphereGeometry(BR, 64, 48), skin), skinM); belly.scale.set(1.08, 1, 1.12); body.add(belly);
+    // Speckrollen / Falten
+    for (let k = 0; k < 6; k++) { const y = -BR * 0.15 - k * BR * 0.13, r = Math.sqrt(Math.max(0, 1 - (y / BR) ** 2)) * BR * 1.1; const roll = new T.Mesh(new T.TorusGeometry(r, BR * (0.06 + k * 0.01), 10, 64), phong('#c08a72')); roll.rotation.x = Math.PI / 2; roll.position.y = y; roll.scale.set(1, 1.12 / 1.08, 1); body.add(roll); }
+    for (let k = 0; k < 3; k++) { const fold = new T.Mesh(new T.TorusGeometry(BR * 0.55 - k * 260, 70, 8, 40, Math.PI), phong('#a8705a')); fold.position.set(0, -BR * 0.35 - k * 220, BR * 0.93); fold.rotation.z = Math.PI; body.add(fold); }
+    // Dehnungsstreifen, Adern, Haare, Schweiß
+    for (let k = 0; k < 70; k++) { const sm = new T.Mesh(L.GEO.box, phong(k % 3 ? '#b06070' : '#9a4a6a')); sm.scale.set(40, 22 + Math.random() * 30, 600 + Math.random() * 900); onSphere(body, BR * 1.06, -0.9 + Math.random() * 1.1, -1.6 + Math.random() * 3.2, sm, 8); sm.rotateZ(Math.random() * 3); }
+    for (let k = 0; k < 220; k++) { const hr = new T.Mesh(L.GEO.cone, phong('#2a1a10')); hr.scale.set(18, 22, 120 + Math.random() * 160); onSphere(body, BR * 1.07, -0.2 + Math.random() * 0.9, -1.2 + Math.random() * 2.4, hr, 20); hr.rotateX(Math.PI / 2); }
+    const sweat = []; for (let k = 0; k < 60; k++) { const d = new T.Mesh(L.GEO.sph, new T.MeshPhongMaterial({ color: 0xe8f4ff, shininess: 120, transparent: true, opacity: 0.7, fog: false })); d.scale.setScalar(50 + Math.random() * 60); onSphere(body, BR * 1.07, -0.6 + Math.random() * 1.3, -1.5 + Math.random() * 3, d, 30); sweat.push(d); }
+    // tiefer Bauchnabel
+    const navel = new T.Mesh(new T.SphereGeometry(260, 16, 12), phong('#4a2018')); onSphere(body, BR * 1.07, -0.25, 0, navel, -60);
+    const navR = new T.Mesh(new T.TorusGeometry(300, 80, 8, 24), phong('#b07a62')); onSphere(body, BR * 1.07, -0.25, 0, navR, 0);
+    // Brust (Männerbrüste) mit Haaren
+    for (const s of [-1, 1]) { const ch = new T.Mesh(mottled(new T.SphereGeometry(1500, 28, 20), skin), skinM); ch.position.set(s * 1300, BR * 0.62, BR * 0.62); ch.scale.set(1, 0.85, 0.7); body.add(ch); const np = new T.Mesh(new T.SphereGeometry(170, 12, 10), phong('#8a4a40')); np.position.set(s * 1300, BR * 0.55, BR * 0.62 + 1030); body.add(np); }
+    // Arme: massig, mit Klauen
+    const arms = [];
+    for (const s of [-1, 1]) {
+      const sh = new T.Group(); sh.position.set(s * BR * 0.98, BR * 0.55, 0); body.add(sh);
+      const up = new T.Mesh(mottled(new T.CylinderGeometry(800, 650, 3600, 20), skin), skinM); up.position.y = -1800; sh.add(up);
+      const el = new T.Group(); el.position.y = -3600; sh.add(el);
+      const fo = new T.Mesh(mottled(new T.CylinderGeometry(650, 520, 3200, 20), skin), skinM); fo.position.y = -1600; el.add(fo);
+      const hand = new T.Mesh(mottled(new T.SphereGeometry(800, 18, 14), skin), skinM); hand.position.y = -3500; hand.scale.set(1, 0.8, 0.6); el.add(hand);
+      for (let f = 0; f < 4; f++) { const fi = new T.Mesh(new T.CylinderGeometry(150, 130, 900, 10), skinM); fi.position.set((f - 1.5) * 320, -4200, 200); fi.rotation.x = 0.3; el.add(fi); const cl = new T.Mesh(L.GEO.cone, phong('#d8c890')); cl.scale.set(110, 380, 110); cl.position.set((f - 1.5) * 320, -4750, 380); cl.rotation.x = Math.PI + 0.4; el.add(cl); }
+      sh.rotation.z = s * 0.45; arms.push({ sh, el, s });
+    }
+    // Beine (kurz, dick)
+    for (const s of [-1, 1]) { const lg = new T.Mesh(mottled(new T.CylinderGeometry(1000, 800, 2600, 18), skin), skinM); lg.position.set(s * 1500, -BR - 900, 0); body.add(lg); const ft = new T.Mesh(mottled(new T.SphereGeometry(1000, 16, 12), skin), skinM); ft.position.set(s * 1500, -BR - 2300, 400); ft.scale.set(1, 0.5, 1.4); body.add(ft); }
+    // Kopf: massiv, Glatze mit Adern und Narben, Doppelkinn
+    const head = new T.Group(); head.position.set(0, BR + 900, 600); body.add(head);
+    for (let k = 0; k < 3; k++) { const chin = new T.Mesh(mottled(new T.SphereGeometry(1500 - k * 180, 28, 20), skin), skinM); chin.position.set(0, -900 - k * 260, 300 + k * 120); chin.scale.set(1, 0.45, 0.9); head.add(chin); }
+    const skull = new T.Mesh(mottled(new T.SphereGeometry(1600, 40, 30), skin), skinM); skull.scale.set(1, 1.05, 0.95); head.add(skull);
+    for (let k = 0; k < 14; k++) { const vn = new T.Mesh(new T.CylinderGeometry(28, 28, 700 + Math.random() * 600, 6), phong('#8a3a5a')); onSphere(head, 1600, 0.3 + Math.random() * 1.1, -1.4 + Math.random() * 2.8, vn, 10); vn.rotateX(Math.PI / 2); vn.rotateZ(Math.random() * 3); }
+    for (let k = 0; k < 3; k++) { const sc = new T.Mesh(L.GEO.box, phong('#b05a5a')); sc.scale.set(60, 40, 700); onSphere(head, 1600, 0.6 + k * 0.2, -0.5 + k * 0.5, sc, 15); }
+    // Augen: gelblich, blutunterlaufen, wütende Brauen
+    const eyes = [];
+    for (const s of [-1, 1]) {
+      const eg = new T.Group(); eg.position.set(s * 560, 250, 1380); head.add(eg);
+      eg.add(new T.Mesh(new T.SphereGeometry(300, 20, 16), phong('#f0e0a0')));
+      for (let v = 0; v < 6; v++) { const vv = new T.Mesh(L.GEO.box, new T.MeshBasicMaterial({ color: 0xc02020, fog: false })); vv.scale.set(10, 10, 200); onSphere(eg, 300, (Math.random() - 0.5) * 1.2, Math.random() * 6.28, vv, 2); }
+      const iris = new T.Mesh(new T.SphereGeometry(120, 14, 10), new T.MeshBasicMaterial({ color: 0x8a1a10, fog: false })); iris.position.z = 230; eg.add(iris);
+      const pup = new T.Mesh(new T.SphereGeometry(60, 10, 8), new T.MeshBasicMaterial({ color: 0x000000, fog: false })); pup.position.z = 300; eg.add(pup);
+      const brow = new T.Mesh(L.GEO.box, phong('#2a1a10')); brow.scale.set(700, 140, 160); brow.position.set(s * 560, 620, 1450); brow.rotation.z = -s * 0.45; head.add(brow);
+      eyes.push(eg);
+    }
+    const nose = new T.Mesh(mottled(new T.SphereGeometry(380, 16, 12), skin), skinM); nose.position.set(0, -50, 1600); nose.scale.set(1, 0.8, 0.9); head.add(nose);
+    // Maul mit Kiefer, schiefen Zähnen, Zunge und Sabber
+    const jaw = new T.Group(); jaw.position.set(0, -500, 700); head.add(jaw);
+    const cav = new T.Mesh(new T.SphereGeometry(900, 24, 16), new T.MeshBasicMaterial({ color: 0x2a0606, fog: false })); cav.scale.set(1.2, 0.5, 0.6); cav.position.set(0, -250, 650); head.add(cav);
+    const lowJ = new T.Mesh(mottled(new T.SphereGeometry(1100, 24, 16), skin), skinM); lowJ.scale.set(1.1, 0.42, 0.75); lowJ.position.set(0, -350, 200); jaw.add(lowJ);
+    const tongue = new T.Mesh(new T.SphereGeometry(600, 16, 12), phong('#c0405a')); tongue.scale.set(1, 0.3, 1); tongue.position.set(0, -120, 500); jaw.add(tongue);
+    for (let k = 0; k < 14; k++) { const a = (k / 13 - 0.5) * 2.3, t1 = new T.Mesh(L.GEO.cone, phong(k % 3 ? '#e8d890' : '#c8b060')); t1.scale.set(90, 260 + Math.random() * 160, 90); t1.position.set(Math.sin(a) * 1000, -40, 700 + Math.cos(a) * 420); t1.rotation.z = (Math.random() - 0.5) * 0.5; jaw.add(t1); const t2 = new T.Mesh(L.GEO.cone, phong('#e8d890')); t2.scale.set(90, 240 + Math.random() * 140, 90); t2.position.set(Math.sin(a) * 1000, -430, 1480 + Math.cos(a) * 200 - 600); t2.rotation.x = Math.PI; head.add(t2); }
+    const drool = []; for (let k = 0; k < 5; k++) { const d = new T.Mesh(new T.CylinderGeometry(25, 12, 1, 6), new T.MeshPhongMaterial({ color: 0xd8f0ff, transparent: true, opacity: 0.7, shininess: 120, fog: false })); d.position.set(-600 + k * 300, -900, 1300); head.add(d); drool.push(d); }
+    g.traverse((o) => { if (o.isMesh) { o.material.fog = false; o.frustumCulled = false; o.castShadow = false; } });
+    L.scene.add(g);
+    g.userData = { body, belly, arms, head, jaw, eyes, drool, sweat, headY: BR + 900 };
+    return g;
+  }
+  // Bewegung jeden Frame: atmen, schmatzen, Arme schwingen, auf dich schauen
+  function animB(dt, open) {
+    const u = bern.g.userData, t = performance.now() / 1000;
+    const br = 1 + Math.sin(t * 0.9) * 0.035; u.belly.scale.set(1.08 * br, 1 / br * 1.0, 1.12 * br);
+    u.jaw.rotation.x = L.lerp(u.jaw.rotation.x, open ? 0.65 + Math.sin(t * 6) * 0.08 : 0.08 + Math.max(0, Math.sin(t * 2.2)) * 0.15, Math.min(1, dt * 4));
+    for (const a of u.arms) { a.sh.rotation.x = Math.sin(t * 0.7 + a.s) * 0.35 - (open ? 0.6 : 0); a.el.rotation.x = -0.5 - Math.max(0, Math.sin(t * 0.9 + a.s)) * 0.6; }
+    u.drool.forEach((d, i) => { const l = 1200 + Math.sin(t * 1.5 + i) * 500 + (open ? 900 : 0); d.scale.y = l; d.position.y = -900 - l / 2; });
+    if (Math.random() < dt * 4) { const s = L.pick(u.sweat), wp = new T.Vector3(); s.getWorldPosition(wp); if (L.inMoon(P.x)) L.fx('#d8f0ff', wp.x, wp.y, wp.z, 2, 40, { size: 30, life: 2, g: 1 }); }
+    // Kopf und Augen verfolgen dich
+    const hp = new T.Vector3(); u.head.getWorldPosition(hp); u.head.lookAt(P.x, P.y + 2, P.z); u.head.rotation.x = L.clamp(u.head.rotation.x, -0.8, 0.8);
+    for (const e of u.eyes) e.lookAt(P.x, P.y + 2, P.z);
   }
   function startBernhard() {
     const I = moonIsl; if (!I.earth) return;
     if (!bern || !bern.g) bern = { g: buildBernhard() };
-    bern.phase = 'cine'; bern.t = 0; bern.g.visible = true;
+    bern.phase = 'cine'; bern.t = 0; bern.g.visible = true; bern.frags = [];
     const E0 = I.earth.position;
-    bern.g.position.set(E0.x - 14000, E0.y + 4000, E0.z - 6000); bern.g.scale.setScalar(0.3);
-    L.banner('🍔 BERNHARD DER VERSCHLUCKER', 'Er frisst alles … zuerst die Erde. Dann DICH.');
-    L.startCine('😱 BERNHARD DER VERSCHLUCKER', 7, (t) => {
+    bern.g.position.set(E0.x - 30000, E0.y + 9000, E0.z - 14000); bern.g.rotation.set(0, 0, 0); bern.g.scale.setScalar(1);
+    L.banner('😈 BERNHARD DER VERSCHLUCKER', 'Er frisst ganze Welten … zuerst die Erde. Dann jagt er DICH.');
+    L.startCine('😈 BERNHARD DER VERSCHLUCKER', 9, (t) => {
       const Ep = I.earth.position, b = bern.g.position;
-      if (t < 4.5) return { x: Ep.x + 9000, y: Ep.y + 1500, z: Ep.z + 9000, lx: (Ep.x + b.x) / 2, ly: (Ep.y + b.y) / 2, lz: (Ep.z + b.z) / 2 };
-      return { x: MOON.x + 60, y: 40, z: MOON.z + 60, lx: b.x, ly: b.y, lz: b.z };
+      if (t < 5.5) return { x: Ep.x + 16000, y: Ep.y + 3000, z: Ep.z + 16000, lx: (Ep.x + b.x) / 2, ly: (Ep.y + b.y) / 2, lz: (Ep.z + b.z) / 2 };
+      return { x: MOON.x + 80, y: 30, z: MOON.z + 80, lx: b.x, ly: b.y + 2000, lz: b.z };
     });
   }
+  function biteEarth() {
+    const I = moonIsl, Ep = I.earth.position.clone();
+    I.earth.visible = false; I.atmo.visible = false; L.shake = 1.6;
+    L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 5, z: P.z });
+    for (let k = 0; k < 16; k++) { const f = new T.Mesh(new T.DodecahedronGeometry(250 + Math.random() * 450), new T.MeshBasicMaterial({ color: k % 3 ? 0x2a6ac0 : 0x3a8a3a, fog: false })); f.position.copy(Ep).add(new T.Vector3(L.rand(-1500, 1500), L.rand(-1500, 1500), L.rand(-1500, 1500))); f.userData.v = new T.Vector3(L.rand(-1, 1), L.rand(-0.4, 1), L.rand(-1, 1)).multiplyScalar(1600); L.scene.add(f); bern.frags.push(f); }
+    L.msg('🌍💥 Bernhard hat die ERDE mit einem Bissen zerfetzt und verschluckt!', 5000);
+  }
+  function headWorld(out) { bern.g.userData.head.getWorldPosition(out); return out; }
   function updateBernhard(dt) {
     const I = moonIsl;
-    if (!bern || bern.phase === 'gone' || !bern.phase) {
-      if (L.inMoon(P.x) && I.built && !L.cine && L.state === 'game') { bTimer -= dt; if (bTimer <= 12 && !bWarned) { bWarned = true; L.msg('⚠️ Etwas Riesiges nähert sich der Erde … Geh in die Nähe vom 🍔 Burger!', 6000); } if (bTimer <= 0) { bTimer = 180; bWarned = false; startBernhard(); } }
+    if (!bern || !bern.phase || bern.phase === 'gone') {
+      if (L.inMoon(P.x) && I.built && !L.cine && L.state === 'game') {
+        bTimer -= dt;
+        if (bTimer <= 12 && !bWarned) { bWarned = true; L.msg('⚠️ Etwas Gigantisches nähert sich der Erde … bleib in der Nähe vom 🍔 Burger!', 6000); }
+        if (bTimer <= 0) { bTimer = 180; bWarned = false; startBernhard(); }
+      }
       return;
     }
-    if (!L.inMoon(P.x)) { bern.g.visible = false; bern.phase = 'gone'; if (I.earth) { I.earth.visible = true; I.atmo.visible = true; } return; }
+    if (!L.inMoon(P.x)) { bern.g.visible = false; bern.phase = 'gone'; for (const f of bern.frags || []) L.scene.remove(f); if (I.earth) { I.earth.visible = true; I.atmo.visible = true; } return; }
     bern.t += dt; const b = bern.g, Ep = I.earth.position;
+    for (const f of bern.frags || []) { f.position.addScaledVector(f.userData.v, dt); f.rotation.x += dt; f.rotation.y += dt * 0.7; }
     if (bern.phase === 'cine') {
-      // fliegt zur Erde und beißt sie mit einem Happs weg
-      if (bern.t < 3) b.position.lerp(new T.Vector3(Ep.x, Ep.y + 2600, Ep.z - 1500), dt * 1.2);
-      if (bern.t > 3 && I.earth.visible) { I.earth.visible = false; I.atmo.visible = false; L.shake = 1.5; L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 5, z: P.z }); L.msg('🌍💥 Bernhard hat die ERDE mit einem Happs verschluckt!', 5000); }
-      if (bern.t > 3.2) { const s = Math.min(1, 0.3 + (bern.t - 3.2) * 0.3); b.scale.setScalar(s); }
-      if (bern.t > 7 || !L.cine) { bern.phase = 'approach'; bern.t = 0; bern.from = b.position.clone(); L.msg('😱 Bernhard fliegt auf DICH zu! Ab in den 🍔 Burger!', 6000); }
+      animB(dt, bern.t > 2.5 && bern.t < 4.5);
+      if (bern.t < 4.2) b.position.lerp(new T.Vector3(Ep.x - 2500, Ep.y - 7000, Ep.z - 9000), dt * 0.9);
+      b.lookAt(Ep.x, b.position.y, Ep.z);
+      if (bern.t > 4.2 && I.earth.visible) biteEarth();
+      if (bern.t > 9 || !L.cine) { bern.phase = 'approach'; bern.t = 0; bern.from = b.position.clone(); L.msg('😈 Bernhard hat DICH entdeckt! Er jagt dich jetzt 10 Minuten – nur der 🍔 Burger ist sicher!', 7000); }
     } else if (bern.phase === 'approach') {
-      // fliegt auf den Mond zu – man sieht ihn immer größer werden
-      const u = Math.min(1, bern.t / 22), to = new T.Vector3(MOON.x, 2600, MOON.z);
-      b.position.lerpVectors(bern.from, to, u * u * (3 - 2 * u)); b.scale.setScalar(1);
-      b.lookAt(MOON.x, 0, MOON.z);
-      bern.g.userData.mouth.scale.set(1.3, 0.6 + u * 1.2, 0.4);
-      if (Math.random() < dt * (0.5 + u * 3)) L.shake = Math.max(L.shake, u * 0.8);
+      animB(dt, false);
+      const u = Math.min(1, bern.t / 15), to = new T.Vector3(P.x - 2000, 9000, P.z - 9000);
+      b.position.lerpVectors(bern.from, to, u * u * (3 - 2 * u)); b.lookAt(P.x, b.position.y, P.z);
+      if (Math.random() < dt * 2) L.shake = Math.max(L.shake, u * 0.6);
+      if (u >= 1) { bern.phase = 'hunt'; bern.t = 0; bern.huntT = HUNT; bern.next = 14; }
+    } else if (bern.phase === 'hunt' || bern.phase === 'aim' || bern.phase === 'chomp' || bern.phase === 'rise') {
+      bern.huntT -= dt;
+      if (bern.phase === 'hunt') {
+        // schwebt über dir und folgt dir
+        animB(dt, false);
+        const want = new T.Vector3(P.x - 1500, 8500 + Math.sin(bern.t * 0.4) * 600, P.z - 8000);
+        b.position.lerp(want, Math.min(1, dt * 0.25)); b.rotation.set(0, Math.atan2(P.x - b.position.x, P.z - b.position.z), 0);
+        bern.next -= dt;
+        if (bern.next <= 0) {
+          bern.next = 20 + Math.random() * 10;
+          if (L.inBurger(P.x, P.z)) { L.msg('😤 Bernhard hämmert wütend auf den Burger – aber er kommt nicht rein!', 3000); L.shake = 0.9; }
+          else { bern.phase = 'aim'; bern.st = 0; bern.tx = P.x + P.vx * 1.5; bern.tz = P.z + P.vz * 1.5; ring(bern.tx, bern.tz); L.msg('⚠️ BERNHARD BEISST ZU – RAUS AUS DEM ROTEN KREIS!', 2500); L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 5, z: P.z }); }
+        }
+        if (bern.huntT <= 0) { bern.phase = 'final'; bern.t = 0; bern.from = b.position.clone(); L.msg('😱 Die 10 Minuten sind um – Bernhard frisst jetzt den GANZEN MOND! In den 🍔 Burger!', 6000); }
+      } else if (bern.phase === 'aim') {
+        bern.st += dt; animB(dt, true);
+        if (bern.st > 5) { bern.phase = 'chomp'; bern.st = 0; bern.chompFrom = b.position.clone(); bern.chompRot = b.rotation.y; }
+      } else if (bern.phase === 'chomp') {
+        // stürzt mit dem Kopf voran herab und beißt zu
+        bern.st += dt; animB(dt, bern.st < 1.0);
+        const u = Math.min(1, bern.st / 1.1), pitch = 1.25 * u, yaw = Math.atan2(bern.tx - bern.chompFrom.x, bern.tz - bern.chompFrom.z), hy = b.userData.headY;
+        const fwd = new T.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+        const target = new T.Vector3(bern.tx, 600, bern.tz).addScaledVector(fwd, -Math.sin(pitch) * hy).add(new T.Vector3(0, -Math.cos(pitch) * hy, 0));
+        b.position.lerpVectors(bern.chompFrom, target, u * u); b.rotation.set(0, yaw, 0); b.rotateX(pitch);
+        if (u >= 1 && !bern.bit) {
+          bern.bit = true; L.shake = 2; L.snd.explosion && L.snd.explosion({ x: bern.tx, y: 0, z: bern.tz });
+          L.fx('#8a8a8e', bern.tx, 2, bern.tz, 60, 30, { size: 3, life: 2 }); L.decal(bern.tx, bern.tz, CHOMP_R * 0.6, '#2a2a2e');
+          if (P.alive && Math.hypot(P.x - bern.tx, P.z - bern.tz) < CHOMP_R && !L.inBurger(P.x, P.z)) { if (P.vehicle && L._leaveVehicle) L._leaveVehicle(true); L.hurtPlayer(99999, 'Von Bernhard dem Verschlucker verschluckt'); }
+        }
+        if (bern.st > 1.8) { bern.phase = 'rise'; bern.st = 0; bern.bit = false; bern.riseFrom = b.position.clone(); }
+      } else if (bern.phase === 'rise') {
+        bern.st += dt; animB(dt, false);
+        const u = Math.min(1, bern.st / 3); b.position.lerpVectors(bern.riseFrom, new T.Vector3(P.x - 1500, 8500, P.z - 8000), u * u * (3 - 2 * u)); b.rotation.set(0, b.rotation.y, 0); b.rotateX(1.25 * (1 - u));
+        if (u >= 1) bern.phase = 'hunt';
+      }
+    } else if (bern.phase === 'final') {
+      animB(dt, true);
+      const u = Math.min(1, bern.t / 12), to = new T.Vector3(MOON.x, 4500, MOON.z - 3000);
+      b.position.lerpVectors(bern.from, to, u * u * (3 - 2 * u)); b.rotation.set(0, Math.atan2(MOON.x - b.position.x, MOON.z - b.position.z), 0);
+      if (Math.random() < dt * 3) L.shake = Math.max(L.shake, u);
       if (u >= 1) eatMoon();
     } else if (bern.phase === 'eat') {
-      if (bern.t > 2.5) {
-        // der Mond setzt sich wieder zusammen
-        for (const m of I.surface) m.visible = true; I.group.visible = true;
-        bern.phase = 'leave'; bern.t = 0; bern.from = b.position.clone();
-        L.msg('🌕 Bernhard zieht weiter … der Mond setzt sich wieder zusammen.', 5000);
-      }
+      animB(dt, true);
+      if (bern.t > 2.5) { for (const m of I.surface) m.visible = true; bern.phase = 'leave'; bern.t = 0; bern.from = b.position.clone(); L.msg('🌕 Bernhard zieht satt weiter … der Mond setzt sich wieder zusammen.', 5000); }
     } else if (bern.phase === 'leave') {
-      const u = Math.min(1, bern.t / 8); b.position.lerpVectors(bern.from, new T.Vector3(MOON.x + 40000, 30000, MOON.z + 40000), u); b.scale.setScalar(1 - u * 0.7);
-      if (u >= 1) { bern.phase = 'gone'; b.visible = false; I.earth.visible = true; I.atmo.visible = true; L.msg('🌍 Die Erde ist wieder da. Bernhard kommt in 3 Minuten wieder.', 5000); }
+      animB(dt, false);
+      const u = Math.min(1, bern.t / 10); b.position.lerpVectors(bern.from, new T.Vector3(MOON.x + 60000, 40000, MOON.z + 60000), u);
+      if (u >= 1) { bern.phase = 'gone'; b.visible = false; for (const f of bern.frags) L.scene.remove(f); bern.frags = []; I.earth.visible = true; I.atmo.visible = true; L.msg('🌍 Die Erde ist wieder da. Bernhard kommt in 3 Minuten wieder.', 5000); }
     }
   }
+  const rings = [];
+  function ring(x, z) {
+    const m = new T.Mesh(new T.RingGeometry(CHOMP_R - 3, CHOMP_R, 64), new T.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0.85, side: T.DoubleSide, fog: false, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.3, z); L.scene.add(m); rings.push({ m, t: 0 });
+  }
+  function updateRings(dt) { for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.t += dt; r.m.material.opacity = 0.5 + Math.sin(r.t * 14) * 0.35; if (r.t > 6.2) { L.scene.remove(r.m); rings.splice(i, 1); } } }
   function eatMoon() {
     bern.phase = 'eat'; bern.t = 0;
-    L.shake = 2; L.env.bolt = 1;
-    flashScreen();
+    L.shake = 2; L.env.bolt = 1; flashScreen();
     L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 5, z: P.z }); L.snd.explosion && L.snd.explosion({ x: P.x, y: 5, z: P.z });
     for (const m of moonIsl.surface) m.visible = false;
     if (P.alive && !L.inBurger(P.x, P.z)) { P.vehicle && L._leaveVehicle && L._leaveVehicle(true); L.hurtPlayer(99999, 'Von Bernhard dem Verschlucker mit dem ganzen Mond verschluckt'); }
@@ -249,11 +376,14 @@
   }
   L.moonBossText = function () {
     if (!L.inMoon(P.x)) return null;
-    if (bern && bern.phase === 'approach') return '😱 BERNHARD frisst gleich den Mond! In den 🍔 Burger! (' + Math.max(0, Math.ceil(22 - bern.t)) + ' s)';
-    if (bern && (bern.phase === 'cine' || bern.phase === 'eat' || bern.phase === 'leave')) return '🍔 BERNHARD DER VERSCHLUCKER';
+    const ph = bern && bern.phase;
+    if (ph === 'aim' || ph === 'chomp') return '⚠️ BERNHARD BEISST ZU – RAUS AUS DEM ROTEN KREIS!';
+    if (ph === 'hunt' || ph === 'rise') return '😈 BERNHARD jagt dich – noch ' + L.fmt(Math.max(0, bern.huntT)) + ' · nur der 🍔 Burger ist sicher';
+    if (ph === 'final') return '😱 BERNHARD FRISST DEN MOND! In den 🍔 Burger! (' + Math.max(0, Math.ceil(12 - bern.t)) + ' s)';
+    if (ph === 'cine' || ph === 'approach' || ph === 'eat' || ph === 'leave') return '😈 BERNHARD DER VERSCHLUCKER';
     return '🍔 Bernhard kommt in ' + L.fmt(Math.max(0, bTimer));
   };
-  L.moonNav = () => (L.inMoon(P.x) && bern && bern.phase === 'approach' && !L.inBurger(P.x, P.z) ? BURGER : null);
+  L.moonNav = () => (L.inMoon(P.x) && bern && ['hunt', 'aim', 'chomp', 'rise', 'final', 'approach'].includes(bern.phase) && !L.inBurger(P.x, P.z) ? BURGER : null);
   L.moonTargets = () => [[LAND.x, LAND.z, '🚀', 'Rakete (Heimflug)'], [BURGER.x, BURGER.z, '🍔', 'Burger (sicher)']];
 
   // ---------- jedes Bild ----------
@@ -269,6 +399,7 @@
       if (P.y < -90 && P.alive && !P.vehicle) { const c = L.moonCheckpoint(); P.x = c.x; P.z = c.z; P.y = 2; P.vy = 0; P.air = true; L.hurtPlayer(25, 'Vom Mond ins All gefallen'); L.msg('🌌 Ins All gefallen – zurück zum Landeplatz.', 4000); }
     }
     updateBernhard(dt);
+    updateRings(dt);
   };
   L._moonDbg = { setT: (v) => { bTimer = v; }, bern: () => bern, isl: () => moonIsl };
   L.clearMoon = function () { trip = null; bTimer = 45; if (bern && bern.g) { bern.g.visible = false; bern.phase = 'gone'; } if (moonIsl.earth) { moonIsl.earth.visible = true; moonIsl.atmo.visible = true; } if (moonIsl.surface) for (const m of moonIsl.surface) m.visible = true; };
