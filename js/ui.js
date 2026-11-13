@@ -233,11 +233,21 @@
     const c = $('bigmap'), r = c.getBoundingClientRect(), X = L.bigMapXform; if (!X) return;
     const px = (e.clientX - r.left) * c.width / r.width, py = (e.clientY - r.top) * c.height / r.height;
     const wx = px / X.k - X.ox, wz = py / X.k - X.ox;
-    if (L.suitOn && L.suitOn() && L.mapTp !== false && L.suitTeleportTo) { L.suitTeleportTo(wx, wz); drawBigMap(); return; }
+    if (L.suitOn && L.suitOn() && L.mapTp !== false && L.suitPortalTo) { L.suitPortalTo(wx, wz); closeOverlays(); return; }
     L.setWaypoint(wx, wz);
     drawBigMap();
   });
+  // Anzug: Knöpfe für Portale in alle Welten
+  function suitWorldButtons() {
+    const c = $('bigmap'); if (!c) return; let box = $('suitWorlds');
+    const on = L.suitOn && L.suitOn();
+    if (!box) { box = document.createElement('div'); box.id = 'suitWorlds'; box.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:6px 0;max-width:100%'; c.parentNode.insertBefore(box, c.nextSibling); }
+    box.hidden = !on; if (!on || box.dataset.built) return; box.dataset.built = '1';
+    const h = document.createElement('div'); h.style.cssText = 'width:100%;text-align:center;color:#ffd040;font-weight:700'; h.textContent = '🛡️ Portal öffnen nach … (oder irgendwo auf die Karte klicken)'; box.appendChild(h);
+    for (const [label, x, z] of L.suitWorldTargets()) { const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = 'font-size:12px;padding:4px 8px;border:1px solid #ffd040'; b.textContent = label; b.onclick = () => { L.suitPortalTo(x, z, label); closeOverlays(); }; box.appendChild(b); }
+  }
   function drawBigMap() {
+    suitWorldButtons();
     if (Math.max(Math.abs(P.x), Math.abs(P.z)) > L.HALF + 200) { drawWorldMap(); return; }
     const c = $('bigmap'), g = c.getContext('2d'), S = c.width, k = S / (L.HALF * 2);
     g.drawImage(L.mapCanvas, 0, 0, S, S);
