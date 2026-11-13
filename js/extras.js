@@ -60,6 +60,8 @@
       overlay.querySelector('#cruiseClose').onclick = closePicker;
     }
     const list = overlay.querySelector('#cruiseList'); list.innerHTML = '';
+    const mv = myVehNear(from), info = overlay.querySelector('#cruiseVeh') || (() => { const d = document.createElement('p'); d.id = 'cruiseVeh'; d.className = 'small'; list.parentNode.insertBefore(d, list); return d; })();
+    info.textContent = mv ? '🚗 Dein ' + mv.t.name + ' kommt mit an Bord und steht am Ziel neben dir.' : '🚗 Tipp: Park dein Fahrzeug am Anleger (in der Nähe), dann nimmt das Schiff es mit.';
     for (const d of docks) {
       if (d === from) continue;
       const b = document.createElement('button'); b.className = 'btn'; b.textContent = d.name;
@@ -71,10 +73,22 @@
   function closePicker() { if (overlay) overlay.hidden = true; L.uiBlock = false; }
   // ---------- Überfahrt als Kurzfilm ----------
   let voyage = null;
+  // dein zuletzt gefahrenes Fahrzeug, wenn es am Anleger steht
+  function myVehNear(from) {
+    const v = L.myVeh, t = v && v.t;
+    if (!v || !L.ents.vehicles.includes(v) || t.police || t.boat || t.sub || t.plane || v.hp <= 0 || v.occupied || P.vehicle === v) return null;
+    return Math.hypot(v.x - from.x, v.z - from.z) < 110 ? v : null;
+  }
+  // sicheren Platz an Land neben der Ankunft suchen
+  function landSpot(cx, cz) {
+    for (let k = 0; k < 120; k++) { const a = k * 0.75, d = 7 + k * 0.6, x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d; if (L.waterDepth(x, z) < -0.2 && !L.queryBoxes(x, z, 3).length) return { x, z }; }
+    return { x: cx + 6, z: cz };
+  }
   function sail(from, to) {
     const m = shipModel(24, 110, 22.4); L.scene.add(m);
     const a0 = Math.atan2(to.sx - from.sx, to.sz - from.sz);
-    voyage = { m, from, to, t: 0, dur: 11, yaw: a0 };
+    voyage = { m, from, to, t: 0, dur: 11, yaw: a0, veh: myVehNear(from) };
+    if (voyage.veh) { voyage.veh.rig.root.visible = false; voyage.veh.x = voyage.veh.z = 1e7; }
     L.snd.horn({ x: from.sx, y: 20, z: from.sz });
     L.banner('🛳️ LEINEN LOS!', 'Kurs auf ' + to.name);
     L.startCine('KREUZFAHRT NACH ' + to.name.replace(/^\S+ /, '').toUpperCase(), voyage.dur, (t) => {
@@ -98,6 +112,13 @@
       L.scene.remove(V.m);
       P.x = V.to.land.x; P.z = V.to.land.z; P.y = 0.5; P.vx = P.vz = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 10);
       L.msg('🛳️ Angekommen: ' + V.to.name, 5000);
+      if (V.veh) {
+        const s = landSpot(V.to.land.x, V.to.land.z), v = V.veh;
+        v.x = s.x; v.z = s.z; v.yaw = Math.atan2(V.to.land.x - V.to.sx, V.to.land.z - V.to.sz); v.speed = 0; v.lat = 0; v.alt = 0; v.vy = 0; v.sink = 0; v.isl = L.islandAt ? L.islandAt(s.x, s.z) : null;
+        v.rig.root.visible = true; v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
+        if (L.mp && L.mp.send) L.mp.send({ t: 'vmove', id: v.id, x: v.x, z: v.z, yaw: v.yaw });
+        L.msg('🚗 Dein ' + v.t.name + ' steht neben dir an Land.', 5000);
+      }
       voyage = null;
     }
   }

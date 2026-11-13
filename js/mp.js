@@ -343,6 +343,8 @@
         L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);
         addChat('System', m.result === 'escape' ? nameOf(from) + ' ist entkommen' : nameOf(from) + ' ist gestorben', true);
         renderLobby(); break;
+      case 'vmove': { const v = L.byId.get('v' + m.id); if (v) { v.x = m.x; v.z = m.z; v.yaw = m.yaw; v.speed = 0; v.rig.root.visible = true; v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0); } if (host) forward(from, m); break; }
+      case 'caught': if (L.policeCaught) L.policeCaught(); break;
       case 'revive': if (L.gotRevive) L.gotRevive(m.hp, m.it, nameOf(from)); break;
       case 'coins': if (L.gotCoins) L.gotCoins(m.n, nameOf(from)); break;
       case 'vcust': { const v = L.byId.get('v' + m.id); if (v && L.applyCustom) L.applyCustom(v, m.c, false); if (host) forward(from, m); break; }

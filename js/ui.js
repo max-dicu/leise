@@ -176,7 +176,7 @@
     for (const w of L.ents.walkers) { if (w.dead || L.dist(w.x, w.z, P.x, P.z) > 220) continue; const [x, y] = toM(w.x, w.z); g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(x, y, 5, 0, 6.28); g.fill(); }
     if (L.boss && !L.boss.dead) { const [x, y] = toM(L.clamp(L.boss.x, P.x - 200, P.x + 200), L.clamp(L.boss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText('👹', x, y); }
     if (L.wboss) { const [x, y] = toM(L.clamp(L.wboss.x, P.x - 200, P.x + 200), L.clamp(L.wboss.z, P.z - 200, P.z + 200)); g.font = '20px sans-serif'; g.fillText(L.GBT[L.wboss.type || 'walross'].icon, x, y); }
-    for (const v of L.ents.vehicles) if (v.t.plane || v.t.sub || v.t.heli || v.t.boat || v.t.special) { if (L.dist(v.x, v.z, P.x, P.z) > 210 && (v.t.boat || v.t.heli)) continue; const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); if (v.t.special) { g.strokeStyle = '#ffc030'; g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, 11, 0, 6.28); g.stroke(); } g.font = '16px sans-serif'; g.fillText(v.t.plane ? '✈️' : v.t.sub ? '⚓' : v.t.heli ? '🚁' : v.t.special ? (v.t.kind === 'bike' ? '🏍️' : '🏎️') : '🚤', x, y); }
+    for (const v of L.ents.vehicles) if (v.t.police) { if (L.dist(v.x, v.z, P.x, P.z) < 200) { const [x, y] = toM(v.x, v.z); g.font = '15px sans-serif'; g.fillText('🚓', x, y); } } else if (v.t.plane || v.t.sub || v.t.heli || v.t.boat || v.t.special) { if (L.dist(v.x, v.z, P.x, P.z) > 210 && (v.t.boat || v.t.heli)) continue; const [x, y] = toM(L.clamp(v.x, P.x - 200, P.x + 200), L.clamp(v.z, P.z - 200, P.z + 200)); if (v.t.special) { g.strokeStyle = '#ffc030'; g.lineWidth = 2.5; g.beginPath(); g.arc(x, y, 11, 0, 6.28); g.stroke(); } g.font = '16px sans-serif'; g.fillText(v.t.plane ? '✈️' : v.t.sub ? '⚓' : v.t.heli ? '🚁' : v.t.special ? (v.t.kind === 'bike' ? '🏍️' : '🏎️') : '🚤', x, y); }
     { const [x, y] = toM(L.clamp(L.PORTAL.x, P.x - 200, P.x + 200), L.clamp(L.PORTAL.z, P.z - 200, P.z + 200)); g.font = '18px sans-serif'; g.fillText('🌀', x, y); }
     if (L.TOWER) { const big = L.boss && !L.boss.dead, [x, y] = toM(L.clamp(L.TOWER.x, P.x - 200, P.x + 200), L.clamp(L.TOWER.z, P.z - 200, P.z + 200)); g.font = (big ? 22 + Math.sin(performance.now() / 200) * 4 : 14) + 'px sans-serif'; g.fillText(L.towerSafe() ? '🗼' : '💥', x, y); }
     if (L.heli) { const [x, y] = toM(L.heli.x, L.heli.z); g.font = '16px sans-serif'; g.fillText('🚁', x, y); }
@@ -347,6 +347,7 @@
       $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`
         + (v.t.teleport ? (P.tpCd > 0 ? ` · 🌀 Teleport in ${Math.ceil(P.tpCd)} s` : ' · 🌀 T: Teleport bereit') : '')
         + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (E hoch, C/Shift runter, Leertaste driften)` : '')
+        + (v.t.jetFly ? (v.jetOn ? ` · 🚀 Flug noch ${Math.ceil(v.jetT)} s, Höhe ${Math.round(v.alt || 0)} m (E hoch, C runter)` : v.jetLand ? ' · 🛬 Landung …' : v.jetCd > 0 ? ` · 🚀 Düsen kühlen ab: ${Math.ceil(v.jetCd)} s` : ' · 🚀 E = 30 s fliegen · fährt über Wasser') : '')
         + (v.t.plane ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m – ab 80 km/h: E steigen, C/Shift sinken` : '')
         + (v.t.sub ? ` · ⚓ Tiefe ${Math.max(0, Math.round(-(v.alt || 0)))} m · ⚡ Nitro ${L.nitro || 0}/3 (Leertaste) · E hoch, C/Shift runter` : '');
     }

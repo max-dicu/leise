@@ -26,7 +26,9 @@
     sporen: { name: 'SPORENKÖNIG', title: 'Der giftige Riese', icon: '🍄', kind: 'mush', speed: 6, abil: ['cloud', 'stomp'] },
     golem: { name: 'KRISTALLGOLEM', title: 'Wächter der Kristalle', icon: '💎', kind: 'crystal', speed: 7, abil: ['shards', 'stomp'], proj: 'splitter' }
   };
-  const BY_ISL = { asgard: ['thor', 'odin', 'loki'], eis: ['ymir'], wueste: ['wurm'], dschungel: ['urwald'], vulkan: ['lava'], pilz: ['sporen'], kristall: ['golem'], geist: ['geist'] };
+  B.nina = { name: 'NINA', title: 'Die Walross-Oma', icon: '👵', kind: 'human', scale: 11, speed: 5, abil: ['summon', 'sweep', 'sweep'], prop: 'besen', oma: true, life: 80,
+    app: { skin: '#e8c0a0', hair: 'wellig', hairColor: '#d8d8dc', beard: 'kein', brows: 'dick', mouth: 'grinsen', nose: 'knubbel', eyes: '#4a2f1c', glasses: 'rund', glassesColor: '#8a6a3a', top: 'pullover', topColor: '#a04a6a', pants: 'rock', pantsColor: '#5a4a6a', shoeType: 'lackschuh', shoes: '#3a2a2a', build: 'kraeftig', height: 'mittel', hat: 'keine' } };
+  const BY_ISL = { oma: ['nina'], asgard: ['thor', 'odin', 'loki'], eis: ['ymir'], wueste: ['wurm'], dschungel: ['urwald'], vulkan: ['lava'], pilz: ['sporen'], kristall: ['golem'], geist: ['geist'] };
   L.ISLAND_BOSSES = B;
 
   // ---------- Modelle ----------
@@ -34,6 +36,7 @@
     const hand = rig.hand; if (!hand) return;
     if (b.prop === 'hammer') { part(G().cyl, '#5a3a20', 0.04, 0.5, 0.04, 0, -0.1, 0, hand); part(G().box, '#8a8f96', 0.24, 0.16, 0.16, 0, -0.38, 0, hand); }
     else if (b.prop === 'speer') { const s = part(G().cyl, '#6a4a2a', 0.02, 1.6, 0.02, 0, 0.2, 0, hand); s.rotation.x = 0.2; part(G().cone, '#e8e8f0', 0.05, 0.18, 0.05, 0, 1.0, 0.16, hand, { basic: true }); }
+    else if (b.prop === 'besen') { part(G().cyl, '#8a6a3a', 0.025, 1.9, 0.025, 0, -0.62, 0.03, hand); part(G().cyl, '#b04a3a', 0.05, 0.06, 0.05, 0, -1.5, 0.03, hand); part(G().cone, '#d8b860', 0.2, 0.32, 0.2, 0, -1.68, 0.03, hand); }
     else if (b.prop === 'dolch') { part(G().box, '#c8c8d0', 0.03, 0.3, 0.06, 0, -0.25, 0, hand); part(G().box, '#3a2a4a', 0.1, 0.03, 0.04, 0, -0.1, 0, hand); }
   }
   function buildHumanBoss(b) {
@@ -42,6 +45,14 @@
     if (b.spikes) for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const sp = part(G().cone, b.spikes, 0.06, 0.25, 0.06, s * (0.18 + k * 0.06), 0.66, -0.05 + k * 0.04, rig.torso, { noShadow: true }); sp.rotation.z = -s * 0.5; }
     if (b.glow) { rig.root.traverse((o) => { if (o.isMesh && o.material && o.material.color) o.material = o.material.clone(); }); for (let k = 0; k < 9; k++) part(G().box, b.glow, 0.02, 0.18 + (k % 3) * 0.08, 0.01, (k % 3 - 1) * 0.1, 0.15 + Math.floor(k / 3) * 0.17, 0.165, rig.torso, { basic: true, noShadow: true }).rotation.z = (k % 2 ? 0.4 : -0.4); }
     if (b.ghost) rig.root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.55; o.material.depthWrite = false; } });
+    if (b.oma) {
+      // dick, faltig, volles welliges Haar
+      part(G().sph, b.app.topColor, 0.34, 0.32, 0.3, 0, 0.22, 0.1, rig.torso);
+      part(G().sph, b.app.pantsColor, 0.36, 0.2, 0.3, 0, -0.05, 0, rig.hips);
+      for (let k = 0; k < 11; k++) { const a = 1.0 + k * 0.42; part(G().sph, k % 2 ? b.app.hairColor : '#c8c8cc', 0.11, 0.1, 0.11, Math.sin(a) * 0.16, 0.2 + (k % 3) * 0.06, Math.cos(a) * 0.16 - 0.02, rig.head); }
+      for (let k = 0; k < 3; k++) part(G().box, '#b08870', 0.12 - k * 0.02, 0.006, 0.005, 0, 0.255 + k * 0.018, 0.132, rig.head, { noShadow: true });
+      for (const s of [-1, 1]) for (let k = 0; k < 2; k++) { const w = part(G().box, '#b08870', 0.04, 0.005, 0.005, s * 0.09, 0.13 - k * 0.025, 0.132, rig.head, { noShadow: true }); w.rotation.z = s * 0.5; }
+    }
     propOf(b, rig);
     rig.root.scale.multiplyScalar(b.scale);
     return { rig, anim: (st) => { L.animHuman(rig, st); if (rig.cape) rig.cape.rotation.x = 0.1 + st.speed * 0.25; } };
@@ -191,14 +202,102 @@
     pose(0);
     L.banner(b.icon + ' ' + b.name, b.title + ' ist erwacht! Schleich oder lauf zur 🛡️ Zuflucht!');
     L.snd.boss && L.snd.boss();
+    if (b.life) boss.life = b.life;
+    if (id === 'nina') { ninaIntro(); return; }
     // Kurzfilm: Kamera schaut auf den Boss
     const cx = x, cz = z, h = id === 'wurm' ? 10 : (b.scale || 1) * 1.6 + 8;
     if (L.startCine) L.startCine(b.icon + ' ' + b.name + ' – ' + b.title, 4.2, (t) => { const u = t / 4.2, ang = boss.yaw + 0.8 + u * 0.9, dist = 55 - u * 15; return { x: cx + Math.sin(ang) * dist, y: h * 0.5 + 6 + u * 8, z: cz + Math.cos(ang) * dist, lx: boss.x, ly: h * (id === 'wurm' ? 0.4 : 0.7), lz: boss.z }; });
     L.shake = Math.max(L.shake, 1.2);
   }
+  // ---------- NINA: Mini-See, Schaum, Walrosse ----------
+  const lakes = [], mins = [];
+  const VARS = ['zimt', 'roller', 'naegel', 'locken', 'schaum', 'strick', 'kaktus', 'auge', 'gold', 'zimt', 'roller', 'naegel'];
+  function makeLake(x, z) {
+    const g = new T.Group(); g.position.set(x, 0, z); L.scene.add(g);
+    const w = new T.Mesh(new T.CircleGeometry(7, 32), new T.MeshLambertMaterial({ color: 0x3a8ac0, transparent: true, opacity: 0.9 })); w.rotation.x = -Math.PI / 2; w.position.y = 0.06; g.add(w);
+    for (let k = 0; k < 14; k++) { const a = k / 14 * 6.283; part(G().sph, k % 2 ? '#8a8a8a' : '#a8a098', 0.9, 0.5, 0.9, Math.sin(a) * 7.3, 0.2, Math.cos(a) * 7.3, g); }
+    const foam = []; for (let k = 0; k < 16; k++) { const f = part(G().sph, '#ffffff', 0.6, 0.45, 0.6, L.rand(-4.5, 4.5), 0, L.rand(-4.5, 4.5), g, { noShadow: true }); f.visible = false; foam.push(f); }
+    const lk = { g, x, z, foam, t: 0 }; lakes.push(lk); return lk;
+  }
+  function decorate(r, v) {
+    const bd = r.body, box = G().box, sph = G().sph, cone = G().cone;
+    if (v === 'zimt') { L.tintRig(r.root, '#b07840', 0.45); for (let k = 0; k < 3; k++) { const t2 = new T.Mesh(new T.TorusGeometry(1 - k * 0.3, 0.22, 8, 20), L.mat('#c08848')); t2.rotation.x = Math.PI / 2; t2.position.set(0, 1.05 + k * 0.12, -0.3); bd.add(t2); } for (let k = 0; k < 4; k++) part(box, '#fff8e8', 0.08, 0.04, 1.6, (k - 1.5) * 0.35, 1.35, -0.3, bd, { noShadow: true }).rotation.y = k * 0.6; }
+    else if (v === 'roller') { part(box, '#1a1a1a', 1.3, 0.14, 3.4, 0, -1.08, 0, bd); part(box, '#e03a2a', 1.32, 0.05, 3.4, 0, -1.16, 0, bd); for (const z of [-1.5, 1.5]) { const w2 = part(G().cyl, '#111', 0.42, 0.3, 0.42, 0, -1.4, z, bd); w2.rotation.z = Math.PI / 2; } part(box, '#333', 0.1, 1.8, 0.1, 0, -0.2, 1.8, bd); part(box, '#333', 1.4, 0.1, 0.1, 0, 0.7, 1.8, bd); }
+    else if (v === 'naegel') { for (const f of r.flips) for (let k = 0; k < 4; k++) { const n = part(cone, '#d0103a', 0.07, 0.9, 0.07, (k - 1.5) * 0.14, -0.1, 0.5, f, { noShadow: true }); n.rotation.x = Math.PI / 2; } }
+    else if (v === 'locken') { for (let k = 0; k < 5; k++) { const c = part(G().cyl, k % 2 ? '#ff8fc0' : '#7fc8ff', 0.16, 0.5, 0.16, (k - 2) * 0.22, 0.65, -0.1, r.head); c.rotation.z = Math.PI / 2; } }
+    else if (v === 'schaum') { L.tintRig(r.root, '#e8f0f8', 0.4); for (let k = 0; k < 14; k++) part(sph, '#ffffff', 0.35, 0.3, 0.35, L.rand(-1.2, 1.2), L.rand(0.4, 1.1), L.rand(-1.8, 1.8), bd, { noShadow: true }); }
+    else if (v === 'strick') { part(sph, '#c02a4a', 1.58, 1.2, 1.7, 0, 0.05, -0.35, bd); for (let k = 0; k < 3; k++) { const t2 = new T.Mesh(new T.TorusGeometry(1.55, 0.08, 6, 24), L.mat('#ffffff')); t2.position.set(0, 0.05, -0.9 + k * 0.5); bd.add(t2); } }
+    else if (v === 'kaktus') { L.tintRig(r.root, '#4a8a3a', 0.5); for (let k = 0; k < 16; k++) { const sp = part(cone, '#e8e0a0', 0.07, 0.5, 0.07, L.rand(-1, 1), 1.1 + Math.random() * 0.2, L.rand(-1.8, 1.4), bd, { noShadow: true }); sp.rotation.set(L.rand(-0.4, 0.4), 0, L.rand(-0.5, 0.5)); } }
+    else if (v === 'auge') { for (let k = 0; k < 9; k++) { const x = L.rand(-1.1, 1.1), y = L.rand(0.2, 1.1), z = L.rand(-1.5, 1.6); part(sph, '#ffffff', 0.25, 0.25, 0.25, x, y, z, bd, { noShadow: true }); part(sph, '#111', 0.11, 0.11, 0.11, x * 1.08, y * 1.08, z + 0.15, bd, { noShadow: true }); } }
+    else if (v === 'gold') { L.tintRig(r.root, '#d4af37', 0.35); part(cone, '#ffd040', 0.4, 0.5, 0.4, 0, 0.75, -0.1, r.head, { noShadow: true }); }
+  }
+  const STATS = { zimt: { dmg: 22, slow: 2.5 }, roller: { dmg: 25 }, naegel: { dmg: 40 }, locken: { dmg: 25 }, schaum: { dmg: 22, knock: 18 }, strick: { dmg: 28 }, kaktus: { dmg: 34 }, auge: { dmg: 25, hear: 1.6 }, gold: { dmg: 30 } };
+  const NAMES = { zimt: 'Zimtschnecken-Walross', roller: 'E-Roller-Walross', naegel: 'Fingernagel-Walross', locken: 'Lockenwickler-Walross', schaum: 'Schaum-Walross', strick: 'Strickpulli-Walross', kaktus: 'Kaktus-Walross', auge: 'Hundert-Augen-Walross', gold: 'Gold-Walross' };
+  function summon(lk, n) {
+    for (let k = 0; k < n; k++) {
+      const v = VARS[(mins.length + k) % VARS.length], r = L.buildWalross(); decorate(r, v); L.scene.add(r.root);
+      const a = Math.random() * 6.28, d = Math.random() * 4;
+      mins.push({ r, v, x: lk.x + Math.sin(a) * d, z: lk.z + Math.cos(a) * d, yaw: a, ph: Math.random() * 6, emerge: -k * 0.3, cd: 0, lk });
+    }
+  }
+  function updateLakes(dt) {
+    for (const lk of lakes) { lk.t += dt; lk.foam.forEach((f, k) => { const on = lk.t > 0.5; f.visible = on; if (on) { const u = (lk.t * 1.5 + k * 0.37) % 1; f.position.y = u * 2.2; f.scale.setScalar(0.4 + u * 0.8); } }); if (lk.t > 0.5 && Math.random() < dt * 25) L.fx('#ffffff', lk.x + L.rand(-4, 4), 0.5, lk.z + L.rand(-4, 4), 2, 2, { size: 0.35, life: 1.2 }); }
+  }
+  function updateMins(dt, cine) {
+    const I = boss && boss.I;
+    for (let i = mins.length - 1; i >= 0; i--) {
+      const m = mins[i]; m.ph += dt * 3;
+      if (m.emerge < 1) { m.emerge += dt * 0.7; const u = Math.max(0, m.emerge); m.r.root.position.set(m.x, -3 + u * 3, m.z); m.r.root.rotation.set(0, m.yaw, 0); L.animWalrossMon(m.r, { mode: 'alert', phase: m.ph }); if (u > 0 && Math.random() < dt * 10) L.fx('#ffffff', m.x, 0.5, m.z, 3, 3, { size: 0.4, life: 0.8 }); continue; }
+      if (m.leave) { m.leave += dt; m.r.root.position.y = -m.leave * 2.5; if (m.leave > 1.6) { L.scene.remove(m.r.root); mins.splice(i, 1); } continue; }
+      if (cine) { L.animWalrossMon(m.r, { mode: 'search', phase: m.ph }); m.r.root.position.set(m.x, 0, m.z); continue; }
+      // hören: wer nicht schleicht, wird gejagt (100 km/h). Wer schleicht, wird nur beim direkten Anrempeln bemerkt
+      const st = STATS[m.v], d = Math.hypot(P.x - m.x, P.z - m.z), loud = P.stance === 'stand' || !!P.vehicle;
+      const canHunt = P.alive && !P.gone && I && L.curIsland === I && !L.islandSafe(P.x, P.z) && !(P.spawnProt > 0) && !L.cine;
+      const hunt = canHunt && ((loud && d < 130 * (st.hear || 1)) || d < 1.8);
+      let tx, tz, spd;
+      if (hunt) { tx = P.x; tz = P.z; spd = 100 / 3.6; }
+      else { m.wt = (m.wt || 0) - dt; if (!m.wx || m.wt <= 0) { const a = Math.random() * 6.28, dd = 6 + Math.random() * 30; m.wx = m.lk.x + Math.sin(a) * dd; m.wz = m.lk.z + Math.cos(a) * dd; m.wt = 4 + Math.random() * 4; } tx = m.wx; tz = m.wz; spd = 4; }
+      const dd = Math.hypot(tx - m.x, tz - m.z);
+      if (dd > 1.5) { m.yaw += L.angDiff(m.yaw, Math.atan2(tx - m.x, tz - m.z)) * Math.min(1, dt * 6); const n = Math.ceil(spd * dt / 1); for (let s = 0; s < n; s++) { L.collide(m.x + Math.sin(m.yaw) * spd * dt / n, m.z + Math.cos(m.yaw) * spd * dt / n, 1.4, 0, RES); m.x = RES.x; m.z = RES.z; } }
+      // zuschlagen
+      m.cd -= dt;
+      if (hunt && d < 2.8 && m.cd <= 0) {
+        m.cd = 1.3; L.hurtPlayer(st.dmg * (L.md ? L.md.dmg : 1), 'Von einem ' + NAMES[m.v] + ' erwischt');
+        if (P.alive && !P.vehicle) { const k = st.knock || 9; P.vx = (P.x - m.x) / (d || 1) * k; P.vz = (P.z - m.z) / (d || 1) * k; P.vy = 4; P.air = true; P.knockT = 0.7; }
+        if (st.slow) { P.slowT = st.slow; L.msg('🍥 Klebriger Zuckerguss – du bist langsamer!', 1500); }
+        L.snd.splat && L.snd.splat({ x: m.x, y: 1, z: m.z });
+      }
+      L.animWalrossMon(m.r, { mode: hunt ? 'run' : 'walk', phase: m.ph * (hunt ? 2.5 : 1) });
+      m.r.root.position.set(m.x, 0, m.z); m.r.root.rotation.set(0, m.yaw, 0);
+    }
+    if (P.slowT > 0) { P.slowT -= dt; P.vx *= 0.88; P.vz *= 0.88; }
+  }
+  const RES = { x: 0, z: 0 };
+  function clearNina() { for (const lk of lakes) L.scene.remove(lk.g); lakes.length = 0; for (const m of mins) L.scene.remove(m.r.root); mins.length = 0; }
+  // Kurzfilm: NINA erscheint, beschwört den See, Schaum quillt, die Walrosse kommen
+  function ninaIntro() {
+    const b0 = boss; b0.ct = 0; b0.intro = true;
+    b0.lakeX = b0.x + Math.sin(b0.yaw) * 22; b0.lakeZ = b0.z + Math.cos(b0.yaw) * 22;
+    L.banner('👵 NINA', 'Die Walross-Oma ist da! Schleich – die Walrosse hören dich sonst!');
+    L.startCine('👵 NINA – DIE WALROSS-OMA', 9, (t) => {
+      const B0 = boss || b0, fx2 = Math.sin(B0.yaw), fz2 = Math.cos(B0.yaw);
+      if (t < 2.4) { const a = B0.yaw + 0.5 + t * 0.15; return { x: B0.x + Math.sin(a) * 34, y: 15, z: B0.z + Math.cos(a) * 34, lx: B0.x, ly: 16, lz: B0.z }; }
+      if (t < 4.6) return { x: B0.lakeX + fz2 * 16 + fx2 * 10, y: 8, z: B0.lakeZ - fx2 * 16 + fz2 * 10, lx: B0.lakeX, ly: 1, lz: B0.lakeZ };
+      const u = (t - 4.6) / 4.4; return { x: B0.lakeX + fx2 * (24 + u * 10) + fz2 * 8, y: 9 + u * 6, z: B0.lakeZ + fz2 * (24 + u * 10) - fx2 * 8, lx: B0.lakeX, ly: 3, lz: B0.lakeZ };
+    });
+  }
   // Boss nur hinstellen und bewegen lassen (während des Kurzfilms)
   function pose(dt) {
     const m = boss.m; boss.ph += dt;
+    if (boss.id === 'nina') {
+      boss.ct = (boss.ct || 0) + dt;
+      if (boss.ct > 2.2 && !boss.lk) { boss.lk = makeLake(boss.lakeX, boss.lakeZ); L.snd.thunder && L.snd.thunder(0.3); L.shake = 0.8; }
+      if (boss.ct > 4.4 && !boss.sum1) { boss.sum1 = true; summon(boss.lk, 10); }
+      m.anim({ mode: 'walk', phase: 0, speed: 0 });
+      const rig = m.rig; if (boss.ct > 1.6 && boss.ct < 4.6) { rig.arms[0].arm.rotation.x = -2.7; rig.arms[0].arm.rotation.z = 0.2; }
+      rig.root.position.set(boss.x, 0, boss.z); rig.root.rotation.set(0, boss.yaw, 0);
+      return;
+    }
     if (boss.worm) { m.segs.forEach((s, k) => { const u = k / 15, up = Math.min(1, boss.ph / 2); s.position.set(Math.sin(boss.ph * 2 + k * 0.5) * 1.5, -6 + up * 30 * Math.max(0, 1 - u * 1.1) - k * 1.2, -k * 1.8); s.rotation.x = -1.2 * (1 - u); }); m.rig.root.position.set(boss.x, 0, boss.z); m.rig.root.rotation.y = boss.yaw; if (Math.random() < dt * 20) L.fx('#d8b878', boss.x + L.rand(-5, 5), 1, boss.z + L.rand(-5, 5), 2, 4, { size: 0.7, life: 1 }); return; }
     m.anim({ mode: 'walk', phase: boss.ph * 0.6, speed: 0.05, atk: 0 });
     m.rig.root.position.set(boss.x, boss.b.ghost ? 3 : 0, boss.z); m.rig.root.rotation.set(0, boss.yaw, 0);
@@ -206,6 +305,8 @@
   function despawn(msg) {
     if (!boss) return;
     if (boss.ravens) for (const r of boss.ravens) L.scene.remove(r);
+    for (const m of mins) m.leave = m.leave || 0.01;
+    setTimeout(() => { for (const lk of lakes) L.scene.remove(lk.g); lakes.length = 0; }, 2000);
     L.scene.remove(boss.m.rig.root);
     for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; if (f.kind === 'clone') { L.scene.remove(f.m.rig.root); fx.splice(i, 1); } }
     if (msg) L.msg(msg, 5000);
@@ -252,6 +353,8 @@
       else if (ab === 'cloud') { boss.cd = 4.5; boss.atk = 0.8; const m2 = new T.Mesh(G().sph, new T.MeshBasicMaterial({ color: 0x90e040, transparent: true, opacity: 0, depthWrite: false, fog: false })); m2.scale.set(7, 4, 7); m2.position.set(P.x, 3, P.z); L.scene.add(m2); fx.push({ t: 0, dur: 9, kind: 'cloud', mesh: m2, x: P.x, z: P.z }); L.msg('☠️ Giftsporen! Raus aus der Wolke!', 2000); }
       else if (ab === 'clones') { boss.cd = 7; boss.atk = 0.8; for (let k = 0; k < 3; k++) { const cm = buildHumanBoss(b); L.scene.add(cm.rig.root); const a = k / 3 * 6.28 + Math.random(), cx = P.x + Math.sin(a) * 45, cz = P.z + Math.cos(a) * 45; fx.push({ t: 0, dur: 10, kind: 'clone', m: cm, x: cx, z: cz, yaw: 0, ph: k }); L.fx('#b080ff', cx, 8, cz, 30, 10, { basic: true, size: 0.6, life: 1 }); } L.msg('🎭 Loki teilt sich – welcher ist der echte?', 2500); }
       else if (ab === 'scream' && dP < 40) { boss.cd = 5; boss.atk = 1; telegraph(boss.x, boss.z, 28, 1.3, 0xc8f0ff, () => { L.snd.langer && L.snd.langer({ x: P.x, y: 2, z: P.z }); L.shake = Math.max(L.shake, 1); if (boss) hurtIf(boss.x, boss.z, 28, 35, 'Vom Schrei der Geisterkönigin umgeworfen'); }); }
+      else if (ab === 'summon') { boss.cd = 7; if (mins.length < 16) { boss.atk = 1.4; const a = Math.atan2(P.x - boss.x, P.z - boss.z) + L.rand(-0.8, 0.8), x = boss.x + Math.sin(a) * 25, z = boss.z + Math.cos(a) * 25; telegraph(x, z, 7, 1.6, 0x3a8ac0, () => { if (!boss) return; summon(makeLake(x, z), 4); L.msg('🫧 NINA beschwört einen neuen See – noch mehr Walrosse!', 2500); }); } }
+      else if (ab === 'sweep' && dP < 30) { boss.cd = 3.5; boss.atk = 1; const x = boss.x + Math.sin(boss.yaw) * 12, z = boss.z + Math.cos(boss.yaw) * 12; telegraph(x, z, 13, 1.1, 0xff60a0, () => { if (boss) { L.fx('#d8b860', x, 1, z, 30, 10, { size: 0.4, life: 1 }); hurtIf(x, z, 13, 38, 'Von Ninas Kehrbesen weggefegt'); } }); }
       else if (ab === 'teleport') boss.cd = 1;
       else boss.cd = 0.5;
     }
@@ -297,8 +400,9 @@
     const I = L.curIsland;
     for (const J of L.ISL || []) if (J.shelter) J.shelter.ring.material.color.setHex(boss && boss.I === J ? 0x40ffa0 : 0x40c0ff);
     updateFx(dt);
+    updateLakes(dt); updateMins(dt, !!L.cine);
     if (boss) {
-      if (L.state !== 'game' || I !== boss.I || !P.alive && !(L.spectate)) { cleanupRavens(); despawn(I !== boss.I ? null : null); return; }
+      if (L.state !== 'game' || (I !== boss.I && P.alive) || (L.round && L.round.over)) { cleanupRavens(); despawn(I !== boss.I ? null : null); return; }
       if (!L.cine) updateBoss(dt); else pose(dt);
       return;
     }
@@ -318,5 +422,5 @@
   };
   // Wegweiser zur Zuflucht, solange ein Insel-Boss da ist
   L.islandNav = function () { const I = L.curIsland; if (!boss || !I || boss.I !== I || !I.shelter || L.islandSafe(P.x, P.z)) return null; return I.shelter; };
-  L.clearIslandBosses = function () { cleanupRavens(); if (boss) { L.scene.remove(boss.m.rig.root); boss = L.islandBoss = null; } for (const f of fx) { if (f.mesh) L.scene.remove(f.mesh); if (f.m) L.scene.remove(f.m.rig.root); } fx.length = 0; for (const I of L.ISL || []) { I.bossT = undefined; I.warned = false; } };
+  L.clearIslandBosses = function () { clearNina(); cleanupRavens(); if (boss) { L.scene.remove(boss.m.rig.root); boss = L.islandBoss = null; } for (const f of fx) { if (f.mesh) L.scene.remove(f.mesh); if (f.m) L.scene.remove(f.m.rig.root); } fx.length = 0; for (const I of L.ISL || []) { I.bossT = undefined; I.warned = false; } };
 })();

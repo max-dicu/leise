@@ -286,7 +286,39 @@
 
   // Exklusive Skins: Der Wächter, Viktor, Daniel, Richard
   L.GUARD_APP = { name: 'Der Wächter', skin: '#c98e65', hair: 'kurz', hairColor: '#1a1a1a', top: 'anzug', topColor: '#1a1a24', pants: 'anzughose', pantsColor: '#1a1a24', shoeType: 'stiefel', shoes: '#1a1a1a', build: 'muskuloes', height: 'gross', glasses: 'skibrille', glassesColor: '#2a2a3a', hat: 'keine', beard: 'kein', mouth: 'ernst', brows: 'boese' };
-  L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard']];
+  L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard'], ['baer', '🧸 Pinker Bär']];
+  // Pinker Kuschelbär mit genähten X-Augen (eigener Entwurf)
+  function buildBear(app) {
+    const pk = '#f4a6c8', dk = '#d87aa8', lt = '#ffd6e8', box = G().box, sph = G().sph, ns = { noShadow: true };
+    const root = new T.Group(), body = grp(root), hips = grp(body, 0, 0.8, 0), legs = [], arms = [];
+    let hand = null;
+    for (const s of [-1, 1]) {
+      const leg = grp(hips, s * 0.17, 0, 0); part(sph, pk, 0.17, 0.24, 0.18, 0, -0.17, 0, leg);
+      const knee = grp(leg, 0, -0.36, 0); part(sph, pk, 0.15, 0.2, 0.16, 0, -0.12, 0, knee); part(sph, dk, 0.16, 0.09, 0.22, 0, -0.34, 0.05, knee); part(sph, lt, 0.1, 0.07, 0.03, 0, -0.34, 0.25, knee, ns);
+      legs.push({ leg, knee });
+    }
+    const torso = grp(hips);
+    part(sph, pk, 0.42, 0.42, 0.36, 0, 0.32, 0, torso);
+    part(sph, lt, 0.3, 0.3, 0.1, 0, 0.27, 0.29, torso, ns);
+    for (const s of [-1, 1]) part(sph, '#e0306a', 0.05, 0.05, 0.03, s * 0.035, 0.44, 0.38, torso, ns);
+    { const hc = part(G().cone, '#e0306a', 0.06, 0.07, 0.03, 0, 0.395, 0.38, torso, ns); hc.rotation.x = Math.PI; }
+    for (let k = 0; k < 6; k++) part(box, '#7a2a4a', 0.012, 0.035, 0.01, 0, 0.08 + k * 0.08, 0.37, torso, ns);
+    const neck = grp(torso, 0, 0.68, 0), head = grp(neck, 0, 0.04, 0);
+    part(sph, pk, 0.36, 0.33, 0.33, 0, 0.24, 0, head);
+    for (const s of [-1, 1]) { part(sph, pk, 0.13, 0.13, 0.07, s * 0.27, 0.5, -0.02, head); part(sph, lt, 0.08, 0.08, 0.03, s * 0.27, 0.5, 0.04, head, ns); }
+    part(sph, lt, 0.16, 0.12, 0.1, 0, 0.14, 0.27, head);
+    part(sph, '#3a1a2a', 0.07, 0.05, 0.04, 0, 0.19, 0.36, head, ns);
+    part(box, '#3a1a2a', 0.012, 0.06, 0.01, 0, 0.12, 0.37, head, ns); part(box, '#3a1a2a', 0.12, 0.012, 0.01, 0, 0.09, 0.365, head, ns);
+    for (const s of [-1, 1]) for (const r of [0.785, -0.785]) { const e = part(box, '#111', 0.14, 0.028, 0.02, s * 0.13, 0.32, 0.31, head, ns); e.rotation.z = r; }
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) part(box, '#7a2a4a', 0.03, 0.008, 0.01, s * 0.24, 0.2 + k * 0.06, 0.22, head, ns);
+    for (const s of [-1, 1]) {
+      const arm = grp(torso, s * 0.4, 0.5, 0); part(sph, pk, 0.13, 0.22, 0.14, 0, -0.15, 0, arm);
+      const elbow = grp(arm, 0, -0.3, 0); part(sph, pk, 0.12, 0.18, 0.13, 0, -0.1, 0, elbow); part(sph, lt, 0.1, 0.08, 0.1, 0, -0.25, 0.02, elbow, ns);
+      arms.push({ arm, elbow }); if (s === -1) hand = grp(elbow, 0, -0.3, 0.03);
+    }
+    root.traverse((o) => { if (o.isMesh && o.castShadow !== false) o.castShadow = true; });
+    return { root, body, hips, torso, neck, head, legs, arms, hand, held: null, heldType: null, app: Object.assign({}, L.DEFAULT_CHAR, app, { special: 'baer' }), kind: 'human', hipY: 0.8 };
+  }
   // Der Wächter-Skin ist gesperrt: nur wer den geheimen Freischalt-Link geöffnet hat, darf ihn tragen (auch online geprüft)
   L.hash53 = function (str) { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36); };
   const WK = 'ofaw0xb94x';
@@ -294,6 +326,7 @@
   L.waechterToken = () => { const k = L.save && L.save.skinKey; return k && L.hash53(L.hash53(k)) === WK ? L.hash53(k) : null; };
   function buildSpecial(app, force) {
     const sp = app.special;
+    if (sp === 'baer') return buildBear(app);
     if (sp === 'richard') { const r = L.buildHuman(Object.assign({}, L.RICHARD_APP || {}, { name: app.name })); r.app = Object.assign({}, r.app, { special: 'richard' }); return r; }
     if (sp === 'waechter' && !force && !L.waechterOk(app)) return L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter') {
@@ -323,7 +356,7 @@
     return pcs;
   }
   L.buildHuman = function (app, force) {
-    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter')) return buildSpecial(app, force);
+    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter' || app.special === 'baer')) return buildSpecial(app, force);
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
     const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32, extrem: 1.8 }[A.build] || 1;
     const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
@@ -1161,8 +1194,15 @@
     jeep: { name: 'Militär-Jeep', vmax: 135, acc: 7, hp: 230, kind: 'car', len: 4.3, wid: 2.0, off: 0.95, h: 1.7 },
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6, wheelie: true },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95, wheelie: true },
-    quad: { name: 'Straßen-Quad', vmax: 165, acc: 14, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.25, off: 0.75 },
-    atv: { name: 'Gelände-ATV', vmax: 125, acc: 12, hp: 140, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.3, off: 1 },
+    quad: { name: 'Straßen-Quad', vmax: 275, acc: 22, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.25, off: 0.75 },
+    atv: { name: 'Gelände-ATV', vmax: 400, acc: 27, hp: 140, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.3, off: 1 },
+    // Polizei (unzerstörbar, nur KI): 500 km/h
+    polizei_auto: { name: 'Polizeiauto', vmax: 500, acc: 30, hp: 99999, kind: 'car', len: 4.8, wid: 1.85, off: 0.85, h: 1.45, model: 'limousine', police: true },
+    polizei_sport: { name: 'Polizei-Sportwagen', vmax: 500, acc: 34, hp: 99999, kind: 'car', len: 4.4, wid: 1.9, off: 0.8, h: 1.2, model: 'sportwagen', police: true },
+    polizei_suv: { name: 'Polizei-Pickup', vmax: 500, acc: 28, hp: 99999, kind: 'car', len: 5.2, wid: 2.0, off: 0.95, h: 1.8, model: 'pickup', police: true },
+    polizei_motorrad: { name: 'Polizei-Motorrad', vmax: 500, acc: 34, hp: 99999, kind: 'bike', len: 2.1, wid: 0.8, off: 0.8, model: 'motorrad', police: true },
+    polizei_quad: { name: 'Polizei-Quad', vmax: 500, acc: 30, hp: 99999, kind: 'bike', quad: true, len: 2.4, wid: 1.25, off: 0.95, model: 'quad', police: true },
+    polizei_cross: { name: 'Polizei-Crossmaschine', vmax: 500, acc: 32, hp: 99999, kind: 'bike', len: 2.0, wid: 0.8, off: 1, model: 'cross', police: true },
     roller: { name: 'Roller', vmax: 75, acc: 5, hp: 40, kind: 'bike', len: 1.8, wid: 0.7, off: 0.5, wheelie: true },
     jetski: { name: 'Jetski', vmax: 110, acc: 13, hp: 60, kind: 'bike', boat: true, len: 3, wid: 1.2, off: 1 },
     motorboot: { name: 'Motorboot', vmax: 85, acc: 7, hp: 140, kind: 'car', boat: true, len: 7, wid: 2.6, off: 1, h: 2 },
@@ -1171,12 +1211,31 @@
     uboot: { name: 'U-Boot', vmax: 110, acc: 7, hp: 240, kind: 'car', sub: true, len: 10, wid: 2.8, off: 1, h: 3 },
     flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55, wheelie: true },
-    nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true },
-    schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true, wheelie: true },
+    nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true, jetFly: true, waterOk: true },
+    schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true, wheelie: true, jetFly: true, waterOk: true },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65, wheelie: true }
   };
   const CAR_COLORS = ['#b02a2a', '#2a4a8a', '#e8e8e8', '#1a1a1a', '#7a7a7a', '#c0a020', '#2a6a3a', '#5a2a6a', '#d06a20'];
+  // Polizei-Look: weiß, blaue Streifen, Schriftzug, Blaulicht (rot/blau)
+  function policeLook(rig, t) {
+    const root = rig.root;
+    if (L.tintRig) L.tintRig(root, '#f4f6f8', 0.82);
+    const bb = new T.Box3().setFromObject(root), top = bb.max.y, w = bb.max.x - bb.min.x, len = bb.max.z - bb.min.z, bike = t.kind === 'bike';
+    const bar = new T.Group(); bar.position.set(0, top + 0.07, bike ? -len * 0.3 : -0.1); root.add(bar);
+    const bw = bike ? 0.24 : Math.min(1.2, w * 0.6);
+    part(G().box, '#222', bw + 0.06, 0.06, 0.26, 0, -0.04, 0, bar, { noShadow: true });
+    const mr = new T.Mesh(G().box, new T.MeshBasicMaterial({ color: 0xff2020 })); mr.scale.set(bw / 2, 0.13, 0.22); mr.position.x = -bw / 4; bar.add(mr);
+    const mb = new T.Mesh(G().box, new T.MeshBasicMaterial({ color: 0x2050ff })); mb.scale.set(bw / 2, 0.13, 0.22); mb.position.x = bw / 4; bar.add(mb);
+    root.userData.siren = { mr, mb };
+    if (!bike) for (const s of [-1, 1]) {
+      part(G().box, '#1e3a8a', 0.02, 0.16, len * 0.86, s * (w / 2 + 0.01), top * 0.42, 0, root, { noShadow: true });
+      const tx = new T.Mesh(new T.PlaneGeometry(1.6, 0.3), new T.MeshBasicMaterial({ map: L.textTex('POLIZEI', 256, 48, '#1e3a8a', '#ffffff', 'bold 36px Arial'), side: T.DoubleSide }));
+      tx.position.set(s * (w / 2 + 0.025), top * 0.62, 0); tx.rotation.y = s * Math.PI / 2; root.add(tx);
+    }
+  }
   L.buildVehicle = function (type, cust) {
+    const tt = L.VTYPES[type];
+    if (tt && tt.model) { const rig = L.buildVehicle(tt.model, cust); policeLook(rig, tt); return rig; }
     if (L.CUSTOM_TYPES && L.CUSTOM_TYPES[type] && L.buildCustomVehicle) return L.buildCustomVehicle(type, cust);
     const t = L.VTYPES[type], root = new T.Group(), box = G().box;
     const color = type === 'jeep' ? '#4a5a3a' : L.pick(CAR_COLORS);

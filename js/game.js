@@ -471,6 +471,7 @@
       else if (P.flying === 1) { P.flying = 2; L.msg('🛬 Landeanflug …', 1500); }
     }
     if (P.flying) { updateFlying(dt, block); return; }
+    flySpeedUi(false);
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
     const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
     const moving = (fIn || rIn) && P.knockT <= 0 && P.eatT < 0;
@@ -583,7 +584,15 @@
   // Flug des Wächters: frei durch die Luft, sanfte Landung, Umhang weht
   function updateFlying(dt, block) {
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0), rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
-    const fast = !block && (L.keys.ShiftLeft || L.keys.ShiftRight), sp = fast ? 48 : 18;
+    // Tempo selbst wählen: + / − (mit Shift in 100er-Schritten) oder Schieberegler, 1 bis 999 km/h
+    if (!(L.save.flySpeed >= 1)) L.save.flySpeed = 80;
+    if (!block) {
+      const stp = (L.keys.ShiftLeft || L.keys.ShiftRight) ? 100 : 10;
+      if (L.hit('Equal') || L.hit('NumpadAdd') || L.hit('BracketRight')) L.save.flySpeed = Math.min(999, L.save.flySpeed + stp);
+      if (L.hit('Minus') || L.hit('NumpadSubtract') || L.hit('Slash')) L.save.flySpeed = Math.max(1, L.save.flySpeed - stp);
+    }
+    flySpeedUi(true);
+    const sp = L.save.flySpeed / 3.6;
     // in Blickrichtung: nach oben schauen = steigen, nach unten schauen = sinken
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(P.camPitch), spp = Math.sin(P.camPitch);
     let mx = sy * cp * fIn - cy * rIn, my = -spp * fIn, mz = cy * cp * fIn + sy * rIn;
@@ -597,7 +606,7 @@
     if (!L.inDim(P.x)) gY = Math.max(gY, L.WATER_Y);
     P.y = Math.min(450, P.y + P.vy * dt);
     if (P.y <= gY) { P.y = gY; P.vy = Math.max(0, P.vy); if (P.flying === 2) { P.flying = 0; P.air = false; L.snd.land({ x: P.x, y: 0, z: P.z }); L.msg('🦸 Gelandet', 1200); } }
-    L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38, P.y, RES); P.x = RES.x; P.z = RES.z;
+    { const n = Math.min(60, Math.max(1, Math.ceil(Math.hypot(P.vx, P.vz) * dt / 0.5))); for (let i = 0; i < n; i++) { L.collide(P.x + P.vx * dt / n, P.z + P.vz * dt / n, 0.38, P.y, RES); P.x = RES.x; P.z = RES.z; } }
     L.clampWorld(P, true);
     const hsp = Math.hypot(P.vx, P.vz);
     if (hsp > 0.5) P.yaw += L.angDiff(P.yaw, Math.atan2(P.vx, P.vz)) * Math.min(1, dt * 6);
@@ -605,7 +614,7 @@
     if (!block) playerActions(dt);
     updateActions(dt);
     // Superhelden-Pose: nach vorne geneigt, ein Arm voraus, Beine gestreckt
-    const r = P.rig, tilt = L.clamp(hsp / 48, 0, 1);
+    const r = P.rig, tilt = L.clamp(hsp / 30, 0, 1);
     r.root.position.set(P.x, P.y, P.z); r.root.rotation.set(0, P.yaw, 0); r.root.rotateX(tilt * 1.1);
     L.setHeld(r, selType());
     P.phase += dt * 3;
@@ -616,6 +625,20 @@
     if (r.cape) r.cape.rotation.x = 0.3 + tilt * 1.1 + Math.sin(P.phase * 6) * 0.08;
     if (hsp > 20 && Math.random() < dt * 20) L.fx('#ffffff', P.x - P.vx * 0.05, P.y + 1, P.z - P.vz * 0.05, 1, 0.3, { size: 0.15, life: 0.4 });
   }
+  // Anzeige + Schieberegler fürs Flugtempo
+  let fsEl = null;
+  function flySpeedUi(show) {
+    if (!fsEl) {
+      fsEl = document.createElement('div'); fsEl.id = 'flySpd';
+      fsEl.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;padding:6px 12px;border-radius:10px;z-index:9;font-weight:700;text-align:center;font-size:14px';
+      fsEl.innerHTML = '🦸 Flugtempo: <b></b> km/h <small>(+ / −, Shift = 100er)</small><br><input type="range" min="1" max="999" style="width:min(320px,70vw)">';
+      document.body.appendChild(fsEl);
+      const inp = fsEl.querySelector('input'); inp.oninput = () => { L.save.flySpeed = +inp.value; L.persist(); };
+    }
+    fsEl.hidden = !show;
+    if (show) { const v = Math.round(L.save.flySpeed); fsEl.querySelector('b').textContent = v; const inp = fsEl.querySelector('input'); if (document.activeElement !== inp) inp.value = v; }
+  }
+  L.flySpeedUi = flySpeedUi;
   function playerActions() {
     const st = selType();
     // Interaktion
@@ -795,7 +818,7 @@
   }
   function nearestVehicle() {
     let best = null, bd = 3.8;
-    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z) - (v.t.len > 6 ? 3.5 : 0); if (d < bd && v.hp > 0 && seatFor(v) >= 0) { bd = d; best = v; } }
+    for (const v of E.vehicles) { const d = L.dist(P.x, P.z, v.x, v.z) - (v.t.len > 6 ? 3.5 : 0); if (d < bd && v.hp > 0 && !v.t.police && seatFor(v) >= 0) { bd = d; best = v; } }
     return best;
   }
   L.interactHint = function () {
@@ -896,6 +919,7 @@
   }
   function enterVehicle(v) {
     P.flying = 0;
+    if (!v.t.police) L.myVeh = v;
     const seat = seatFor(v);
     if (seat < 0) { L.msg('Kein Platz mehr frei.'); return; }
     P.vehicle = v; P.seat = seat; P.belted = false; P.stance = 'stand'; P.vx = P.vz = 0; P.beltWarnT = 2;
@@ -1030,6 +1054,16 @@
     }
     if (!block && L.hit('KeyT') && t.teleport) { if (P.tpCd > 0) L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); else teleportVehicle(v); }
     if (t.fly) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
+    else if (t.jetFly) {
+      v.jetCd = Math.max(0, (v.jetCd || 0) - dt);
+      if (!block && L.hit('KeyE') && !v.jetOn && !v.jetLand) {
+        if (v.jetCd > 0) L.msg('⏳ Die Düsen kühlen noch ab … ' + Math.ceil(v.jetCd) + ' s', 1500);
+        else { v.jetOn = true; v.jetT = 30; v.vy = 8; L.msg('🚀 ' + t.name + ' fliegt! 30 Sekunden – E/R hoch, C runter', 3000); L.snd.teleport && L.snd.teleport({ x: v.x, y: 1, z: v.z }); }
+      }
+      if (v.jetOn) { v.jetT -= dt; if (v.jetT <= 0) { v.jetOn = false; v.jetLand = true; v.jetCd = 30; L.msg('⚠️ Flugzeit vorbei – Landung! 30 s Pause', 3000); } }
+      if (v.jetOn) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && L.keys.KeyC);
+      else if (v.jetLand) { updateFlight(v, dt, false, true); const fl = flyFloor(v.x, v.z); if ((v.alt || 0) <= Math.max(fl, L.waterDepth(v.x, v.z) > 0.3 ? 0 : fl) + 0.05) { v.jetLand = false; v.alt = 0; v.vy = 0; } }
+    }
     if (t.sub) L.updateSub(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight), !block && L.hit('Space'));
     if (t.plane) updatePlane(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && (L.keys.KeyC || L.keys.ShiftLeft || L.keys.ShiftRight));
     v.whIn = !block && t.wheelie && !(t.fly && (v.alt || 0) > 0.3) && (L.keys.ShiftLeft || L.keys.ShiftRight);
@@ -1151,7 +1185,7 @@
       if (wd < 0.7 && !L.inDim(v.x)) { v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0; if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('🚤 Hier ist es zu flach für das Boot.', 2000); } }
     } else if (t.sub) {
       if (wd < 1.8 && !L.inDim(v.x)) { v.x = ox; v.z = oz; v.speed *= -0.2; v.lat = 0; if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg('⚓ Das U-Boot fährt nur im Wasser.', 2000); } }
-    } else if (!t.fly && !(t.plane && alt > 0.5) && wd > 0.9 && !L.inDim(v.x)) {
+    } else if (!t.fly && !t.waterOk && !(t.plane && alt > 0.5) && wd > 0.9 && !L.inDim(v.x)) {
       // ins Wasser gefahren: Motor säuft ab, das Fahrzeug wird langsam und geht kaputt
       v.speed = L.clamp(v.speed, -2.5, 2.5); v.hp -= dt * 6;
       if (wd > 2.6) { v.speed = 0; v.hp = Math.min(v.hp, 0); }
@@ -1160,7 +1194,7 @@
       if (isPlayer && !(v.waterMsgT > 0)) { v.waterMsgT = 4; L.msg(wd > 2.6 ? '🌊 Das Fahrzeug ist abgesoffen – steig aus und schwimm!' : '🌊 Der Motor säuft ab!', 3000); L.nz({ dur: 0.6, f: 700, type: 'bandpass', vol: 0.3 }); }
     }
     v.waterMsgT = (v.waterMsgT || 0) - dt;
-    if (!(wd > 1.2) || t.boat || t.sub || t.fly || (alt || 0) > 0.5 || L.inDim(v.x)) v.sink = Math.max(0, (v.sink || 0) - dt * 2);
+    if (!(wd > 1.2) || t.boat || t.sub || t.fly || t.waterOk || (alt || 0) > 0.5 || L.inDim(v.x)) v.sink = Math.max(0, (v.sink || 0) - dt * 2);
     // Optik
     v.wheel += v.speed * dt / 0.35;
     for (const w of v.rig.wheels) w.rotation.x = v.wheel;
@@ -1291,6 +1325,12 @@
   }
   function updateVehicles(dt) {
     for (const v of E.vehicles) {
+      if (v.t.police) {
+        if (isClient()) { if (v.netPose) netVeh(v, dt); else settleVehicle(v, dt); }
+        else if (L.updatePoliceCar) L.updatePoliceCar(v, dt);
+        v.rig.root.visible = L.dist(P.x, P.z, v.x, v.z) < 450;
+        continue;
+      }
       if (v === P.vehicle && !(P.seat > 0)) continue;
       if (v.netPose) { netVeh(v, dt); continue; }
       if (v === P.vehicle) continue;
@@ -2653,7 +2693,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2753,6 +2793,7 @@
       }
     }
     for (const [x, z] of [[-114, 150], [1180, -880], [114, -150]]) { if (!L.queryBoxes(x, z, 6).length) spawnVehicle({ type: 'heli', x, z, yaw: Math.random() * 6 }); }
+    if (L.spawnPolice) L.spawnPolice();
     // genau ein Flugzeug, irgendwo auf freiem Land
     for (let i = 0; i < 80; i++) {
       const x = L.rand(-1300, 1300), z = L.rand(-1300, 1300);
@@ -2909,6 +2950,7 @@
     L.updateIslands(dt);
     if (L.updateIslandBosses) L.updateIslandBosses(dt);
     if (L.updateDimBoss) L.updateDimBoss(dt);
+    if (L.updatePolice) L.updatePolice(dt);
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);
@@ -2963,5 +3005,7 @@
   };
   L.updateMenuFx = updateFx;
   // interne Funktionen für den Mehrspieler-Teil (mp.js)
+  L._drive = (v, dt, thr, str, hb) => driveVehicle(v, dt, thr, str, hb, false);
+  L._players = () => players(); L._killPlayer = (c) => killPlayer(c); L.safeIn = (x, z) => safeIn(x, z); L._isHost = () => isHost(); L._isClient = () => isClient();
   L._g = { spawnMonster, spawnWalker, spawnNpc, spawnVehicle, clearAll, resetPlayer, removeItem, initGait, gait, MDIFF, NDIFF, players, farSpot };
 })();

@@ -157,7 +157,7 @@
     $('tFly').hidden = inV || !(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
     $('tCust').hidden = !(L.wsHint && L.wsHint());
     $('tDown').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane || P.vehicle.t.sub) || P.seat > 0;
-    $('tUp').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane || P.vehicle.t.sub) || P.seat > 0;
+    $('tUp').hidden = !inV || !(P.vehicle.t.fly || P.vehicle.t.plane || P.vehicle.t.sub || P.vehicle.t.jetFly) || P.seat > 0;
     $('tBrake').textContent = inV && P.vehicle.t.sub ? '🚀' : '🛑';
     $('tChat').hidden = !(L.net && L.net.connected);
     const it = L.selType ? L.selType() : null;

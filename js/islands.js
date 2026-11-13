@@ -29,7 +29,10 @@
       npc: { top: ['anzug', 'hemd', 'regenjacke'], topColor: ['#2a6ac0', '#f2f2f2', '#6a3a8a'], hat: ['keine', 'zylinder'] }, veh: ['sportwagen', 'joyort6e', 'kleinwagen'], vehCol: '#80d8ff', music: ['drift', 'calm'] },
     { id: 'geist', name: 'Geisterinsel', icon: '👻', x: -4800, z: -4800, r: 700, ground: ['#4a4a44', '#3a3a36'], beach: '#6a6a60', tint: '#9aa0a8', sky: '#707880', weather: 'nebel',
       tree: 'tot', treeCol: ['#2a2622', '#3a3430'], bld: 'gruft', bldCol: ['#6a6a66', '#4a4a46'], mon: ['starrende', 'langer', 'viktor', 'schwelle', 'rufer', 'daniel'], monTint: '#b0c0c8',
-      npc: { top: ['anzug', 'kittel', 'lederjacke'], topColor: ['#1a1a1a', '#7a7a7a', '#f2f2f2'], hat: ['zylinder', 'keine'] }, veh: ['limousine', 'kleinwagen', 'roller'], vehCol: '#1a1a1a', music: ['night', 'nightB'] }
+      npc: { top: ['anzug', 'kittel', 'lederjacke'], topColor: ['#1a1a1a', '#7a7a7a', '#f2f2f2'], hat: ['zylinder', 'keine'] }, veh: ['limousine', 'kleinwagen', 'roller'], vehCol: '#1a1a1a', music: ['night', 'nightB'] },
+    { id: 'oma', name: 'Omas Garteninsel', icon: '🧶', x: 6500, z: 6500, r: 650, ground: ['#7ab85a', '#6aa84a'], beach: '#e8dca0', tint: '#ffe0f0', sky: '#f0d8e8', weather: 'klar',
+      tree: 'obst', treeCol: ['#5a3a20', '#3a8a3a'], bld: 'haeuschen', bldCol: ['#f2e8d8', '#e8c8c8', '#d8e8f0'], mon: ['walross', 'rufer', 'blockling', 'schwelle', 'langer', 'starrende'], monTint: '#ffb0d0',
+      npc: { top: ['pullover', 'weste', 'hemd'], topColor: ['#a04a6a', '#d8b46a', '#6a3a8a', '#f2f2f2'], hat: ['keine', 'sonnenhut'] }, veh: ['kleinwagen', 'roller', 'limousine'], vehCol: '#e8a0c0', music: ['calm', 'wander'] }
   ];
   L.ISL = ISL;
   for (const I of ISL) L.ISLANDS.push(I);
@@ -110,6 +113,13 @@
       } else if (I.bld === 'kristallturm') {
         const s = big ? 10 : 4; for (let k = 0; k < (big ? 5 : 3); k++) addInst(mC, x + (R() - 0.5) * s, (big ? 22 : 8) * 0.5 * (1 - k * 0.15), z + (R() - 0.5) * s, s * 0.7, (big ? 44 : 16) * (1 - k * 0.15), s * 0.7, R() * 3, bc(), (R() - 0.5) * 0.3);
         L.addBox(x - s, z - s, x + s, z + s, big ? 40 : 14, 'building');
+      } else if (I.bld === 'haeuschen') {
+        // Omas Häuschen: weiße Wände, rotes Dach, Schornstein, Blumenkästen
+        const w = big ? 16 : 8, d2 = w * 0.8, h = big ? 7 : 4;
+        addInst(mB, x, 0, z, w, h, d2, ry, bc()); addInst(mR, x, h, z, w * 0.82, h * 0.75, d2 * 0.82, ry, '#b04a3a');
+        addInst(mB, x + Math.cos(ry) * w * 0.25, h, z - Math.sin(ry) * w * 0.25, 1, h * 0.8, 1, ry, '#8a5a4a');
+        for (const s2 of [-1, 1]) addInst(mB, x + Math.sin(ry) * d2 * 0.51 + Math.cos(ry) * s2 * w * 0.25, h * 0.35, z + Math.cos(ry) * d2 * 0.51 - Math.sin(ry) * s2 * w * 0.25, w * 0.2, 0.4, 0.5, ry, s2 > 0 ? '#e04a8a' : '#e8c020');
+        L.addBox(x - w / 2, z - w / 2, x + w / 2, z + w / 2, h, 'building');
       } else {
         // Gruft und Grabsteine
         if (big) { addInst(mB, x, 0, z, 12, 8, 16, ry, bc()); addInst(mR, x, 8, z, 9, 5, 12, ry, '#3a3a36'); L.addBox(x - 8, z - 8, x + 8, z + 8, 8, 'building'); }
@@ -125,6 +135,7 @@
       else if (I.tree === 'dschungel') { addInst(mY, x, 0, z, 0.7 * s, 14 * s, 0.7 * s, 0, '#4a3a20'); addInst(mS, x, 14 * s, z, 5 * s, 3 * s, 5 * s, 0, c0); addInst(mS, x + 2 * s, 12 * s, z, 3 * s, 2 * s, 3 * s, 0, c1); }
       else if (I.tree === 'gold') { addInst(mY, x, 0, z, 0.5 * s, 6 * s, 0.5 * s, 0, c0); addInst(mS, x, 7 * s, z, 3.5 * s, 3 * s, 3.5 * s, 0, c1); }
       else if (I.tree === 'pilz') { addInst(mY, x, 0, z, 0.6 * s, 4 * s, 0.6 * s, 0, c0); addInst(mS, x, 4.2 * s, z, 3 * s, 1.4 * s, 3 * s, 0, R() < 0.5 ? c1 : '#6a8aff'); }
+      else if (I.tree === 'obst') { addInst(mY, x, 0, z, 0.4 * s, 3 * s, 0.4 * s, 0, '#6a4a2a'); addInst(mS, x, 4 * s, z, 2.6 * s, 2.2 * s, 2.6 * s, 0, c1); for (let k = 0; k < 4; k++) addInst(mS, x + Math.sin(k * 1.6) * 1.9 * s, 3.6 * s + (k % 2) * 0.8 * s, z + Math.cos(k * 1.6) * 1.9 * s, 0.32 * s, 0.32 * s, 0.32 * s, 0, k % 2 ? '#d02a2a' : '#e8c020'); }
       else if (I.tree === 'kristall') { addInst(mC, x, 2.5 * s, z, 1.2 * s, 5 * s, 1.2 * s, R() * 3, R() < 0.5 ? c0 : c1, (R() - 0.5) * 0.4); }
       else { addInst(mY, x, 0, z, 0.35 * s, 6 * s, 0.35 * s, 0, c0); for (let k = 0; k < 3; k++) addInst(mY, x, 3.5 * s + k, z, 0.12 * s, 2.5 * s, 0.12 * s, 0, c1); }
       L.addBox(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 6, 'tree');

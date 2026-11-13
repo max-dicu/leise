@@ -34,6 +34,7 @@
     const hp = REV[type];
     P.alive = true; P.hp = hp; P.deathT = 0; P.spawnProt = Math.max(P.spawnProt || 0, 5); P.stance = 'crouch'; P.vx = P.vz = 0;
     L.spectate = null; box.hidden = true; lastHtml = ''; giveUp = false; unlocked = false;
+    if (L.policeRelease && L.policeRelease()) { if (L.state === 'game' && L.lock && !L.uiBlock) L.lock(); return; }
     if (L.music && L.music.set) L.music.set('calm');
     L.msg('💚 Du hast dich selbst verarztet! ' + L.ITEMS[type].icon + ' ' + L.ITEMS[type].name + ': ' + hp + ' Leben – 5 Sekunden Schutz, verschwinde!', 6000);
     if (L.snd.heal) L.snd.heal();
@@ -130,6 +131,7 @@
     hp = Math.max(10, Math.min(100, +hp || 35));
     P.alive = true; P.hp = hp; P.deathT = 0; P.spawnProt = Math.max(P.spawnProt || 0, 4); P.stance = 'crouch'; P.vx = P.vz = 0;
     L.spectate = null; box.hidden = true; lastHtml = '';
+    if (L.policeRelease) L.policeRelease();
     if (L.music && L.music.set) L.music.set('calm');
     L.msg('💚 ' + by + ' hat dich wiederbelebt! ' + (L.ITEMS[it] ? L.ITEMS[it].icon + ' ' : '') + Math.round(hp) + ' Leben', 6000);
     if (L.snd.heal) L.snd.heal();
