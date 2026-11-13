@@ -161,7 +161,8 @@
     removeRemote(pid);
     const rig = L.buildHuman(app || L.DEFAULT_CHAR); rig.root.visible = false;
     if (L.scene) L.scene.add(rig.root);
-    const tag = nameTag(name, mp.color(pid)); tag.position.y = 2.2; rig.root.add(tag);
+    const admin = app && app.special === 'waechter' && L.waechterOk && L.waechterOk(app);
+    const tag = nameTag(admin ? '🛡️ ADMIN · ' + name : name, admin ? '#ffd040' : mp.color(pid)); tag.position.y = 2.2; rig.root.add(tag);
     const r = { kind: 'remote', key: 'remote' + pid, pid, rig, name, app, x: 0, y: 0, z: 0, yaw: 0, nx: 0, ny: 0, nz: 0, nyaw: 0, alive: true, inRound: false, gone: false, stance: 'stand', moving: false, inVeh: false, vehId: 0, seat: 0, flash: false, hp: 100, st: { mode: 'walk' }, held: null, got: false, dead: false, acc: 0 };
     RM.set(pid, r);
     return r;

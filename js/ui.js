@@ -119,6 +119,18 @@
     P.bag.forEach((it, i) => bag.appendChild(slotEl(it, { label: ' ', sel: invSel && invSel.where === 'bag' && invSel.key === i, onclick: () => clickSlot('bag', i) })));
     safe.appendChild(slotEl(P.safe, { label: 'Tresor', sel: invSel && invSel.where === 'safe', onclick: () => { if (P.safe) { invSel = { where: 'safe' }; renderInv(); } } }));
     renderInvActions();
+    // Admin (nur mit Anzug): alle Items holen
+    let ab = $('adminItems');
+    if (L.suitOn && L.suitOn()) {
+      if (!ab) {
+        ab = document.createElement('button'); ab.id = 'adminItems'; ab.className = 'btn'; ab.textContent = '🛡️ ADMIN: Alle Items'; ab.style.cssText = 'margin:6px 0;background:#3a0a0a;color:#ffd040;border:2px solid #ffd040';
+        bag.parentNode.insertBefore(ab, bag); ab.onclick = () => { const l = $('adminList'); l.hidden = !l.hidden; };
+        const l = document.createElement('div'); l.id = 'adminList'; l.hidden = true; l.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px;max-height:220px;overflow:auto;margin:4px 0;padding:6px;background:#1a0606;border:1px solid #ffd040;border-radius:8px';
+        for (const [k, d] of Object.entries(L.ITEMS)) { if (k === 'hammer') continue; const b = document.createElement('button'); b.className = 'btn'; b.style.cssText = 'font-size:12px;padding:4px'; b.textContent = d.icon + ' ' + d.name; b.onclick = () => { const left = L.giveItem(k, d.stack || 1, d.mag); if (left > 0) L.msg('🎒 Inventar voll!'); else L.msg('+ ' + d.icon + ' ' + d.name); renderInv(); }; l.appendChild(b); }
+        bag.parentNode.insertBefore(l, bag);
+      }
+      ab.hidden = false; bag.style.maxHeight = '260px'; bag.style.overflow = 'auto';
+    } else if (ab) { ab.hidden = true; $('adminList').hidden = true; }
   }
   function getSel() {
     if (!invSel) return null;

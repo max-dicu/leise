@@ -239,6 +239,9 @@
     }
     for (let i = giants.length - 1; i >= 0; i--) {
       const G0 = giants[i], d = L.dist(G0.x, G0.z, P.x, P.z);
+      // stampft auf, wenn er dich erreicht (Wellen + Schaden)
+      G0.cd = (G0.cd || 0) - dt;
+      if (d < 34 && G0.cd <= 0 && P.alive && (P.y || 0) < 20) { G0.cd = 3; L.hurtPlayer(28 * (L.md ? L.md.dmg : 1), 'Vom Meeresriesen unter Wasser gedrückt'); L.shake = Math.max(L.shake, 1); L.fx('#e8f4ff', P.x, 0, P.z, 30, 10, { size: 1, life: 1.2 }); if (P.vehicle) { P.vehicle.speed *= 0.3; P.vehicle.hp -= 15; } }
       G0.yaw += L.angDiff(G0.yaw, Math.atan2(P.x - G0.x, P.z - G0.z)) * Math.min(1, dt);
       if (d > 30) { G0.x += Math.sin(G0.yaw) * 22 * dt; G0.z += Math.cos(G0.yaw) * 22 * dt; }
       G0.ph += dt * 1.5;

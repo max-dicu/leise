@@ -226,6 +226,8 @@
       const S = e.S || 9, y0 = e.rootY || 0;
       if (e.type === 'walross' || !e.type) out.push([e.x, y0 + S * 1.1, e.z, S * 1.4, 1], [e.x + Math.sin(e.yaw) * S * 2.4, y0 + S * 1.6, e.z + Math.cos(e.yaw) * S * 2.4, S * 0.8, 2]);
       else out.push([e.x, y0 + S * 1.2, e.z, S * 0.5, 1], [e.x, y0 + S * 1.9, e.z, S * 0.55, 1], [e.x, y0 + S * GBT[e.type].top, e.z, S * 0.3, 2]);
+    } else if (e.kind === 'tentakel') {
+      for (const s of e.sph) out.push(s);
     } else if (e.kind === 'dwurm') {
       for (const s of e.sph) out.push(s);
     } else if (e.kind === 'boss') {
@@ -241,6 +243,7 @@
     if (L.boss && !L.boss.dead) a.push(L.boss);
     if (L.wboss && !L.wboss.leaving) a.push(L.wboss);
     if (L.dimWorm && !L.dimWorm.dead && L.inDim(P.x)) a.push(L.dimWorm);
+    if (L.tentacleEnts) for (const e of L.tentacleEnts) if (!e.dead && e.rig.root.visible) a.push(e);
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
@@ -289,6 +292,7 @@
   L.damageEnt = function (e, dmg, fromX, fromZ, src) {
     if (e.dead) return;
     if (e.kind === 'dwurm') { if (L.dimWormHit) L.dimWormHit(dmg, src); return; }
+    if (e.kind === 'tentakel') { if (L.tentHit) L.tentHit(e, dmg); return; }
     if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
@@ -429,7 +433,7 @@
     if (P.rig) L.scene.remove(P.rig.root);
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
     L.scene.add(P.rig.root);
-    if (L.suitOn()) { P.hot[1] = { type: 'donneraxt', count: 1, mag: 1 }; }
+    if (L.suitOn()) { P.hot[1] = { type: 'donneraxt', count: 1, mag: 1 }; P.bag = new Array(75).fill(null); }
   }
   function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
   function selType() { const it = selItem(); return it ? it.type : null; }
@@ -474,6 +478,16 @@
       else if (typeof e.hp === 'number' && e.hp > 1) L.damageEnt(e, e.hp - 1, P.x, P.z, P);
       L.msg('⚡ Donnerschlag! Nur noch 1 Leben übrig.', 1500);
     }
+  }
+  // ADMIN-Schild über dem eigenen Kopf (nur mit dem Anzug)
+  let adminTag = null;
+  function updateAdminTag() {
+    const on = L.suitOn && L.suitOn() && P.rig;
+    if (on && (!adminTag || adminTag.parent !== P.rig.root)) {
+      if (!adminTag) { adminTag = new T.Sprite(new T.SpriteMaterial({ map: L.textTex('🛡️ ADMIN', 256, 56, '#3a0a0a', '#ffd040', 'bold 40px Arial'), depthTest: false, transparent: true })); adminTag.scale.set(1.6, 0.35, 1); adminTag.renderOrder = 999; }
+      P.rig.root.add(adminTag); adminTag.position.y = 2.45;
+    }
+    if (adminTag) adminTag.visible = !!on;
   }
   const SPEED = { crawl: 1.1, crouch: 2.1, walk: 4.0, run: 7.3, idle: 0 };
   const STEP = { crawl: [0.5, 0, 0.015], crouch: [0.6, 0, 0.03], walk: [0.75, 7, 0.1], run: [1.1, 24, 0.22] };
@@ -2758,7 +2772,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -3022,6 +3036,8 @@
     if (L.updatePolice) L.updatePolice(dt);
     if (L.updateCrates) L.updateCrates(dt);
     if (L.updateMoon) L.updateMoon(dt);
+    if (L.updateTentacles) L.updateTentacles(dt);
+    updateAdminTag();
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);

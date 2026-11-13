@@ -123,9 +123,10 @@
   }
   function updateHunters(dt) {
     const v = P.vehicle, sub = v && v.t.sub && (v.alt || 0) < -12;
-    if (sub && hunters.length < 3 && Math.random() < dt * 0.15 && L.openSea(v.x, v.z) > 200 && !isClient()) {
-      const a = Math.random() * 6.28, h = buildHunter(), y = Math.max(L.seaFloor(v.x, v.z) + 6, (v.alt || 0) - 10);
-      h.x = v.x + Math.sin(a) * 140; h.z = v.z + Math.cos(a) * 140; h.y = y; h.trail = []; h.bite = 0; hunters.push(h);
+    const diver = !v && L.underwaterDive && P.y < -8;
+    if ((sub || diver) && hunters.length < 3 && Math.random() < dt * 0.15 && L.openSea(P.x, P.z) > 200 && !isClient()) {
+      const a = Math.random() * 6.28, h = buildHunter(), y = Math.max(L.seaFloor(P.x, P.z) + 6, (v ? (v.alt || 0) : P.y) - 10);
+      h.x = P.x + Math.sin(a) * 140; h.z = P.z + Math.cos(a) * 140; h.y = y; h.trail = []; h.bite = 0; hunters.push(h);
       L.msg('🐟 Ein Tiefenjäger hat dich entdeckt! Nitro-Kristalle helfen beim Entkommen.', 3500);
       L.tn({ f: 90, fTo: 60, dur: 1.5, type: 'sawtooth', vol: 0.25, pos: { x: h.x, y: h.y, z: h.z }, ref: 30 });
     }
@@ -139,7 +140,9 @@
       h.segs.forEach((s, k) => { const p = h.trail[Math.min(h.trail.length - 1, k * 3)]; s.position.set(p[0], p[1] + Math.sin(performance.now() / 200 + k) * 0.3, p[2]); if (k === 0) s.lookAt(tx, ty, tz); });
       h.bite -= dt;
       if (d < 7 && h.bite <= 0 && v && v.t.sub) { h.bite = 2; v.hp -= 25; L.snd.crash(0.8, { x: h.x, y: h.y, z: h.z }); L.shake = Math.max(L.shake, 1); L.msg('🐟 Der Tiefenjäger beißt ins U-Boot! (' + Math.max(0, Math.round(v.hp / v.t.hp * 100)) + '%)', 2000); if (v.hp <= 0) L.msg('💥 Das U-Boot ist kaputt – raus und hoch!', 3000); }
-      if (!sub && d > 250 || d > 600) { L.scene.remove(h.g); hunters.splice(i, 1); }
+      // Schwimmer/Taucher und Boote werden auch gebissen
+      if (d < 4.5 && h.bite <= 0 && !(v && v.t.sub) && P.alive) { h.bite = 1.6; if (v) { v.hp -= 20; L.hurtPlayer(12 * (L.md ? L.md.dmg : 1), 'Vom Tiefenjäger aus dem Boot gerissen'); } else L.hurtPlayer(24 * (L.md ? L.md.dmg : 1), 'Vom Tiefenjäger gebissen'); L.blood(P.x, P.y + 1, P.z, 12); L.shake = Math.max(L.shake, 0.7); }
+      if (!sub && !diver && d > 250 || d > 600) { L.scene.remove(h.g); hunters.splice(i, 1); }
     }
   }
 
