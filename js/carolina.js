@@ -51,7 +51,7 @@
 
   // ---------- Die wahre Carolina ----------
   let C = null;
-  const HP = 4000;
+  const HP = 4000, SZ = 3; // SZ: Größe (3x so groß wie vorher)
   function build() {
     const app = Object.assign({}, L.DEFAULT_CHAR, { name: 'Carolina', skin: '#e8d2c4', hair: 'emo', hairColor: '#0e0e12', eyes: '#3a2a3a', brows: 'boese', mouth: 'ernst',
       top: 'tanktop', topColor: '#141418', pants: 'skinny', pantsColor: '#141418', shoeType: 'stiefel', shoes: '#0e0e0e', build: 'extrem', height: 'sehr_gross' });
@@ -72,14 +72,14 @@
     add(r.head, L.GEO.sph, L.mat('#d0d0d8'), 0.012, 0.012, 0.012, 0.02, 0.06, 0.155);
     add(r.head, L.GEO.sph, L.mat('#d0d0d8'), 0.01, 0.01, 0.01, 0.075, 0.2, 0.13);
     for (const a of r.arms) for (let k = 0; k < 4; k++) add(a.elbow, L.GEO.box, L.mat(k % 2 ? '#c02a2a' : '#141418'), 0.13, 0.05, 0.13, 0, -0.06 - k * 0.055, 0);
-    r.root.scale.set(2.9, 1.9, 2.5);
+    r.root.scale.set(2.9 * SZ, 1.9 * SZ, 2.5 * SZ);
     r.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     L.scene.add(r.root);
     return r;
   }
   function spawnC() {
     const M = L.MIL, rig = build();
-    C = { kind: 'carolina', rig, x: (M.x1 + M.x2) / 2, z: (M.z1 + M.z2) / 2, yaw: 0, hp: HP, state: 'wander', tx: 0, tz: 0, t: 0, ph: 0, searchT: 0, cd: 0, bigR: 2, hitR: 40, stepT: 0, growlT: 0, dead: false, deadT: 0 };
+    C = { kind: 'carolina', rig, x: (M.x1 + M.x2) / 2, z: (M.z1 + M.z2) / 2, yaw: 0, hp: HP, state: 'wander', tx: 0, tz: 0, t: 0, ph: 0, searchT: 0, cd: 0, bigR: 6, hitR: 60, stepT: 0, growlT: 0, dead: false, deadT: 0 };
     pickGoal();
   }
   function pickGoal() { const M = L.MIL; C.tx = L.rand(M.x1 + 15, M.x2 - 15); C.tz = L.rand(M.z1 + 15, M.z2 - 15); }
@@ -115,21 +115,21 @@
     const nr = playerNoise();
     if (nr > 0 && dP < nr) alertTo(P.x, P.z, false);
     // Bewegung
-    const spd = C.state === 'chase' ? (C.rage > 0 ? 9 : 7) : C.state === 'search' ? 2.5 : 2.2;
+    const spd = C.state === 'chase' ? (C.rage > 0 ? 10 : 8) : C.state === 'search' ? 3 : 3;
     let dx = C.tx - C.x, dz = C.tz - C.z, d = Math.hypot(dx, dz);
     if (C.state === 'search') { C.searchT -= dt; C.yaw += Math.sin(C.t * 1.3) * dt; if (C.searchT <= 0) { C.state = 'wander'; pickGoal(); } }
     else if (d < 2) { if (C.state === 'chase') { C.state = 'search'; C.searchT = 6; } else pickGoal(); }
     else {
       const want = Math.atan2(dx, dz); C.yaw += L.angDiff(C.yaw, want) * Math.min(1, dt * 5);
       const nx = C.x + Math.sin(C.yaw) * spd * dt, nz = C.z + Math.cos(C.yaw) * spd * dt;
-      L.collide(nx, nz, 1.6, undefined, RES);
+      L.collide(nx, nz, 3, undefined, RES);
       const moved = Math.hypot(RES.x - C.x, RES.z - C.z);
-      C.x = L.clamp(RES.x, M.x1 + 2.5, M.x2 - 2.5); C.z = L.clamp(RES.z, M.z1 + 2.5, M.z2 - 2.5);
-      if (moved < spd * dt * 0.2) { C.stuck = (C.stuck || 0) + dt; if (C.stuck > 1.5) { C.stuck = 0; if (C.state === 'wander') pickGoal(); else C.yaw += 1.2; } } else C.stuck = 0;
+      C.x = L.clamp(RES.x, M.x1 + 4, M.x2 - 4); C.z = L.clamp(RES.z, M.z1 + 4, M.z2 - 4);
+      if (moved < spd * dt * 0.2) { C.stuck = (C.stuck || 0) + dt; if (C.stuck > 1.5) { C.stuck = 0; if (C.state === 'wander') pickGoal(); else { C.x = L.clamp(nx, M.x1 + 4, M.x2 - 4); C.z = L.clamp(nz, M.z1 + 4, M.z2 - 4); } } } else C.stuck = 0;
     }
     // Erwischt: ein Schlag (Admin bleibt heil)
-    const reach = 2.6 + (P.vehicle ? P.vehicle.t.len * 0.4 : 0);
-    if (P.alive && !P.gone && dP < reach && Math.abs((P.y || 0) - 0) < 4 && C.cd <= 0 && (C.state === 'chase' || dP < 1.8)) {
+    const reach = 6.5 + (P.vehicle ? P.vehicle.t.len * 0.4 : 0);
+    if (P.alive && !P.gone && dP < reach && Math.abs((P.y || 0) - 0) < 12 && C.cd <= 0 && (C.state === 'chase' || dP < 4.5)) {
       C.cd = 1.2; C.yaw = Math.atan2(P.x - C.x, P.z - C.z); L.shake = Math.max(L.shake, 1);
       L.snd.stomp && L.snd.stomp({ x: C.x, y: 1, z: C.z });
       if (P.vehicle && L._leaveVehicle && !(L.suitOn && L.suitOn())) L._leaveVehicle(true);
@@ -137,18 +137,18 @@
       if (P.alive && L.suitOn && L.suitOn()) L.msg('🛡️ Carolina schlägt zu – aber der Anzug hält.', 2000);
     }
     // Aussehen
-    C.ph += dt * (C.state === 'chase' ? 9 : 4);
+    C.ph += dt * (C.state === 'chase' ? 4.2 : 2.2);
     rig.root.position.set(C.x, 0, C.z); rig.root.rotation.set(0, C.yaw, 0);
     L.animHuman(rig, { mode: C.state === 'chase' ? 'run' : 'walk', phase: C.ph, speed: C.state === 'search' ? 0.1 : 1 });
     if (rig.belly) { const j = Math.sin(C.ph * 2) * (C.state === 'chase' ? 0.06 : 0.03); rig.belly.scale.set(1 - j * 0.5, 1 + j, 1); rig.belly.position.y = 0.05 - Math.abs(j) * 0.3; }
     // schwere Schritte
-    C.stepT -= dt * (C.state === 'chase' ? 2.2 : 1);
-    if (C.stepT <= 0 && C.state !== 'search') { C.stepT = 0.9; if (dP < 60) { L.tn && L.tn({ f: 55, fTo: 30, dur: 0.35, vol: Math.max(0.03, 0.3 * (1 - dP / 60)), pos: { x: C.x, y: 0, z: C.z } }); if (dP < 30) L.shake = Math.max(L.shake, 0.08 * (1 - dP / 30)); } }
+    C.stepT -= dt * (C.state === 'chase' ? 1.4 : 0.7);
+    if (C.stepT <= 0 && C.state !== 'search') { C.stepT = 0.9; if (dP < 90) { L.tn && L.tn({ f: 55, fTo: 30, dur: 0.35, vol: Math.max(0.03, 0.3 * (1 - dP / 60)), pos: { x: C.x, y: 0, z: C.z } }); if (dP < 30) L.shake = Math.max(L.shake, 0.08 * (1 - dP / 30)); } }
   }
   L.extraTargets = () => (C && !C.dead && L.MIL ? [C] : []);
   L.carolinaHit = function (dmg, src) {
     if (!C || C.dead || !(dmg > 0)) return;
-    C.hp -= dmg; L.blood && L.blood(C.x, 2.5, C.z, 8);
+    C.hp -= dmg; L.blood && L.blood(C.x, 7, C.z, 10);
     if (L.showBossHp) L.showBossHp('🖤 DIE WAHRE CAROLINA', C.hp, HP);
     if (src) alertTo(src.x, src.z, true);
     if (C.hp <= 0) {
@@ -158,24 +158,32 @@
     }
   };
   // andere Monster kommen nicht in die Basis
-  let pushT = 0;
-  function keepMonstersOut(dt) {
-    pushT -= dt; if (pushT > 0) return; pushT = 0.25;
-    const M = L.MIL;
-    for (const m of E.monsters) {
-      if (m.dead || !L.inMil(m.x, m.z, 1)) continue;
-      const dl = m.x - M.x1, dr = M.x2 - m.x, dt2 = m.z - M.z1, db = M.z2 - m.z, mn = Math.min(dl, dr, dt2, db);
-      if (mn === dl) m.x = M.x1 - 3; else if (mn === dr) m.x = M.x2 + 3; else if (mn === dt2) m.z = M.z1 - 3; else m.z = M.z2 + 3;
-      if (m.prey === P && L.inMil(P.x, P.z)) { m.prey = null; m.state = 'search'; m.timer = 3; }
-    }
+  // Zaun um die Basis (jedes Bild): wer an die Grenze kommt, bleibt außen stehen und verliert die Spur.
+  // Gilt für alle Monster, Laser-Roboter, Tentakel-Maschinen, MAMA IVA und den Walross-Boss.
+  function fence(m, pad) {
+    if (!m || m.dead || m === C || typeof m.x !== 'number' || !L.inMil(m.x, m.z, pad)) return false;
+    const M = L.MIL, dl = m.x - (M.x1 - pad), dr = M.x2 + pad - m.x, dt2 = m.z - (M.z1 - pad), db = M.z2 + pad - m.z, mn = Math.min(dl, dr, dt2, db);
+    if (mn === dl) m.x = M.x1 - pad; else if (mn === dr) m.x = M.x2 + pad; else if (mn === dt2) m.z = M.z1 - pad; else m.z = M.z2 + pad;
+    const root = m.rig && m.rig.root; if (root && root.position) { root.position.x = m.x; root.position.z = m.z; }
+    return true;
   }
+  const lose = (m, st) => { if (st && m.state !== st && (m.kind === 'walker' ? L.inMil(m.aimX, m.aimZ, 4) : true)) m.state = st; if (m.prey && L.inMil(m.prey.x, m.prey.z, 2)) { m.prey = null; if (m.state !== 'dead') m.state = 'search'; m.timer = 3; } if (m.tx !== undefined && L.inMil(m.tx, m.tz, 2)) { m.tx = m.x; m.tz = m.z; } };
+  function keepMonstersOut() {
+    for (const m of E.monsters) if (fence(m, 1.5)) lose(m); else if (!m.dead && m.prey && L.inMil(m.prey.x, m.prey.z, 2) && Math.hypot(m.x - m.prey.x, m.z - m.prey.z) > 30) lose(m);
+    for (const w of E.walkers) if (fence(w, 6)) lose(w, 'patrol');
+    if (L.tentacleEnts) for (const t of L.tentacleEnts) if (fence(t, 12)) lose(t);
+    if (L.boss && !L.boss.dead) fence(L.boss, 25);
+    if (L.wboss && !L.wboss.dead) fence(L.wboss, 15);
+  }
+  L.milFence = keepMonstersOut;
+  L._caro = () => C;
   let toldT = 0;
   L.updateCarolina = function (dt) {
     if (!L.MIL || L.state !== 'game') return;
     if (!panels) buildWalls();
     if (!C) spawnC();
     carVsGlass();
-    if (!L._isClient || !L._isClient()) keepMonstersOut(dt);
+    if (!L._isClient || !L._isClient()) keepMonstersOut();
     updateC(dt);
     toldT -= dt;
     if (toldT <= 0 && L.inMil(P.x, P.z, 4) && P.alive) { toldT = 120; L.banner('🖤 HIER LEBT DIE WAHRE CAROLINA', 'Sie hört dich laufen – aber nicht schleichen (C). Nicht rennen, nicht schießen!'); }
