@@ -236,9 +236,9 @@
   const NAMES = { zimt: 'Zimtschnecken-Walross', roller: 'E-Roller-Walross', naegel: 'Fingernagel-Walross', locken: 'Lockenwickler-Walross', schaum: 'Schaum-Walross', strick: 'Strickpulli-Walross', kaktus: 'Kaktus-Walross', auge: 'Hundert-Augen-Walross', gold: 'Gold-Walross' };
   function summon(lk, n) {
     for (let k = 0; k < n; k++) {
-      const v = VARS[(mins.length + k) % VARS.length], r = L.buildWalross(); decorate(r, v); L.scene.add(r.root);
+      const v = VARS[(mins.length + k) % VARS.length], r = L.buildWalross(); decorate(r, v); r.root.scale.setScalar(3); r.root.visible = false; L.scene.add(r.root);
       const a = Math.random() * 6.28, d = Math.random() * 4;
-      mins.push({ r, v, x: lk.x + Math.sin(a) * d, z: lk.z + Math.cos(a) * d, yaw: a, ph: Math.random() * 6, emerge: -k * 0.3, cd: 0, lk });
+      mins.push({ r, v, x: lk.x, z: lk.z, yaw: a, ph: Math.random() * 6, emerge: -k * 0.5, cd: 0, lk, S: 3 });
     }
   }
   function updateLakes(dt) {
@@ -248,21 +248,38 @@
     const I = boss && boss.I;
     for (let i = mins.length - 1; i >= 0; i--) {
       const m = mins[i]; m.ph += dt * 3;
-      if (m.emerge < 1) { m.emerge += dt * 0.7; const u = Math.max(0, m.emerge); m.r.root.position.set(m.x, -3 + u * 3, m.z); m.r.root.rotation.set(0, m.yaw, 0); L.animWalrossMon(m.r, { mode: 'alert', phase: m.ph }); if (u > 0 && Math.random() < dt * 10) L.fx('#ffffff', m.x, 0.5, m.z, 3, 3, { size: 0.4, life: 0.8 }); continue; }
+      if (!m.landed) {
+        m.emerge += dt;
+        if (m.emerge < 0) { m.r.root.visible = false; continue; }
+        m.r.root.visible = true;
+        if (m.jx === undefined) {
+          const a = Math.random() * 6.28, dd = 18 + Math.random() * 20; m.sx = m.lk.x; m.sz = m.lk.z; m.jx = m.lk.x + Math.sin(a) * dd; m.jz = m.lk.z + Math.cos(a) * dd; m.yaw = a;
+          L.fx('#ffffff', m.sx, 0.5, m.sz, 40, 14, { size: 0.9, life: 1.2 }); L.fx('#7ac8ff', m.sx, 0.5, m.sz, 25, 10, { size: 0.6, life: 1 });
+          L.snd.splat && L.snd.splat({ x: m.sx, y: 1, z: m.sz }); L.snd.walross && L.snd.walross({ x: m.sx, y: 3, z: m.sz });
+        }
+        const u = Math.min(1, m.emerge / 1.3);
+        m.x = L.lerp(m.sx, m.jx, u); m.z = L.lerp(m.sz, m.jz, u);
+        m.r.root.position.set(m.x, -7 + u * 7 + Math.sin(u * Math.PI) * 24, m.z);
+        m.r.root.rotation.set(0, m.yaw, 0); m.r.root.rotateX(-0.9 + u * 1.5);
+        L.animWalrossMon(m.r, { mode: 'run', phase: m.ph * 4 });
+        if (u < 0.25 && Math.random() < dt * 30) L.fx('#e8f8ff', m.x, Math.max(0.5, m.r.root.position.y - 3), m.z, 2, 3, { size: 0.5, life: 0.8 });
+        if (u >= 1) { m.landed = true; L.shake = Math.max(L.shake, 0.6); L.fx('#8a7a60', m.x, 0.5, m.z, 30, 12, { size: 0.8, life: 1.4 }); L.snd.stomp && L.snd.stomp({ x: m.x, y: 0, z: m.z }); m.r.root.rotation.set(0, m.yaw, 0); }
+        continue;
+      }
       if (m.leave) { m.leave += dt; m.r.root.position.y = -m.leave * 2.5; if (m.leave > 1.6) { L.scene.remove(m.r.root); mins.splice(i, 1); } continue; }
       if (cine) { L.animWalrossMon(m.r, { mode: 'search', phase: m.ph }); m.r.root.position.set(m.x, 0, m.z); continue; }
       // hören: wer nicht schleicht, wird gejagt (100 km/h). Wer schleicht, wird nur beim direkten Anrempeln bemerkt
       const st = STATS[m.v], d = Math.hypot(P.x - m.x, P.z - m.z), loud = P.stance === 'stand' || !!P.vehicle;
       const canHunt = P.alive && !P.gone && I && L.curIsland === I && !L.islandSafe(P.x, P.z) && !(P.spawnProt > 0) && !L.cine;
-      const hunt = canHunt && ((loud && d < 130 * (st.hear || 1)) || d < 1.8);
+      const hunt = canHunt && ((loud && d < 130 * (st.hear || 1)) || d < 1.8 * (m.S || 1));
       let tx, tz, spd;
       if (hunt) { tx = P.x; tz = P.z; spd = 100 / 3.6; }
       else { m.wt = (m.wt || 0) - dt; if (!m.wx || m.wt <= 0) { const a = Math.random() * 6.28, dd = 6 + Math.random() * 30; m.wx = m.lk.x + Math.sin(a) * dd; m.wz = m.lk.z + Math.cos(a) * dd; m.wt = 4 + Math.random() * 4; } tx = m.wx; tz = m.wz; spd = 4; }
       const dd = Math.hypot(tx - m.x, tz - m.z);
-      if (dd > 1.5) { m.yaw += L.angDiff(m.yaw, Math.atan2(tx - m.x, tz - m.z)) * Math.min(1, dt * 6); const n = Math.ceil(spd * dt / 1); for (let s = 0; s < n; s++) { L.collide(m.x + Math.sin(m.yaw) * spd * dt / n, m.z + Math.cos(m.yaw) * spd * dt / n, 1.4, 0, RES); m.x = RES.x; m.z = RES.z; } }
+      if (dd > 1.5) { m.yaw += L.angDiff(m.yaw, Math.atan2(tx - m.x, tz - m.z)) * Math.min(1, dt * 6); const n = Math.ceil(spd * dt / 1); for (let s = 0; s < n; s++) { L.collide(m.x + Math.sin(m.yaw) * spd * dt / n, m.z + Math.cos(m.yaw) * spd * dt / n, 1.4 * (m.S || 1), 0, RES); m.x = RES.x; m.z = RES.z; } }
       // zuschlagen
       m.cd -= dt;
-      if (hunt && d < 2.8 && m.cd <= 0) {
+      if (hunt && d < 2.8 * (m.S || 1) * 0.8 && m.cd <= 0) {
         m.cd = 1.3; L.hurtPlayer(st.dmg * (L.md ? L.md.dmg : 1), 'Von einem ' + NAMES[m.v] + ' erwischt');
         if (P.alive && !P.vehicle) { const k = st.knock || 9; P.vx = (P.x - m.x) / (d || 1) * k; P.vz = (P.z - m.z) / (d || 1) * k; P.vy = 4; P.air = true; P.knockT = 0.7; }
         if (st.slow) { P.slowT = st.slow; L.msg('🍥 Klebriger Zuckerguss – du bist langsamer!', 1500); }
@@ -280,11 +297,11 @@
     const b0 = boss; b0.ct = 0; b0.intro = true;
     b0.lakeX = b0.x + Math.sin(b0.yaw) * 40; b0.lakeZ = b0.z + Math.cos(b0.yaw) * 40;
     L.banner('👵 NINA', 'Die Walross-Oma ist da! Schleich – die Walrosse hören dich sonst!');
-    L.startCine('👵 NINA – DIE WALROSS-OMA', 9, (t) => {
+    L.startCine('👵 NINA – DIE WALROSS-OMA', 11.5, (t) => {
       const B0 = boss || b0, fx2 = Math.sin(B0.yaw), fz2 = Math.cos(B0.yaw);
       if (t < 2.4) { const a = B0.yaw + 0.5 + t * 0.15; return { x: B0.x + Math.sin(a) * 80, y: 30, z: B0.z + Math.cos(a) * 80, lx: B0.x, ly: 38, lz: B0.z }; }
       if (t < 4.6) return { x: B0.lakeX + fz2 * 16 + fx2 * 10, y: 8, z: B0.lakeZ - fx2 * 16 + fz2 * 10, lx: B0.lakeX, ly: 1, lz: B0.lakeZ };
-      const u = (t - 4.6) / 4.4; return { x: B0.lakeX + fx2 * (24 + u * 10) + fz2 * 8, y: 9 + u * 6, z: B0.lakeZ + fz2 * (24 + u * 10) - fx2 * 8, lx: B0.lakeX, ly: 3, lz: B0.lakeZ };
+      const u = (t - 4.6) / 6.9; return { x: B0.lakeX + fx2 * (36 + u * 14) + fz2 * 18, y: 6 + u * 6, z: B0.lakeZ + fz2 * (36 + u * 14) - fx2 * 18, lx: B0.lakeX, ly: 11, lz: B0.lakeZ };
     });
   }
   // Boss nur hinstellen und bewegen lassen (während des Kurzfilms)
