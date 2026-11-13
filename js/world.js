@@ -420,12 +420,11 @@
   }
   function buildMilitary() {
     const x1 = 790, x2 = 1110, z1 = -1060, z2 = -740, gate = 950;
-    fenceLine(x1, z1, x2, z1); fenceLine(x1, z1, x1, z2); fenceLine(x2, z1, x2, z2);
-    fenceLine(x1, z2, gate - 8, z2); fenceLine(gate + 8, z2, x2, z2);
-    L.addBox(x1, z1 - 0.3, x2, z1 + 0.3, 3, 'fence'); L.addBox(x1 - 0.3, z1, x1 + 0.3, z2, 3, 'fence');
-    L.addBox(x2 - 0.3, z1, x2 + 0.3, z2, 3, 'fence');
-    L.addBox(x1, z2 - 0.3, gate - 8, z2 + 0.3, 3, 'fence'); L.addBox(gate + 8, z2 - 0.3, x2, z2 + 0.3, 3, 'fence');
-    sign('MILITÄRISCHER SICHERHEITSBEREICH', gate, 4.2, z2 + 0.5, 14, 1.6, 0, '#b02020', '#ffffff');
+    // Glaswände (9 m hoch, mit dem Auto zerbrechlich) entstehen in carolina.js
+    L.MIL = { x1, x2, z1, z2, gate };
+    L.inMil = (x, z, m) => x > x1 - (m || 0) && x < x2 + (m || 0) && z > z1 - (m || 0) && z < z2 + (m || 0);
+    sign('MILITÄRISCHER SICHERHEITSBEREICH', gate, 10.2, z2 + 0.6, 16, 1.8, 0, '#b02020', '#ffffff');
+    sign('⚠️ BETRETEN AUF EIGENE GEFAHR – NICHT RENNEN!', gate, 8.2, z2 + 0.6, 16, 1.2, 0, '#1a1a1a', '#ffd040');
     // Hangars
     const hg = new T.CylinderGeometry(10, 10, 30, 18, 1, false, 0, Math.PI);
     for (const hx of [830, 870, 910]) {
@@ -456,11 +455,61 @@
       mesh(L.GEO.boxB, '#3a3a3a', 4.6, 0.3, 4.6, wx, 11.4, wz);
       L.addBox(wx - 2, wz - 2, wx + 2, wz + 2, 11, 'prop');
     }
+    // mehr Wachtürme entlang der Glaswand
+    for (const [wx, wz] of [[870, -1050], [950, -1050], [1030, -1050], [800, -980], [800, -900], [800, -820], [1100, -980], [1100, -900], [1100, -820], [880, -750], [1020, -750]]) watchtower(wx, wz);
+    // Container-Hof (teils gestapelt) – Loot vor den Türen
+    const CC = ['#7a3a2a', '#2a5a7a', '#5a6a3a', '#8a7a3a', '#4a4a52', '#6a2a3a'];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
+      const cx = 948 + c * 17, cz = -1040 + r * 13, col = CC[(r * 4 + c) % CC.length];
+      container(cx, cz, col, 0, 'militaer');
+      if ((r + c) % 2 === 0) container(cx, cz, CC[(r * 4 + c + 2) % CC.length], 2.62, 'militaer');
+    }
+    // Hütten mit Loot
+    for (const [hx, hz] of [[820, -935], [848, -935], [820, -790], [866, -795], [1080, -785], [1005, -880]]) hut(hx, hz, 'militaer');
+    // Sandsack-Wälle am Eingang
+    for (const s of [-1, 1]) for (let k = 0; k < 4; k++) mesh(L.GEO.boxB, '#8a7a55', 1.6, 0.9, 0.9, gate + s * (12 + k * 1.7), 0, z2 - 6, { noShadow: true });
     // Hubschrauberlandeplatz mit kaputtem Hubschrauber
     helipad(1050, -810);
     const heli = L.buildHeli('#4a5240'); heli.root.position.set(1050, 0, -850); heli.root.rotation.set(0.05, 0.7, 0.25); L.scene.add(heli.root);
     L.addBox(1044, -856, 1056, -844, 3, 'prop');
     L.vehSpots.push({ x: 930, z: -790, yaw: 0, type: 'jeep' }, { x: 970, z: -790, yaw: 0, type: 'jeep' }, { x: 1000, z: -960, yaw: 1.57, type: 'jeep' }, { x: 990, z: -800, yaw: 3.1, type: 'motorrad' });
+  }
+  function watchtower(wx, wz) {
+    for (const [ox, oz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) mesh(L.GEO.boxB, '#4a3d2a', 0.25, 9, 0.25, wx + ox, 0, wz + oz);
+    mesh(L.GEO.boxB, '#5a4a32', 4, 2.4, 4, wx, 9, wz);
+    mesh(L.GEO.boxB, '#3a3a3a', 4.6, 0.3, 4.6, wx, 11.4, wz);
+    L.addBox(wx - 2, wz - 2, wx + 2, wz + 2, 11, 'prop');
+  }
+  // Schiffscontainer (6 × 2,6 × 2,4), Tür im Süden; y0 > 0 = gestapelt
+  function container(x, z, col, y0, poi) {
+    mesh(L.GEO.boxB, col, 6.06, 2.6, 2.44, x, y0, z);
+    for (let k = 0; k < 7; k++) mesh(L.GEO.boxB, '#26262a', 0.12, 2.5, 2.48, x - 2.7 + k * 0.9, y0 + 0.05, z, { noShadow: true });
+    mesh(L.GEO.boxB, '#2a2a2a', 0.1, 2.4, 2.3, x + 3.04, y0 + 0.1, z, { noShadow: true });
+    if (!y0) { L.addBox(x - 3.03, z - 1.22, x + 3.03, z + 1.22, 5.3, 'prop'); L.lootSpots.push({ x: x + 4, z, poi }); L.lootSpots.push({ x, z: z + 2, poi }); }
+    L.mapRects.push({ x, z, w: 6, d: 2.4, c: col });
+  }
+  // kleine Holzhütte mit Satteldach, Loot vor der Tür
+  function hut(x, z, poi) {
+    mesh(L.GEO.boxB, '#7a5a3a', 5, 3, 4, x, 0, z);
+    inst.roof.push({ x, y: 3, z, w: 5.6, h: 1.6, d: 4.6, color: '#4a3a2a' });
+    mesh(L.GEO.boxB, '#2a1a10', 1.1, 2.1, 0.08, x, 0, z + 2.02, { noShadow: true });
+    mesh(L.GEO.boxB, '#a8c8d8', 0.9, 0.7, 0.06, x + 1.6, 1.4, z + 2.02, { noShadow: true });
+    L.addBox(x - 2.5, z - 2, x + 2.5, z + 2, 4.6, 'prop');
+    L.lootSpots.push({ x, z: z + 3.2, poi }, { x: x + 3.4, z, poi });
+    L.mapRects.push({ x, z, w: 5, d: 4, c: '#6a4a2a' });
+  }
+  // leere Orte füllen: Hütten und Container mit passendem Loot
+  function fillPOIs() {
+    const plan = { funk: [3, 2], windpark: [4, 3], krater: [2, 3], sperre: [1, 4], bunker: [2, 1], wald: [6, 0], camping: [4, 0], hof: [2, 2] };
+    for (const [id, [nh, nc]] of Object.entries(plan)) {
+      const p = L.POIS.find((q) => q.id === id); if (!p) continue;
+      let h = 0, c = 0;
+      for (let k = 0; k < 400 && (h < nh || c < nc); k++) {
+        const a = R() * 6.283, d = Math.sqrt(R()) * Math.max(20, p.r * 0.85), x = p.x + Math.sin(a) * d, z = p.z + Math.cos(a) * d;
+        if (Math.abs(x) > 1440 || Math.abs(z) > 1440 || L.queryBoxes(x, z, 9).length || L.waterDepth(x, z) > -0.3) continue;
+        if (h < nh) { hut(x, z, id); h++; } else { container(x, z, rpick(['#7a3a2a', '#2a5a7a', '#5a6a3a', '#8a7a3a']), 0, id); c++; }
+      }
+    }
   }
   function helipad(x, z) {
     const m = new T.Mesh(new T.CircleGeometry(11, 32), new T.MeshLambertMaterial({ map: L.textTex('H', 256, 256, '#3a3a3c', '#e8e8e8', 'bold 190px Arial') }));
@@ -967,7 +1016,7 @@
     buildGround(); buildSea(); buildRoads();
     buildCity(); buildVillage(); buildFarm(); buildMilitary();
     buildGas(700, -35, true, 'tanke1'); buildGas(-35, 800, false, 'tanke2');
-    buildBunker(); buildRadio(); buildCrater(); buildCamping(); buildWindpark(); buildSperre(); buildMountains();
+    buildBunker(); buildRadio(); buildCrater(); buildCamping(); buildWindpark(); buildSperre(); buildMountains(); fillPOIs();
     scatteredHouses(); perimeter(); wrecks(); trees(); extraBikes(); lootCountryside();
     flush(); buildMapCanvas();
     // Startpunkte für Spieler (auf Landstraßen)

@@ -246,6 +246,7 @@
     if (L.tentacleEnts) for (const e of L.tentacleEnts) if (!e.dead && e.rig.root.visible) a.push(e);
     if (L.islandTargets) for (const e of L.islandTargets()) a.push(e);
     if (L.bernTarget) { const b = L.bernTarget(); if (b) a.push(b); }
+    if (L.extraTargets) for (const e of L.extraTargets()) a.push(e);
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
@@ -317,6 +318,7 @@
     if (e.kind === 'tentakel') { if (L.tentHit) L.tentHit(e, dmg); return; }
     if (e.kind === 'iboss' || e.kind === 'nmin') { if (L.islandHit) L.islandHit(e, dmg, src); return; }
     if (e.kind === 'bern') { if (L.bernHit) L.bernHit(dmg, src); return; }
+    if (e.kind === 'carolina') { if (L.carolinaHit) L.carolinaHit(dmg, src); return; }
     if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
@@ -363,6 +365,7 @@
       if (I) { const a = Math.random() * 6.28, d = 60 + Math.sqrt(Math.random()) * Math.max(10, I.r - 90); x = I.x + Math.sin(a) * d; z = I.z + Math.cos(a) * d; }
       else { x = L.rand(-1400, 1400); z = L.rand(-1400, 1400); if (L.inTower(x, z, 6)) continue; }
       if (L.queryBoxes(x, z, 1.5).length) continue;
+      if (!I && L.inMil && L.inMil(x, z, 15)) continue;
       if (pl.some((p) => p && L.dist(x, z, p.x, p.z) < 110)) continue;
       return [x, z];
     }
@@ -470,20 +473,20 @@
   const LT = {
     stadt: 'konserve:3 brot:2 apfel:2 riegel:2 wasser:3 cola:2 saft:2 verband:2 bandage:2 tabletten:1.5 medkit:0.6 9mm:2 minipistole:1 granate:0.5 uhr:1 gold:0.4',
     krankenhaus: 'verband:5 bandage:5 tabletten:4 spritze:3 medkit:3 erstehilfe:1.5 wasser:2 saft:1',
-    polizei: 'pistole:3 9mm:4 schrotflinte:1.5 schrot:2 granate:1.5 verband:1 bandage:1.5 medkit:0.6',
+    polizei: 'pistole:3 9mm:4 schrotflinte:1.5 schrot:2 granate:1.5 verband:1 bandage:1.5 medkit:0.6 revolver:1 mp:0.8 taschenpistole:1 blendgranate:1 pumpgun:0.6',
     supermarkt: 'konserve:4 brot:3 apfel:3 riegel:3 wasser:4 cola:3 saft:3 tabletten:1.5 bandage:1.5',
-    militaer: 'gewehr:2.5 gewehrmuni:4 granate:3 pistole:1.5 9mm:2 medkit:1.5 erstehilfe:0.6 spritze:1 verband:1 bandage:1 riegel:1',
-    hof: 'schrotflinte:2 schrot:3 apfel:3 brot:2 wasser:2 saft:1',
+    militaer: 'gewehr:2.5 gewehrmuni:4 granate:3 pistole:1.5 9mm:2 medkit:1.5 erstehilfe:0.6 spritze:1 verband:1 bandage:1 riegel:1 sniper:1.2 scharfmuni:2 lmg:0.9 mp:1 raketenwerfer:0.4 raketen:0.8 minigun:0.25 blendgranate:1.5 rauchgranate:1.2 pumpgun:0.6',
+    hof: 'schrotflinte:2 schrot:3 apfel:3 brot:2 wasser:2 saft:1 armbrust:0.6 bolzen:1.2 treibstoff:0.6',
     tanke1: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
     tanke2: 'riegel:3 cola:3 wasser:2 konserve:1 minipistole:0.6 9mm:1',
     dorf: 'konserve:2 brot:2 apfel:2 wasser:2 saft:1 schrotflinte:0.6 schrot:1 minipistole:0.8 9mm:1 verband:1 uhr:1 gold:0.3',
-    camping: 'konserve:2 riegel:2 wasser:3 cola:1 minipistole:0.7 9mm:1 verband:1',
-    krater: 'artefakt:2 granate:1 gewehrmuni:1',
-    funk: 'verband:1 wasser:1 riegel:1 9mm:1',
-    windpark: 'wasser:1 riegel:1 verband:1 9mm:1',
-    sperre: 'gewehrmuni:1 granate:1 verband:1',
-    bunker: 'konserve:1 wasser:1',
-    wald: 'apfel:2 wasser:1 9mm:0.5 verband:0.5',
+    camping: 'konserve:2 riegel:2 wasser:3 cola:1 minipistole:0.7 9mm:1 verband:1 armbrust:0.4 bolzen:0.8 molotow:0.6 taschenpistole:0.5',
+    krater: 'artefakt:2 granate:1 gewehrmuni:1 raketenwerfer:0.3 raketen:0.6 medkit:0.4',
+    funk: 'verband:1 wasser:1 riegel:1 9mm:1 lmg:0.3 gewehrmuni:1 rauchgranate:0.6 taschenpistole:0.5 konserve:1',
+    windpark: 'wasser:1 riegel:1 verband:1 9mm:1 treibstoff:1 flammenwerfer:0.3 molotow:0.6 konserve:1',
+    sperre: 'gewehrmuni:2 granate:1 verband:1 lmg:0.6 pumpgun:0.6 schrot:1 blendgranate:0.6 gewehr:0.8',
+    bunker: 'konserve:1.5 wasser:1 sniper:0.4 scharfmuni:1 medkit:0.8 minigun:0.15 gewehrmuni:1',
+    wald: 'apfel:2 wasser:1 9mm:0.5 verband:0.5 armbrust:0.4 bolzen:0.8 schrotflinte:0.5 schrot:0.8',
     land: 'apfel:2 wasser:2 brot:1 konserve:1 9mm:0.6 schrot:0.5 minipistole:0.3 uhr:0.3 bandage:0.8 tabletten:0.5'
   };
   const LTP = {};
@@ -2862,7 +2865,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); if (L.clearWeapons) L.clearWeapons(); if (L.clearLegend) L.clearLegend(); if (L.clearFireworks) L.clearFireworks(); if (L.clearEvents) L.clearEvents(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); if (L.clearWeapons) L.clearWeapons(); if (L.clearLegend) L.clearLegend(); if (L.clearFireworks) L.clearFireworks(); if (L.clearEvents) L.clearEvents(); if (L.clearCarolina) L.clearCarolina(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2983,6 +2986,7 @@
         else { x = L.rand(-1450, 1450); z = L.rand(-1450, 1450); }
         if (L.dist(x, z, P.x, P.z) < 120 || L.queryBoxes(x, z, 1.2).length) continue;
         if (L.inTower(x, z, 4)) continue;
+        if (L.inMil && L.inMil(x, z, 15)) continue;
         spawnMonster(kind, x, z, kind === 'viktor' ? randVariant() : kind === 'walross' && L.WALROSS_VARS ? L.pick(L.WALROSS_VARS) : undefined);
         if (kind === 'blockling') for (let k = 0; k < 2; k++) spawnMonster(kind, x + L.rand(-4, 4), z + L.rand(-4, 4));
         made++;
@@ -3134,6 +3138,7 @@
     if (L.updateLegend) L.updateLegend(dt);
     if (L.updateFireworks) L.updateFireworks(dt);
     if (L.updateEvents) L.updateEvents(dt);
+    if (L.updateCarolina) L.updateCarolina(dt);
     updateAdminTag();
     L.updateOcean2(dt);
     L.updateNav(dt);

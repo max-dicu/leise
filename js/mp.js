@@ -19,7 +19,7 @@
   const nameOf = (pid) => (RM.get(pid) ? RM.get(pid).name : 'Mitspieler');
   const V1 = new T.Vector3(), V2 = new T.Vector3(), V3 = new T.Vector3(), DOWN = new T.Vector3(0, -1, 0);
   // Nachrichten, die der Host von einem Mitspieler an alle anderen weiterreicht
-  const FWD = new Set(['ps', 'chat', 'venter', 'vleave', 'done', 'ready', 'shot', 'boom', 'fw']);
+  const FWD = new Set(['ps', 'chat', 'venter', 'vleave', 'done', 'ready', 'shot', 'boom', 'fw', 'glass']);
 
   // ---------- Senden ----------
   function rawSend(c, o) { if (c && c.open) { try { c.send(o); } catch (e) { /* Verbindung weg */ } } }
@@ -341,6 +341,7 @@
       case 'msg': L.msg(String(m.text)); break;
       case 'kc': if (!host && L.gotKillCoins) L.gotKillCoins(m.n); break;
       case 'fw': if (L.fwRemote) L.fwRemote(m); break;
+      case 'glass': if (L.glassRemote) L.glassRemote(m.i | 0); break;
       case 'done':
         if (R) { freeRemoteVehicle(R); R.inRound = false; R.rig.root.visible = false; }
         L.msg(m.result === 'escape' ? `🏁 ${nameOf(from)} ist entkommen (über ${m.why})!` : `💀 ${nameOf(from)} ist gestorben: ${m.why}`, 6000);

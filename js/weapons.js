@@ -143,7 +143,7 @@
   const NEW = ['taschenpistole', 'revolver', 'mp', 'pumpgun', 'sniper', 'minigun', 'lmg', 'armbrust', 'raketenwerfer', 'flammenwerfer', 'blendgranate', 'rauchgranate', 'molotow', 'scharfmuni', 'raketen', 'treibstoff', 'bolzen', 'scharfmuni', 'bolzen', 'blendgranate'];
   L.NEW_WEAPONS = NEW;
   const orr = L.rollLoot;
-  if (orr) L.rollLoot = (poi) => (Math.random() < (poi === 'militaer' || poi === 'polizei' ? 0.45 : 0.25) ? L.pick(NEW) : orr(poi));
+  if (orr) L.rollLoot = (poi) => (Math.random() < 0.06 ? L.pick(NEW) : orr(poi));
 
   // ---------- Animationen ----------
   // Donneraxt: fliegt drehend zum Ziel und kommt zurück in die Hand
