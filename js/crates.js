@@ -111,6 +111,7 @@
       if (vis && c.under && !c.open && Math.random() < dt * 2) L.fx('#e8f8ff', c.x, c.y + 1, c.z, 1, 0.3, { size: 0.12, life: 1.5, g: -0.5 });
     }
     if (!secret && L.TOWER) buildSecret();
+    if (L.round && !L.round.suitTold && L.state === 'game') { L.round.suitT = (L.round.suitT || 0) + dt; if (L.round.suitT > 12) { L.round.suitTold = true; if (!L.hasDiveSuit()) L.msg('🤿 Tipp: Taucheranzüge liegen oben auf dem TURMDACH – die Treppe im Turm führt hinauf.', 7000); } }
     if (secret && secret.open && secret.t < 1) { secret.t = Math.min(1, secret.t + dt * 1.5); const e = 1 - Math.pow(1 - secret.t, 3); secret.tile.position.set(0.4 * e, 0.1 + Math.sin(e * Math.PI) * 0.4, 0); secret.tile.rotation.z = -1.6 * e; }
     // Kistendeckel klappt animiert auf
     for (const c of crates) if (c.open && c.openT !== undefined && c.openT < 1) {

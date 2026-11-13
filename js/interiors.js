@@ -134,6 +134,19 @@
     const wallMesh = (x1, z1, x2, z2, y0, y1, mat) => { const m = new T.Mesh(L.GEO.boxB, mat || matWall); m.scale.set(x2 - x1, y1 - y0, z2 - z1); m.position.set((x1 + x2) / 2, y0, (z1 + z2) / 2); g.add(m); return m; };
     const wallBox = (x1, z1, x2, z2, y0, y1) => { wallMesh(x1, z1, x2, z2, y0, y1); I.boxes.push(L.addBoxY(x1, z1, x2, z2, y0, y1, 'building')); };
     const X1 = B.x - B.w / 2, X2 = B.x + B.w / 2, Z1 = B.z - B.d / 2, Z2 = B.z + B.d / 2;
+    if (B.tower) {
+      // Innenhülle des Turms (von außen nicht zu sehen, von innen echte Wände mit Fenstern)
+      const tw = new T.MeshLambertMaterial({ color: 0x4a5464 }), win = new T.MeshBasicMaterial({ color: 0x9ac8e8 }), hfI = 11.15, cx = B.x, cz = B.z, Hh = B.h;
+      const shell = (x1, z1, x2, z2, y0, y1, mat) => wallMesh(x1, z1, x2, z2, y0, y1, mat || tw);
+      shell(cx - hfI - 0.05, cz - hfI, cx - hfI, cz + hfI, 0, Hh); shell(cx + hfI, cz - hfI, cx + hfI + 0.05, cz + hfI, 0, Hh);
+      shell(cx - hfI, cz - hfI - 0.05, cx + hfI, cz - hfI, 0, Hh);
+      shell(cx - hfI, cz + hfI, cx - 3, cz + hfI + 0.05, 0, Hh); shell(cx + 3, cz + hfI, cx + hfI, cz + hfI + 0.05, 0, Hh); shell(cx - 3, cz + hfI, cx + 3, cz + hfI + 0.05, 4.5, Hh);
+      for (let k = 1; k < Ly.nf; k++) {
+        const y0 = Ly.levels[k] + 1.1, y1 = Math.min(Ly.levels[k] + Ly.fh - 0.8, y0 + 1.8);
+        shell(cx - hfI + 0.01, cz - 8, cx - hfI + 0.02, cz + 8, y0, y1, win); shell(cx + hfI - 0.02, cz - 8, cx + hfI - 0.01, cz + 8, y0, y1, win);
+        shell(cx - 8, cz - hfI + 0.01, cx + 8, cz - hfI + 0.02, y0, y1, win); shell(cx - 8, cz + hfI - 0.02, cx + 8, cz + hfI - 0.01, y0, y1, win);
+      }
+    }
     if (!B.tower) {
       B.box.on = false;
       // Außenwände mit Tür im Süden
@@ -252,7 +265,15 @@
     }
     // drinnen? (für Kamera und Anzeige)
     L.indoor = null;
+    towerHide();
     for (const B of active) { const Ly = B.lay; if (P.x > Ly.ix1 && P.x < Ly.ix2 && P.z > Ly.iz1 && P.z < Ly.iz2 && (P.y || 0) < B.h - 0.5) { let k = 0; for (let j = 0; j < Ly.nf; j++) if (Ly.levels[j] <= (P.y || 0) + 0.5) k = j; L.indoor = { B, floor: k, ceil: k + 1 < Ly.nf ? Ly.levels[k + 1] : B.h }; } }
   };
+  // im Turm die Außenhülle ausblenden (sonst sieht man von innen durch die Wände bzw. Zwischendecken)
+  let tHidden = false;
+  function towerHide() {
+    const g = L.tower && L.tower.group; if (!g) return;
+    const Bt = towerB, Ly = Bt.lay, inside = !!(Bt.int && Ly && !L.tower.down && P.x > Ly.ix1 && P.x < Ly.ix2 && P.z > Ly.iz1 && P.z < Ly.iz2 && (P.y || 0) < Bt.h - 0.5 && (P.y || 0) > 0.5);
+    if (inside !== tHidden) { tHidden = inside; g.visible = !inside; }
+  }
   L.clearInteriors = function () { for (let i = active.length - 1; i >= 0; i--) destroy(active[i]); for (const B of L.buildings || []) B.state = null; towerB.state = null; };
 })();

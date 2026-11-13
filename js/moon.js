@@ -225,6 +225,25 @@
   // Kilometergroß, Oberkörper frei, fleckige verschwitzte Haut, Speckrollen, Haare, Adern, Sabber.
   // Ablauf: frisst die Erde (Kurzfilm) → fliegt her → JAGT DICH 10 MINUTEN (beißt immer wieder zu) → frisst den Mond → zieht weiter.
   let bern = null, bTimer = 45, bWarned = false;
+  // Bernhard hat sehr viel Leben – treffen kann man ihn nur, wenn er herunterkommt (Zubeißen)
+  const BERN_HP = 25000;
+  L.bernTarget = function () {
+    if (!bern || !bern.g || !bern.g.visible || !L.inMoon(P.x)) return null;
+    if (!['hunt', 'aim', 'chomp', 'rise'].includes(bern.phase)) return null;
+    if (!(bern.hp > 0)) bern.hp = bern.hp === undefined ? BERN_HP : bern.hp;
+    if (!(bern.hp > 0)) return null;
+    const p = bern.g.position;
+    return { kind: 'bern', rig: { root: bern.g }, x: p.x, z: p.z, hp: bern.hp, hitR: 1e9 };
+  };
+  L.bernHit = function (dmg) {
+    if (!bern || !(bern.hp > 0) || !(dmg > 0)) return;
+    bern.hp -= dmg; if (L.showBossHp) L.showBossHp('😈 BERNHARD', bern.hp, BERN_HP);
+    if (bern.hp <= 0) {
+      bern.hp = 0; if (L.gotKillCoins) L.gotKillCoins(1000);
+      L.banner('🏆 BERNHARD IST BESIEGT!', 'Und jetzt holt MAMA IVA sich den Rest …');
+      startIvaEnd();
+    }
+  };
   const HUNT = 600, CHOMP_R = 34;
   const phong = (c, o) => { const m = new T.MeshPhongMaterial(Object.assign({ color: c, shininess: 60, specular: 0x554433, fog: false }, o || {})); return m; };
   function mottled(geo, base) {
@@ -315,7 +334,7 @@
   function startBernhard() {
     const I = moonIsl; if (!I.earth) return;
     if (!bern || !bern.g) bern = { g: buildBernhard() };
-    bern.phase = 'cine'; bern.t = 0; bern.g.visible = true; bern.frags = [];
+    bern.phase = 'cine'; bern.t = 0; bern.g.visible = true; bern.frags = []; bern.hp = BERN_HP;
     const E0 = I.earth.position;
     bern.g.position.set(E0.x - 30000, E0.y + 9000, E0.z - 14000); bern.g.rotation.set(0, 0, 0); bern.g.scale.setScalar(1);
     L.banner('😈 BERNHARD DER VERSCHLUCKER', 'Er frisst ganze Welten … zuerst die Erde. Dann jagt er DICH.');

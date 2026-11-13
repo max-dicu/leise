@@ -187,14 +187,18 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     if (P.rig && L.state === 'game') P.rig.root.visible = !fp && !(P.vehicle && P.vehicle.t.sub);
     const rx = -cy, rz = sy;
     piv.x += rx * side; piv.z += rz * side;
+    // Schulter-Versatz nicht in eine Wand schieben
+    if (side && L.blockedAt(piv.x, piv.y, piv.z)) { piv.x -= rx * side; piv.z -= rz * side; }
     want.set(piv.x - sy * cp * dist, piv.y + sp * dist, piv.z - cy * cp * dist);
-    // nicht durch Wände schauen
+    // nicht durch Wände schauen: fein abtasten und etwas Abstand zur Wand lassen
     let ok = 1;
-    for (let i = 1; i <= 12; i++) {
-      const t = i / 12;
-      if (L.blockedAt(L.lerp(piv.x, want.x, t), L.lerp(piv.y, want.y, t), L.lerp(piv.z, want.z, t))) { ok = (i - 1) / 12; break; }
+    const cd = Math.hypot(want.x - piv.x, want.y - piv.y, want.z - piv.z), n = Math.max(12, Math.ceil(cd / 0.12));
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      if (L.blockedAt(L.lerp(piv.x, want.x, t), L.lerp(piv.y, want.y, t), L.lerp(piv.z, want.z, t))) { ok = Math.max(0, (i - 1) / n - 0.3 / Math.max(cd, 0.01)); break; }
     }
-    camera.position.lerpVectors(piv, want, Math.max(0.12, ok));
+    camera.position.lerpVectors(piv, want, ok);
+    if (P.rig && L.state === 'game' && !v && cd * ok < 0.55) P.rig.root.visible = false;
     { const gy = L.seaFloor(camera.position.x, camera.position.z); if (camera.position.y < gy + 0.3) camera.position.y = gy + 0.3; }
     if (L.indoor && !v) camera.position.y = Math.min(camera.position.y, L.indoor.ceil - 0.35);
     look.set(piv.x + sy * cp * 20, piv.y - sp * 20, piv.z + cy * cp * 20);

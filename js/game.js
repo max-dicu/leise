@@ -244,13 +244,34 @@
     if (L.wboss && !L.wboss.leaving) a.push(L.wboss);
     if (L.dimWorm && !L.dimWorm.dead && L.inDim(P.x)) a.push(L.dimWorm);
     if (L.tentacleEnts) for (const e of L.tentacleEnts) if (!e.dead && e.rig.root.visible) a.push(e);
+    if (L.islandTargets) for (const e of L.islandTargets()) a.push(e);
+    if (L.bernTarget) { const b = L.bernTarget(); if (b) a.push(b); }
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
+  }
+  const RC = new T.Raycaster(), HB = new T.Box3();
+  const visChain = (o) => { while (o) { if (!o.visible) return false; o = o.parent; } return true; };
+  function meshHit(e, o, d, minT, far) {
+    const root = e.rig && e.rig.root; if (!root || !root.visible) return null;
+    RC.set(o, d); RC.near = minT; RC.far = far; RC.camera = L.camera;
+    let hits; try { hits = RC.intersectObject(root, true); } catch (er) { return null; }
+    for (const h of hits) {
+      const ob = h.object, mt = ob.material;
+      if (!ob.isMesh || !visChain(ob)) continue;
+      if (mt && (mt.visible === false || (mt.transparent && mt.opacity < 0.3))) continue;
+      HB.setFromObject(root); const top = HB.max.y, hgt = Math.max(0.1, top - HB.min.y);
+      return { t: h.distance, mult: h.point.y > top - hgt * 0.16 ? 2 : 1 };
+    }
+    return null;
   }
   L.rayHit = function (o, d, maxD, minT) {
     let best = null, bt = maxD;
     for (const e of allTargets()) {
-      if (e.kind !== 'dwurm' && L.dist(o.x, o.z, e.x, e.z) > maxD + 30) continue;
+      if (e.kind !== 'dwurm' && L.dist(o.x, o.z, e.x, e.z) > maxD + (e.hitR || 30)) continue;
+      if (e.kind !== 'remote' && e.kind !== 'npc') {
+        const far = e.kind === 'bern' ? Math.max(bt, 3000) : bt, mh = meshHit(e, o, d, minT, far);
+        if (mh && mh.t < far) { bt = mh.t; best = { ent: e, mult: mh.mult, t: mh.t }; }
+      }
       for (const s of spheres(e)) {
         const cx = s[0] - o.x, cy = s[1] - o.y, cz = s[2] - o.z;
         const t = cx * d.x + cy * d.y + cz * d.z;
@@ -294,6 +315,8 @@
     if (e.dead) return;
     if (e.kind === 'dwurm') { if (L.dimWormHit) L.dimWormHit(dmg, src); return; }
     if (e.kind === 'tentakel') { if (L.tentHit) L.tentHit(e, dmg); return; }
+    if (e.kind === 'iboss' || e.kind === 'nmin') { if (L.islandHit) L.islandHit(e, dmg, src); return; }
+    if (e.kind === 'bern') { if (L.bernHit) L.bernHit(dmg, src); return; }
     if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
@@ -846,7 +869,8 @@
     for (const e of allTargets()) {
       if (e.kind === 'walker' || e.kind === 'boss') continue;
       const dx = e.x - P.x, dz = e.z - P.z, d = Math.hypot(dx, dz);
-      if (d > 2.6 || (dx * fx + dz * fz) / (d || 1) < 0.3) continue;
+      if (e.kind === 'bern') continue;
+      if (d > 2.6 + (e.bigR || 0) || (dx * fx + dz * fz) / (d || 1) < 0.3) continue;
       const sneak = (P.stance !== 'stand') && (e.state === 'wander' || e.state === 'search' || e.state === 'idle');
       const dmg = sneak ? 90 : 34;
       if (sneak) L.msg('🔨 Schleich-Angriff! (x2,6 Schaden)');
@@ -928,7 +952,8 @@
     for (const e of allTargets()) {
       if (e.kind === 'remote') continue;
       const d = L.dist(e.x, e.z, x, z);
-      if (d < rad + (e.kind === 'walker' ? 6 : e.kind === 'boss' ? 6 : 0)) L.damageEnt(e, dmg * (1 - Math.min(d, rad) / (rad + 6)) * (e.kind === 'walker' || e.kind === 'boss' ? 2.5 : 1), x, z, src);
+      if (e.kind === 'bern') continue;
+      if (d < rad + (e.kind === 'walker' ? 6 : e.kind === 'boss' ? 6 : (e.bigR || 0))) L.damageEnt(e, dmg * (1 - Math.min(d, rad) / (rad + 6)) * (e.kind === 'walker' || e.kind === 'boss' ? 2.5 : 1), x, z, src);
     }
     for (const v of E.vehicles) { const d = L.dist(v.x, v.z, x, z); if (d < rad) v.hp -= dmg * (1 - d / rad); }
   };
@@ -1307,7 +1332,7 @@
     else if (impact > 0) { v.speed *= 0.8; v.lat *= 0.5; }
     // Monster und Menschen überfahren
     if (Math.abs(v.speed) > 3 && alt < 2) for (const e of allTargets()) {
-      if (e.kind === 'walker' || e.kind === 'boss' || e.kind === 'wboss' || e.fly) continue;
+      if (e.kind === 'walker' || e.kind === 'boss' || e.kind === 'wboss' || e.kind === 'iboss' || e.kind === 'bern' || e.fly) continue;
       if (L.dist(e.x, e.z, v.x + fx * t.len * 0.4, v.z + fz * t.len * 0.4) > (t.kind === 'bike' ? 1.2 : t.wid * 0.7 + 0.5)) continue;
       const sp = Math.abs(v.speed);
       if (MK[e.kind] && MK[e.kind].heavy) { L.damageEnt(e, sp * 5, v.x, v.z, isPlayer ? P : null); v.speed *= 0.1; crash(v, sp * 0.7, isPlayer); }

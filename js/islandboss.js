@@ -37,7 +37,14 @@
     const hand = rig.hand; if (!hand) return;
     if (b.prop === 'hammer') { part(G().cyl, '#5a3a20', 0.04, 0.5, 0.04, 0, -0.1, 0, hand); part(G().box, '#8a8f96', 0.24, 0.16, 0.16, 0, -0.38, 0, hand); }
     else if (b.prop === 'speer') { const s = part(G().cyl, '#6a4a2a', 0.02, 1.6, 0.02, 0, 0.2, 0, hand); s.rotation.x = 0.2; part(G().cone, '#e8e8f0', 0.05, 0.18, 0.05, 0, 1.0, 0.16, hand, { basic: true }); }
-    else if (b.prop === 'besen') { part(G().cyl, '#8a6a3a', 0.025, 1.9, 0.025, 0, -0.62, 0.03, hand); part(G().cyl, '#b04a3a', 0.05, 0.06, 0.05, 0, -1.5, 0.03, hand); part(G().cone, '#d8b860', 0.2, 0.32, 0.2, 0, -1.68, 0.03, hand); }
+    else if (b.prop === 'besen') {
+      const bg = grp(hand, 0, 0, 0.03); bg.rotation.x = -1.1; rig.broom = bg;
+      part(G().cyl, '#8a5a2a', 0.035, 1.6, 0.035, 0, -0.55, 0, bg);
+      const br = grp(bg, 0, -1.3, 0);
+      const head = new T.Mesh(new T.CylinderGeometry(0.09, 0.34, 0.8, 16, 1), L.mat('#e0bc5a')); head.position.y = -0.42; head.castShadow = true; br.add(head);
+      for (let k = 0; k < 18; k++) { const a = k / 18 * 6.283, s2 = part(G().box, k % 2 ? '#c89a3a' : '#f0d070', 0.035, 0.85, 0.035, Math.sin(a) * 0.24, -0.45, Math.cos(a) * 0.24, br, { noShadow: true }); s2.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35); }
+      for (const y of [-0.06, -0.2]) { const ring = new T.Mesh(new T.CylinderGeometry(0.13 + (-y) * 0.5, 0.13 + (-y) * 0.5, 0.06, 14), L.mat('#b03a3a')); ring.position.y = y; br.add(ring); }
+    }
     else if (b.prop === 'dolch') { part(G().box, '#c8c8d0', 0.03, 0.3, 0.06, 0, -0.25, 0, hand); part(G().box, '#3a2a4a', 0.1, 0.03, 0.04, 0, -0.1, 0, hand); }
   }
   function buildHumanBoss(b) {
@@ -204,6 +211,7 @@
     L.banner(b.icon + ' ' + b.name, b.title + ' ist erwacht! Schleich oder lauf zur 🛡️ Zuflucht!');
     L.snd.boss && L.snd.boss();
     if (b.life) boss.life = b.life;
+    boss.kind = 'iboss'; boss.rig = m.rig; boss.hp = boss.maxHp = BHP[id] || 5000; boss.hitR = 150; boss.bigR = 6 + (b.scale || 6) * BIG * 0.25;
     if (id === 'nina') { ninaIntro(); return; }
     // Kurzfilm: Kamera schaut auf den Boss
     const cx = x, cz = z, h = id === 'wurm' ? 25 : (b.scale || 1) * BIG * 1.6 + 8;
@@ -212,6 +220,43 @@
   }
   // ---------- NINA: Mini-See, Schaum, Walrosse ----------
   const lakes = [], mins = [];
+  // Leben der Insel-Bosse (jeder anders)
+  const BHP = { thor: 6000, odin: 5500, loki: 4000, ymir: 7000, lava: 7000, geist: 3500, wurm: 8000, urwald: 5000, sporen: 5000, golem: 6500, nina: 4500 };
+  const MINHP = { zimt: 350, roller: 300, naegel: 420, locken: 320, schaum: 330, strick: 380, kaktus: 450, auge: 300, gold: 600 };
+  // Lebensbalken oben in der Mitte
+  let hpBar = null, hpT = 0;
+  L.showBossHp = function (name, hp, max) {
+    if (!hpBar) { hpBar = document.createElement('div'); hpBar.id = 'bossHp'; hpBar.style.cssText = 'position:fixed;left:50%;top:58px;transform:translateX(-50%);width:min(420px,80vw);z-index:14;pointer-events:none;text-align:center;font-weight:800;color:#fff;text-shadow:0 1px 3px #000;font-size:14px'; hpBar.innerHTML = '<div></div><div style="height:12px;background:#0009;border:2px solid #fff;border-radius:7px;overflow:hidden;margin-top:2px"><i style="display:block;height:100%;background:linear-gradient(90deg,#c01a1a,#ff6a3a);width:100%"></i></div>'; document.body.appendChild(hpBar); }
+    hpBar.hidden = false; hpBar.firstChild.textContent = name + ' – ' + Math.max(0, Math.ceil(hp)) + ' / ' + max;
+    hpBar.querySelector('i').style.width = L.clamp(hp / max, 0, 1) * 100 + '%'; hpT = 8;
+  };
+  setInterval(() => { if (hpBar && !hpBar.hidden) { hpT -= 0.5; if (hpT <= 0 || L.state !== 'game') hpBar.hidden = true; } }, 500);
+  L.islandTargets = function () {
+    const a = [];
+    if (boss && boss.active && boss.hp > 0 && !L.cine && boss.m && boss.m.rig.root.visible) a.push(boss);
+    for (const m of mins) if (m.landed && !m.leave && !m.dead) { if (m.kind !== 'nmin') { m.kind = 'nmin'; m.rig = m.r; m.hp = m.maxHp = MINHP[m.v] || 350; m.hitR = 20; m.bigR = 3; } a.push(m); }
+    return a;
+  };
+  L.islandHit = function (e, dmg, src) {
+    if (!(dmg > 0)) return;
+    if (e.kind === 'nmin') {
+      if (e.dead) return; e.hp -= dmg; L.blood(e.x, 2.5 * (e.S || 1), e.z, 8);
+      if (e.hp <= 0) { e.dead = true; e.leave = 0.01; L.blood(e.x, 2, e.z, 30, true); L.snd.splat && L.snd.splat({ x: e.x, y: 1, z: e.z }); if (src === P && L.gotKillCoins) L.gotKillCoins(40); }
+      return;
+    }
+    if (e !== boss || boss.hp <= 0) return;
+    boss.hp -= dmg; boss.life = Math.max(boss.life, 25);
+    L.fx('#ff5030', boss.x, (boss.b.scale || 6) * BIG * 1.2, boss.z, 6, 6, { basic: true, size: 0.6, life: 0.5 });
+    L.showBossHp(boss.b.icon + ' ' + boss.b.name, boss.hp, boss.maxHp);
+    if (boss.hp <= 0) {
+      const b = boss.b, x = boss.x, z = boss.z;
+      L.explode(x, 4, z, 18, 0, null, true); L.shake = Math.max(L.shake, 1.5);
+      L.banner('🏆 ' + b.name + ' BESIEGT!', 'Unglaublich! Sammle die Beute ein.');
+      for (let i = 0; i < 4; i++) L.spawnItem(i < 2 ? 'artefakt' : 'gold', x + L.rand(-8, 8), z + L.rand(-8, 8), 1);
+      if (src === P && L.gotKillCoins) L.gotKillCoins(300);
+      despawn(null);
+    }
+  };
   const VARS = ['zimt', 'roller', 'naegel', 'locken', 'schaum', 'strick', 'kaktus', 'auge', 'gold', 'zimt', 'roller', 'naegel'];
   function makeLake(x, z) {
     const g = new T.Group(); g.position.set(x, 0, z); L.scene.add(g);
