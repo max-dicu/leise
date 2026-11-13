@@ -438,13 +438,12 @@
   L.suitOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
   function freeSpot(x, z, y) { return !L.queryBoxes(x, z, 0.7).some((b) => (b.y0 || 0) <= (y || 0) + 1.6 && b.h > (y || 0)); }
   function suitTeleport() {
-    if (P.tpCd > 0) { L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); return; }
     const cp = P.flying ? Math.cos(P.camPitch) : 1, up = P.flying ? -Math.sin(P.camPitch) : 0;
     for (let d = 70; d >= 10; d -= 5) {
       const x = P.x + Math.sin(P.camYaw) * cp * d, z = P.z + Math.cos(P.camYaw) * cp * d, y = Math.max(0, (P.y || 0) + up * d);
       if (!freeSpot(x, z, y)) continue;
       L.fx('#a050ff', P.x, (P.y || 0) + 1, P.z, 30, 5, { basic: true, size: 0.25, life: 0.8 });
-      P.x = x; P.z = z; if (P.flying) P.y = y; P.tpCd = 2;
+      P.x = x; P.z = z; if (P.flying) P.y = y;
       L.fx('#a050ff', x, (P.y || 0) + 1, z, 40, 6, { basic: true, size: 0.3, life: 0.9 }); L.snd.teleport && L.snd.teleport({ x, y: 1, z }); return;
     }
     L.msg('🚫 Kein freier Platz zum Teleportieren.', 1500);
