@@ -668,7 +668,7 @@
     L.addBox(x - (along ? 2.2 : 1), z - (along ? 1 : 2.2), x + (along ? 2.2 : 1), z + (along ? 1 : 2.2), 1.6, 'wreck');
   }
   // Verlassene Fahrzeuge auf den Straßen – alle fahrbar (manche schon beschädigt)
-  const CIVIL = ['kleinwagen', 'limousine', 'kleinwagen', 'pickup', 'sportwagen', 'motorrad', 'cross', 'roller', 'limousine', 'kleinwagen', 'pickup'];
+  const CIVIL = ['kleinwagen', 'limousine', 'kleinwagen', 'pickup', 'sportwagen', 'motorrad', 'cross', 'roller', 'limousine', 'kleinwagen', 'pickup', 'van', 'cabrio', 'lkw', 'bus', 'monstertruck', 'buggy', 'gokart', 'traktor', 'quad', 'atv'];
   function parked(x, z, yaw, worn, type, gap) {
     gap = gap || 7;
     for (const s of L.vehSpots) if (Math.abs(s.x - x) < gap && Math.abs(s.z - z) < gap) return false;
@@ -679,7 +679,7 @@
   function extraBikes() {
     const types = ['joyort10', 'joyort6e', 'joyort10', 'joyort6e', 'motorrad', 'cross', 'joyort10', 'joyort6e', 'motorrad', 'cross', 'quad', 'atv', 'quad', 'atv'];
     let placed = 0, tries = 0;
-    while (placed < 90 && tries++ < 3000) {
+    while (placed < 150 && tries++ < 5000) {
       let x, z;
       if (R() < 0.5) {
         const line = rpick([-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]) * 76 + (R() < 0.5 ? -6.8 : 6.8), along = rr(-370, 370);

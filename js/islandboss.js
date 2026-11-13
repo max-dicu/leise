@@ -28,6 +28,7 @@
   };
   B.nina = { name: 'NINA', title: 'Die Walross-Oma', icon: '👵', kind: 'human', scale: 11, speed: 5, abil: ['summon', 'sweep', 'sweep'], prop: 'besen', oma: true, life: 80,
     app: { skin: '#e8c0a0', hair: 'wellig', hairColor: '#d8d8dc', beard: 'kein', brows: 'dick', mouth: 'grinsen', nose: 'knubbel', eyes: '#4a2f1c', glasses: 'rund', glassesColor: '#8a6a3a', top: 'pullover', topColor: '#a04a6a', pants: 'rock', pantsColor: '#5a4a6a', shoeType: 'lackschuh', shoes: '#3a2a2a', build: 'kraeftig', height: 'mittel', hat: 'keine' } };
+  const BIG = 2.5; // alle Insel-Bosse viel größer
   const BY_ISL = { oma: ['nina'], asgard: ['thor', 'odin', 'loki'], eis: ['ymir'], wueste: ['wurm'], dschungel: ['urwald'], vulkan: ['lava'], pilz: ['sporen'], kristall: ['golem'], geist: ['geist'] };
   L.ISLAND_BOSSES = B;
 
@@ -54,7 +55,7 @@
       for (const s of [-1, 1]) for (let k = 0; k < 2; k++) { const w = part(G().box, '#b08870', 0.04, 0.005, 0.005, s * 0.09, 0.13 - k * 0.025, 0.132, rig.head, { noShadow: true }); w.rotation.z = s * 0.5; }
     }
     propOf(b, rig);
-    rig.root.scale.multiplyScalar(b.scale);
+    rig.root.scale.multiplyScalar(b.scale * BIG);
     return { rig, anim: (st) => { L.animHuman(rig, st); if (rig.cape) rig.cape.rotation.x = 0.1 + st.speed * 0.25; } };
   }
   function buildWorm() {
@@ -73,7 +74,7 @@
     const cap = part(G().sph, '#c02a2a', 13, 6, 13, 0, 24, 0, body);
     for (let k = 0; k < 14; k++) { const a = k * 2.4, r = 3 + (k % 4) * 2.4; part(G().sph, '#ffffff', 1.4, 0.7, 1.4, Math.cos(a) * r, 28.5 - r * 0.25, Math.sin(a) * r, body, { noShadow: true }); }
     for (const s of [-1, 1]) { part(G().sph, '#d8ff40', 0.9, 0.9, 0.5, s * 1.6, 19, 4.3, body, { basic: true, noShadow: true }); const a = grp(body, s * 4.8, 19, 0); part(G().cyl, '#e8dcc8', 1.1, 9, 1.1, 0, -4.5, 0, a); part(G().sph, '#c02a2a', 2, 2, 2, 0, -9.5, 0, a); arms.push(a); }
-    L.scene.add(root); cap.castShadow = true;
+    root.scale.setScalar(BIG * 0.8); L.scene.add(root); cap.castShadow = true;
     return { rig: { root }, anim: (st) => { const w = Math.sin(st.phase) * st.speed; legs[0].rotation.x = w * 0.5; legs[1].rotation.x = -w * 0.5; arms[0].rotation.x = -w * 0.4 + (st.atk || 0) * -1.4; arms[1].rotation.x = w * 0.4 + (st.atk || 0) * -1.4; body.position.y = Math.abs(Math.sin(st.phase)) * 0.6 * st.speed; } };
   }
   function buildCrystal() {
@@ -83,11 +84,11 @@
     for (let k = 0; k < 12; k++) { const c = part(G().cone, k % 2 ? cA : cB, 1.2 + (k % 3) * 0.5, 5 + (k % 4) * 2, 1.2 + (k % 3) * 0.5, (k % 5 - 2) * 2, 22 + (k % 3), -2 + (k % 2) * 1.5, body, { noShadow: true }); c.rotation.set((k % 3 - 1) * 0.5, 0, (k % 5 - 2) * 0.25); }
     part(G().box, '#4a5a70', 5, 4, 4.5, 0, 24, 1, body);
     for (const s of [-1, 1]) { part(G().box, cA, 0.9, 0.6, 0.3, s * 1.2, 24.5, 3.3, body, { basic: true, noShadow: true }); const a = grp(body, s * 6.5, 21, 0); part(G().box, '#5a6a80', 2.6, 10, 2.6, 0, -5, 0, a); part(G().cone, cA, 2.4, 4, 2.4, 0, -11, 0, a).rotation.x = Math.PI; arms.push(a); }
-    L.scene.add(root);
+    root.scale.setScalar(BIG * 0.8); L.scene.add(root);
     return { rig: { root }, anim: (st) => { const w = Math.sin(st.phase) * st.speed; legs[0].rotation.x = w * 0.45; legs[1].rotation.x = -w * 0.45; arms[0].rotation.x = -w * 0.35 + (st.atk || 0) * -1.6; arms[1].rotation.x = w * 0.35 + (st.atk || 0) * -1.6; } };
   }
   function buildBeast(b) {
-    const rig = L.buildRufer(); rig.root.scale.setScalar(b.scale); L.tintRig(rig.root, '#3a6a2a', 0.65);
+    const rig = L.buildRufer(); rig.root.scale.setScalar(b.scale * BIG); L.tintRig(rig.root, '#3a6a2a', 0.65);
     for (let k = 0; k < 10; k++) part(G().sph, k % 2 ? '#2e7a2a' : '#5a8a30', 0.4, 0.3, 0.4, (k % 5 - 2) * 0.25, 1.6 + (k % 3) * 0.2, -0.3, rig.root, { noShadow: true });
     L.scene.add(rig.root);
     return { rig, anim: (st) => L.animBeast(rig, { mode: st.speed > 0.2 ? 'walk' : 'search', phase: st.phase }) };
@@ -205,8 +206,8 @@
     if (b.life) boss.life = b.life;
     if (id === 'nina') { ninaIntro(); return; }
     // Kurzfilm: Kamera schaut auf den Boss
-    const cx = x, cz = z, h = id === 'wurm' ? 10 : (b.scale || 1) * 1.6 + 8;
-    if (L.startCine) L.startCine(b.icon + ' ' + b.name + ' – ' + b.title, 4.2, (t) => { const u = t / 4.2, ang = boss.yaw + 0.8 + u * 0.9, dist = 55 - u * 15; return { x: cx + Math.sin(ang) * dist, y: h * 0.5 + 6 + u * 8, z: cz + Math.cos(ang) * dist, lx: boss.x, ly: h * (id === 'wurm' ? 0.4 : 0.7), lz: boss.z }; });
+    const cx = x, cz = z, h = id === 'wurm' ? 25 : (b.scale || 1) * BIG * 1.6 + 8;
+    if (L.startCine) L.startCine(b.icon + ' ' + b.name + ' – ' + b.title, 4.2, (t) => { const u = t / 4.2, ang = boss.yaw + 0.8 + u * 0.9, dist = 55 - u * 15; return { x: cx + Math.sin(ang) * dist * BIG, y: h * 0.5 + 6 + u * 8, z: cz + Math.cos(ang) * dist * BIG, lx: boss.x, ly: h * (id === 'wurm' ? 0.4 : 0.7), lz: boss.z }; });
     L.shake = Math.max(L.shake, 1.2);
   }
   // ---------- NINA: Mini-See, Schaum, Walrosse ----------
@@ -277,11 +278,11 @@
   // Kurzfilm: NINA erscheint, beschwört den See, Schaum quillt, die Walrosse kommen
   function ninaIntro() {
     const b0 = boss; b0.ct = 0; b0.intro = true;
-    b0.lakeX = b0.x + Math.sin(b0.yaw) * 22; b0.lakeZ = b0.z + Math.cos(b0.yaw) * 22;
+    b0.lakeX = b0.x + Math.sin(b0.yaw) * 40; b0.lakeZ = b0.z + Math.cos(b0.yaw) * 40;
     L.banner('👵 NINA', 'Die Walross-Oma ist da! Schleich – die Walrosse hören dich sonst!');
     L.startCine('👵 NINA – DIE WALROSS-OMA', 9, (t) => {
       const B0 = boss || b0, fx2 = Math.sin(B0.yaw), fz2 = Math.cos(B0.yaw);
-      if (t < 2.4) { const a = B0.yaw + 0.5 + t * 0.15; return { x: B0.x + Math.sin(a) * 34, y: 15, z: B0.z + Math.cos(a) * 34, lx: B0.x, ly: 16, lz: B0.z }; }
+      if (t < 2.4) { const a = B0.yaw + 0.5 + t * 0.15; return { x: B0.x + Math.sin(a) * 80, y: 30, z: B0.z + Math.cos(a) * 80, lx: B0.x, ly: 38, lz: B0.z }; }
       if (t < 4.6) return { x: B0.lakeX + fz2 * 16 + fx2 * 10, y: 8, z: B0.lakeZ - fx2 * 16 + fz2 * 10, lx: B0.lakeX, ly: 1, lz: B0.lakeZ };
       const u = (t - 4.6) / 4.4; return { x: B0.lakeX + fx2 * (24 + u * 10) + fz2 * 8, y: 9 + u * 6, z: B0.lakeZ + fz2 * (24 + u * 10) - fx2 * 8, lx: B0.lakeX, ly: 3, lz: B0.lakeZ };
     });
@@ -343,8 +344,8 @@
     if (I.shelter) { const S = I.shelter, sd = Math.hypot(boss.x - S.x, boss.z - S.z), lim = SAFE_R + 6; if (sd < lim) { boss.x = S.x + (boss.x - S.x) / (sd || 1) * lim; boss.z = S.z + (boss.z - S.z) / (sd || 1) * lim; } }
     // Angriffe
     if (tgt && boss.cd <= 0) {
-      const ab = L.pick(b.abil), hy = (b.scale || 10) * 1.5;
-      if (ab === 'stomp' && dP < 26) { boss.cd = 4; boss.atk = 1; telegraph(boss.x, boss.z, 22, 1.1, 0xff3030, () => { L.snd.stomp({ x: boss ? boss.x : P.x, y: 0, z: boss ? boss.z : P.z }); L.shake = Math.max(L.shake, 1.4); if (boss) { L.fx('#7a6a50', boss.x, 0.5, boss.z, 30, 12, { size: 0.4, life: 1.4 }); hurtIf(boss.x, boss.z, 22, 60, b.name + ' hat dich zertrampelt'); } }); }
+      const ab = L.pick(b.abil), hy = (b.scale || 10) * 1.5 * BIG;
+      if (ab === 'stomp' && dP < 36) { boss.cd = 4; boss.atk = 1; telegraph(boss.x, boss.z, 32, 1.1, 0xff3030, () => { L.snd.stomp({ x: boss ? boss.x : P.x, y: 0, z: boss ? boss.z : P.z }); L.shake = Math.max(L.shake, 1.4); if (boss) { L.fx('#7a6a50', boss.x, 0.5, boss.z, 30, 12, { size: 0.4, life: 1.4 }); hurtIf(boss.x, boss.z, 32, 60, b.name + ' hat dich zertrampelt'); } }); }
       else if (ab === 'bolt') { boss.cd = 2.6; boss.atk = 0.8; const x = P.x + P.vx * 0.8, z = P.z + P.vz * 0.8; telegraph(x, z, 6, 1.2, 0x80c8ff, () => { column(x, z, 0xc8e0ff, 200); L.env.bolt = 1; L.snd.thunder(0.02); L.fx('#c8e0ff', x, 1, z, 30, 12, { basic: true, size: 0.6, life: 0.6 }); L.decal(x, z, 3, '#111'); hurtIf(x, z, 6, 50, 'Von Thors Blitz getroffen'); }); }
       else if (ab === 'erupt') { boss.cd = 2.8; boss.atk = 0.8; for (let k = 0; k < 3; k++) { const x = P.x + L.rand(-8, 8) * (k ? 1 : 0), z = P.z + L.rand(-8, 8) * (k ? 1 : 0); telegraph(x, z, 5, 1.3 + k * 0.25, 0xff6a10, () => { column(x, z, 0xff6a10, 40); L.fx('#ff6a10', x, 1, z, 30, 14, { basic: true, size: 0.6, life: 1 }); L.decal(x, z, 3, '#1a0a05'); hurtIf(x, z, 5, 40, 'Von einer Lava-Fontäne erwischt'); }); } }
       else if (ab === 'throw' && b.proj) { boss.cd = 2.4; boss.atk = 0.8; const from = { x: boss.x + Math.sin(boss.yaw) * 4, y: hy, z: boss.z + Math.cos(boss.yaw) * 4 }; throwAt(from, P.x + P.vx * 1.4, P.z + P.vz * 1.4, b.proj, 45, b.proj === 'speer' ? 'Von Odins Speer durchbohrt' : b.proj === 'dolch' ? 'Von Lokis Dolch getroffen' : b.proj === 'lava' ? 'Von einem Lavabrocken getroffen' : 'Von einem Felsbrocken getroffen'); }

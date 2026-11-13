@@ -30,6 +30,7 @@
     gold: { name: 'Goldbarren', slot: 'bag', icon: '🪙', stack: 10 },
     uhr: { name: 'Taschenuhr', slot: 'bag', icon: '⌚', stack: 5 },
     artefakt: { name: 'Alien-Artefakt', slot: 'bag', icon: '🔮', stack: 3 },
+    taucheranzug: { name: 'Taucheranzug', slot: 'bag', icon: '🤿', stack: 1 },
     donneraxt: { name: 'Donneraxt', slot: 'waffe', icon: '🪓', dmg: 0, rate: 0.7, noise: 40, range: 260, ammo: null, mag: 1, spread: 0 }
   };
   const ITEMS = L.ITEMS;
@@ -545,7 +546,7 @@
     P.knockT -= dt;
     if (sprint) P.stam = Math.max(0, P.stam - (L.frenzy ? 8 : 16) * dt); else P.stam = Math.min(100, P.stam + (P.stance === 'stand' ? 11 : 15) * dt);
     // Schwimmen kostet Kraft – ohne Kraft ertrinkt man
-    if (P.swim) {
+    if (P.swim && !(L.hasDiveSuit && L.hasDiveSuit())) {
       P.stam = Math.max(0, P.stam - 18 * dt);
       if (P.stam <= 0) {
         P.hp -= 12 * dt; P.hurtFlash = Math.min(1, P.hurtFlash + dt);
@@ -568,7 +569,14 @@
     const depth = L.WATER_Y - sf;
     P.swim = depth > 1.35 && !L.inDim(P.x);
     const gY = P.swim ? L.WATER_Y - 1.25 : sf;
-    if (!P.air && Math.abs(P.y - gY) < 0.8) P.y = gY;
+    // 🤿 mit Taucheranzug: frei tauchen (C runter, Leertaste hoch), kein Ertrinken
+    if (P.swim && L.hasDiveSuit && L.hasDiveSuit()) {
+      const upK = !block && L.keys.Space, dnK = !block && (L.keys.KeyC || L.keys.ControlLeft);
+      if (P.y > gY) P.y = gY;
+      P.y = L.clamp(P.y + ((upK ? 5 : 0) - (dnK ? 5 : 0)) * dt, sf + 0.4, gY); P.vy = 0; P.air = false; P.stam = 100;
+      L.underwaterDive = P.y < gY - 0.05 || dnK;
+    } else L.underwaterDive = false;
+    if (!P.air && Math.abs(P.y - gY) < 0.8 && !L.underwaterDive) P.y = gY;
     if (P.air || P.y > gY) {
       P.vy -= 20 * dt; P.y += P.vy * dt;
       if (P.y <= gY) {
@@ -882,6 +890,7 @@
     const ch = L.cruiseHint && L.cruiseHint(); if (ch) return ch;
     const wh = L.wsHint && L.wsHint(); if (wh) return wh;
     const rh = L.reviveHint && L.reviveHint(); if (rh) return rh;
+    const kh = L.crateHint && L.crateHint(); if (kh) return kh;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) return 'E: ' + L.containerName(cont) + ' öffnen';
     const v = nearestVehicle();
@@ -916,6 +925,7 @@
       return;
     }
     if (L.reviveInteract && L.reviveInteract()) return;
+    if (L.crateInteract && L.crateInteract()) return;
     if (L.cruiseInteract && L.cruiseInteract()) return;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) { L.openContainer(cont); return; }
@@ -1407,6 +1417,10 @@
       voice: (p) => L.snd.viktor(p), idle: (p) => L.snd.click(p), hit: [] },
     daniel: { build: () => L.buildDaniel(), anim: (r, s) => L.animDaniel(r, s), spd: MSPD.daniel, hp: 280, r: 0.8, reach: 3.2, grab: 2.6, atk: 1.1, wind: 0.55, dmg: 45, veh: 50, knock: 15, up: 6, heavy: true, view: 260,
       cause: 'Daniel hat dich zerquetscht', voice: (p) => L.snd.daniel(p), idle: (p) => L.snd.heavy(p, 0.2), hit: [] },
+    rollerviktor: { build: () => L.buildRollerViktor(), anim: (r, s) => L.animRollerViktor(r, s), spd: [3, 9, 15], hp: 100, r: 0.6, reach: 2.6, grab: 2.2, atk: 0.8, wind: 0.35, dmg: 32, veh: 35, knock: 12, up: 4.5, view: 260,
+      cause: 'Roller-Viktor hat dich überfahren', voice: (p) => L.snd.viktor(p), idle: (p) => L.snd.click(p), hit: [[1.6, 0.4, 1], [2.4, 0.4, 1], [3.1, 0.26, 2]] },
+    capydaniel: { build: () => L.buildCapyDaniel(), anim: (r, s) => L.animCapyDaniel(r, s), spd: [2.5, 7.5, 12.5], hp: 320, r: 1.0, reach: 3.2, grab: 2.8, atk: 1.0, wind: 0.5, dmg: 45, veh: 50, knock: 15, up: 6, heavy: true, view: 260,
+      cause: 'Capybara-Daniel hat dich niedergeritten', voice: (p) => L.snd.daniel(p), idle: (p) => L.snd.heavy(p, 0.2), hit: [[1.0, 1.0, 1], [2.1, 0.7, 1], [2.9, 0.3, 2]] },
     langer: { build: () => L.buildLanger(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 5.5, 9.5], hp: 140, r: 0.4, reach: 3.4, grab: 2.8, atk: 0.9, wind: 0.45, dmg: 40, veh: 35, knock: 11, up: 5, view: 300,
       cause: 'Der Gesichtslose hat dich geholt', voice: (p) => L.snd.langer(p), idle: (p) => L.snd.langerIdle(p), hit: [[1.4, 0.3, 1], [2.3, 0.3, 1], [3.1, 0.2, 2]] },
     rufer: { build: () => L.buildRufer(), anim: (r, s) => L.animBeast(r, s), spd: [1.5, 4.5, 8], hp: 650, r: 1.1, reach: 6.5, grab: 5.5, atk: 1.5, wind: 0.6, dmg: 60, veh: 70, knock: 18, up: 8, heavy: true, view: 480,
@@ -2743,7 +2757,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -2844,6 +2858,8 @@
     }
     for (const [x, z] of [[-114, 150], [1180, -880], [114, -150]]) { if (!L.queryBoxes(x, z, 6).length) spawnVehicle({ type: 'heli', x, z, yaw: Math.random() * 6 }); }
     if (L.spawnPolice) L.spawnPolice();
+    if (L.stripDiveSuits) L.stripDiveSuits();
+    if (L.spawnDiveSuits) L.spawnDiveSuits();
     // genau ein Flugzeug, irgendwo auf freiem Land
     for (let i = 0; i < 80; i++) {
       const x = L.rand(-1300, 1300), z = L.rand(-1300, 1300);
@@ -2871,6 +2887,8 @@
     place('viktor', NK);
     place('daniel', NK);
     place('langer', NK);
+    place('rollerviktor', Math.round(NK * 0.6));
+    place('capydaniel', Math.round(NK * 0.6));
     place('rufer', NK);
     place('starrende', NK);
     for (const k of ['rufer', 'langer', 'starrende']) {
@@ -3001,6 +3019,7 @@
     if (L.updateIslandBosses) L.updateIslandBosses(dt);
     if (L.updateDimBoss) L.updateDimBoss(dt);
     if (L.updatePolice) L.updatePolice(dt);
+    if (L.updateCrates) L.updateCrates(dt);
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);

@@ -3,7 +3,9 @@
 // Schränke, Schubladen, Kühlschränke und Spinde zum Öffnen – mit Beute. Das Innere entsteht, wenn man in die Nähe kommt.
 (function () {
   const L = window.L, T = THREE, P = L.player;
-  const FH = 3.2, WT = 0.3, NEAR = 45, FAR = 95;
+  const FH = 4.0, WT = 0.3, NEAR = 45, FAR = 95;
+  let matTread, matRiser, matStringer, matRail;
+  setTimeout(() => { matTread = L.mat('#8a6a4a'); matRiser = L.mat('#5a4434'); matStringer = L.mat('#3a3a3e'); matRail = L.mat('#2a2a2e'); }, 0);
   const C1 = new T.Color(), D = new T.Object3D();
   const active = [];
   L.indoor = null;
@@ -15,7 +17,7 @@
   // ---------- Höhe des Bodens im Gebäude (Stockwerke, Treppen, Dach) ----------
   function layout(B) {
     if (B.lay) return B.lay;
-    const nf = B.tower ? Math.floor(B.h / 3.4) : Math.max(1, Math.floor((B.h - 0.4) / FH));
+    const nf = B.tower ? Math.floor(B.h / 4.2) : Math.max(1, Math.floor((B.h - 0.4) / FH));
     const fh = B.tower ? B.h / nf : FH;
     const ix1 = B.x - B.w / 2 + WT, ix2 = B.x + B.w / 2 - WT, iz1 = B.z - B.d / 2 + WT, iz2 = B.z + B.d / 2 - WT;
     const sl = Math.min(7, (iz2 - iz1) * 0.45), stair = { x1: ix1 + 0.2, x2: ix1 + 1.9, z1: iz1 + 0.4, z2: iz1 + 0.4 + sl };
@@ -155,9 +157,17 @@
       // Treppe nach oben
       const top = k + 1 < Ly.nf ? Ly.levels[k + 1] : (Ly.roofAccess ? B.h : null);
       if (top !== null) {
-        const n = Math.ceil((top - y) / 0.25);
-        for (let s = 0; s < n; s++) { const st = new T.Mesh(L.GEO.boxB, matStair); const zz = S.z1 + (s + 0.5) * (S.z2 - S.z1) / n; st.scale.set(S.x2 - S.x1, (s + 1) * (top - y) / n, (S.z2 - S.z1) / n); st.position.set((S.x1 + S.x2) / 2, y, zz); g.add(st); }
-        const rail = new T.Mesh(L.GEO.boxB, L.mat('#3a3a3a')); rail.scale.set(0.08, 1, S.z2 - S.z1); rail.position.set(S.x2 + 0.04, y + (top - y) / 2, (S.z1 + S.z2) / 2); g.add(rail);
+        // richtige Treppe: Trittstufen mit Setzstufen, Wangen an beiden Seiten, Geländer mit Pfosten
+        const n = Math.ceil((top - y) / 0.22), run = (S.z2 - S.z1) / n, rise = (top - y) / n, wdt = S.x2 - S.x1, cx = (S.x1 + S.x2) / 2;
+        for (let s = 0; s < n; s++) {
+          const zz = S.z1 + s * run;
+          const tr = new T.Mesh(L.GEO.boxB, matTread); tr.scale.set(wdt, 0.06, run + 0.04); tr.position.set(cx, y + (s + 1) * rise - 0.06, zz + run / 2); g.add(tr);
+          const rs = new T.Mesh(L.GEO.boxB, matRiser); rs.scale.set(wdt * 0.98, rise, 0.04); rs.position.set(cx, y + s * rise, zz + 0.02); g.add(rs);
+        }
+        const len = Math.hypot(S.z2 - S.z1, top - y), ang = Math.atan2(top - y, S.z2 - S.z1);
+        for (const sx of [S.x1 - 0.04, S.x2 + 0.04]) { const st2 = new T.Mesh(L.GEO.box, matStringer); st2.scale.set(0.08, 0.3, len); st2.position.set(sx, y + (top - y) / 2 - 0.05, (S.z1 + S.z2) / 2); st2.rotation.x = -ang; g.add(st2); }
+        const rail = new T.Mesh(L.GEO.box, matRail); rail.scale.set(0.06, 0.06, len); rail.position.set(S.x2 + 0.06, y + (top - y) / 2 + 0.95, (S.z1 + S.z2) / 2); rail.rotation.x = -ang; g.add(rail);
+        for (let p = 0; p <= 4; p++) { const u = p / 4, post = new T.Mesh(L.GEO.boxB, matRail); post.scale.set(0.05, 0.95, 0.05); post.position.set(S.x2 + 0.06, y + u * (top - y), S.z1 + u * (S.z2 - S.z1)); g.add(post); }
       }
       // Zimmer: Wände mit Durchgängen
       const [cols, rows] = L.roomGrid(B), ch = k + 1 < Ly.nf ? Ly.fh - 0.15 : (B.h - y);
@@ -169,7 +179,6 @@
       for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) {
         let x1 = Ly.ix1 + c * cw + (c ? 0.15 : 0), x2 = Ly.ix1 + (c + 1) * cw - (c < cols - 1 ? 0.15 : 0), z1 = Ly.iz1 + r * rd + (r ? 0.15 : 0), z2 = Ly.iz1 + (r + 1) * rd - (r < rows - 1 ? 0.15 : 0);
         if (c === 0 && r === 0) x1 = S.x2 + 0.3; // Platz für die Treppe
-        if (B.tower && R() < 0.5) continue;
         furnish(I, R, kinds[Math.floor(R() * kinds.length)], x1, z1, x2, z2, y, B.poi);
       }
     }

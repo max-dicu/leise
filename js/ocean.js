@@ -13,15 +13,30 @@
 
   // ---------- Unterwasser-Abschnitte (werden um dich herum erzeugt, so weit du tauchst) ----------
   const CH = 160, chunks = new Map();
-  const coral = ['#ff5a6a', '#ff9a3a', '#ffd040', '#c050ff', '#40d0ff', '#ff70c0', '#60e080'];
+  const coral = ['#ff5a6a', '#ff9a3a', '#ffd040', '#c050ff', '#40d0ff', '#ff70c0', '#60e080', '#ff3a9a', '#7a5aff', '#30f0d0', '#ffef60', '#ff6a2a', '#e060ff', '#5af0ff'];
+  const glowCoral = new T.MeshLambertMaterial({ color: 0xffffff, emissive: 0x302040 });
   const crystalMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, blending: T.AdditiveBlending, depthWrite: false });
   const crystals = [];
   function buildChunk(cx, cz) {
     const R = hash(cx, cz, 7), g = new T.Group(); L.scene.add(g);
     const sph = L.GEO.sph, cone = L.GEO.cone, cyl = L.GEO.cylB, box = L.GEO.box;
-    const mS = inst(sph, 60), mC = inst(cone, 60), mY = inst(cyl, 80), mK = inst(L.GEO.boxB, 30), fish = inst(new T.ConeGeometry(0.35, 1.2, 5).rotateX(Math.PI / 2), 40, new T.MeshLambertMaterial({ color: 0xffffff }));
+    const mS = inst(sph, 260, glowCoral), mC = inst(cone, 200, glowCoral), mY = inst(cyl, 300, glowCoral), mK = inst(L.GEO.boxB, 120, glowCoral), fish = inst(new T.ConeGeometry(0.35, 1.2, 5).rotateX(Math.PI / 2), 72, new T.MeshLambertMaterial({ color: 0xffffff }));
     for (const m of [mS, mC, mY, mK, fish]) g.add(m);
     const ch = { g, fish, school: [], cx, cz, crystals: [] };
+    const pick = () => coral[Math.floor(R() * coral.length)];
+    // Korallenriffe: Geweih-, Hirn-, Fächer-, Röhren-Korallen und Anemonen
+    for (let i = 0; i < 40; i++) {
+      const x = (cx + R()) * CH, z = (cz + R()) * CH, h = L.seaFloor(x, z);
+      if (h > -3 || h < -5000) continue;
+      const k = R(), c = pick(), s = 0.6 + R() * 1.6;
+      if (k < 0.25) { for (let b = 0; b < 5; b++) { const a = b * 1.26 + R(); add(mY, x + Math.sin(a) * 0.3 * s, h, z + Math.cos(a) * 0.3 * s, 0.12 * s, (1.2 + R() * 1.4) * s, 0.12 * s, a, c, 0.35 + R() * 0.3); } }
+      else if (k < 0.42) { add(mS, x, h + 0.3 * s, z, 1.1 * s, 0.7 * s, 1.1 * s, 0, c); add(mS, x, h + 0.55 * s, z, 0.8 * s, 0.35 * s, 0.8 * s, 0, pick()); }
+      else if (k < 0.6) { add(mK, x, h, z, 0.06, 1.8 * s, 1.6 * s, R() * 3, c, (R() - 0.5) * 0.3); }
+      else if (k < 0.78) { for (let b = 0; b < 6; b++) add(mY, x + (R() - 0.5) * 1.2 * s, h, z + (R() - 0.5) * 1.2 * s, 0.18 * s, (0.6 + R() * 1.5) * s, 0.18 * s, 0, b % 2 ? c : pick()); }
+      else { for (let b = 0; b < 8; b++) { const a = b * 0.785; add(mC, x + Math.sin(a) * 0.25 * s, h + 0.5 * s, z + Math.cos(a) * 0.25 * s, 0.1 * s, 0.9 * s, 0.1 * s, 0, c, Math.sin(a) * 0.5); } add(mS, x, h + 0.2 * s, z, 0.35 * s, 0.25 * s, 0.35 * s, 0, pick()); }
+    }
+    // zweiter Fischschwarm in anderer Farbe
+    { const fc2 = pick(), fx2 = (cx + 0.3) * CH, fz2 = (cz + 0.7) * CH, fh2 = L.seaFloor(fx2, fz2); if (fh2 < -6 && fh2 > -5000) for (let i = 0; i < 24; i++) { ch.school.push({ a: R() * 6.28, r: 2 + R() * 6, y: fh2 * (0.3 + R() * 0.5), sp: 0.5 + R() * 0.7, x: fx2, z: fz2 }); add(fish, fx2, fh2 * 0.5, fz2, 0.8, 0.8, 0.8, 0, fc2); } }
     for (let i = 0; i < 28; i++) {
       const x = (cx + R()) * CH, z = (cz + R()) * CH, h = L.seaFloor(x, z);
       if (h > -3 || h < -5000) continue;

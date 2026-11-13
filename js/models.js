@@ -897,6 +897,42 @@
     }
   };
 
+  // ---------- Roller-Viktor: Viktor auf einem E-Roller ----------
+  L.buildRollerViktor = function () {
+    const r = L.buildViktor(L.pick(['grey', 'red', 'blue'])), sc = grp(r.root);
+    part(G().box, '#1a1a1a', 0.3, 0.1, 1.2, 0, 0.22, 0, sc); part(G().box, '#e03a2a', 0.31, 0.03, 1.2, 0, 0.17, 0, sc);
+    const stem = part(G().box, '#2a2a2a', 0.07, 1.3, 0.07, 0, 0.85, 0.58, sc); stem.rotation.x = -0.15;
+    part(G().box, '#2a2a2a', 0.7, 0.05, 0.05, 0, 1.48, 0.68, sc);
+    const wg = new T.CylinderGeometry(1, 1, 1, 12).rotateZ(Math.PI / 2); r.wheels = [];
+    for (const z of [0.6, -0.55]) { const w = new T.Mesh(wg, L.mat('#111')); w.scale.set(0.1, 0.17, 0.17); w.position.set(0, 0.17, z); sc.add(w); r.wheels.push(w); }
+    r.scooter = sc; return r;
+  };
+  L.animRollerViktor = function (r, s) {
+    const m = s.mode;
+    L.animViktor(r, { mode: m === 'attack' || m === 'dead' || m === 'alert' ? m : 'walk', phase: 0, speed: 0, atk: s.atk });
+    if (m !== 'dead') { r.body.position.y += 0.3; r.legs[0].leg.rotation.x = 0.05; r.legs[1].leg.rotation.x = -0.05; for (const a of r.arms) { a.arm.rotation.x = -1.2; } }
+    const sp = m === 'run' || m === 'crawl' ? 1 : m === 'walk' ? 0.4 : 0;
+    for (const w of r.wheels) w.rotation.x += sp * 0.6;
+    r.scooter.visible = m !== 'dead';
+  };
+  // ---------- Capybara-Daniel: Daniel reitet ein Capybara ----------
+  L.buildCapyDaniel = function () {
+    const r = L.buildDaniel(), cap = grp(r.root), br = '#8a5a3a', dk = '#6a4228';
+    part(G().sph, br, 0.75, 0.6, 1.15, 0, 0.9, 0, cap);
+    const head = grp(cap, 0, 1.15, 1.05); part(G().box, br, 0.6, 0.55, 0.75, 0, 0, 0.1, head); part(G().box, dk, 0.5, 0.35, 0.2, 0, -0.08, 0.5, head);
+    for (const s of [-1, 1]) { part(G().sph, '#111', 0.06, 0.06, 0.04, s * 0.22, 0.12, 0.35, head); part(G().sph, dk, 0.1, 0.1, 0.06, s * 0.24, 0.32, -0.15, head); }
+    r.capLegs = [];
+    for (const [x, z] of [[-0.45, 0.6], [0.45, 0.6], [-0.45, -0.6], [0.45, -0.6]]) { const l = grp(cap, x, 0.6, z); part(G().box, dk, 0.22, 0.6, 0.25, 0, -0.3, 0, l); r.capLegs.push(l); }
+    r.capy = cap; return r;
+  };
+  L.animCapyDaniel = function (r, s) {
+    const m = s.mode;
+    L.animDaniel(r, { mode: m === 'attack' || m === 'dead' || m === 'alert' ? m : 'walk', phase: 0, speed: 0, atk: s.atk });
+    if (m !== 'dead') { r.body.position.y += 1.0; for (const l of r.legs) { l.leg.rotation.x = -1.1; l.knee.rotation.x = 1.3; } r.legs[0].leg.rotation.z = 0.5; r.legs[1].leg.rotation.z = -0.5; }
+    const sp = m === 'run' || m === 'crawl' ? 1 : m === 'walk' ? 0.5 : 0, ph = (s.phase || 0) * 2;
+    r.capLegs.forEach((l, i) => { l.rotation.x = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI / 2 : 0)) * 0.6 * sp; });
+    r.capy.position.y = Math.abs(Math.sin(ph)) * 0.08 * sp; r.capy.visible = m !== 'dead';
+  };
   // ---------- Daniel ----------
   L.buildDaniel = function () {
     const box = G().box, sph = G().sph, sk = '#8f766a', sd = '#5c4840';
@@ -1194,6 +1230,14 @@
     jeep: { name: 'Militär-Jeep', vmax: 135, acc: 7, hp: 230, kind: 'car', len: 4.3, wid: 2.0, off: 0.95, h: 1.7 },
     motorrad: { name: 'Motorrad', vmax: 220, acc: 12.5, hp: 60, kind: 'bike', len: 2.1, wid: 0.8, off: 0.6, wheelie: true },
     cross: { name: 'Crossmaschine', vmax: 150, acc: 10, hp: 60, kind: 'bike', len: 2.0, wid: 0.8, off: 0.95, wheelie: true },
+    lkw: { name: 'Lastwagen', vmax: 120, acc: 4.5, hp: 400, kind: 'car', big: true, len: 8.5, wid: 2.5, off: 0.7, h: 3.2, wr: 0.55, body: '#2a4a8a' },
+    bus: { name: 'Bus', vmax: 110, acc: 4, hp: 380, kind: 'car', big: true, len: 10, wid: 2.6, off: 0.6, h: 3.1, wr: 0.5, body: '#e8c020' },
+    van: { name: 'Kleinbus', vmax: 160, acc: 6, hp: 160, kind: 'car', big: true, len: 5.2, wid: 2.0, off: 0.7, h: 2.2, wr: 0.38 },
+    monstertruck: { name: 'Monstertruck', vmax: 190, acc: 9, hp: 300, kind: 'car', big: true, len: 5, wid: 2.8, off: 1, h: 2.6, wr: 1.0, lift: 1.0 },
+    buggy: { name: 'Strandbuggy', vmax: 170, acc: 11, hp: 110, kind: 'car', big: true, len: 3.4, wid: 1.8, off: 1, h: 1.2, wr: 0.48, open: true },
+    gokart: { name: 'Gokart', vmax: 130, acc: 12, hp: 60, kind: 'car', big: true, len: 2.2, wid: 1.3, off: 0.6, h: 0.5, wr: 0.2, open: true },
+    traktor: { name: 'Traktor', vmax: 45, acc: 3.5, hp: 300, kind: 'car', big: true, len: 4, wid: 2.2, off: 1, h: 2.6, wr: 0.75, body: '#2a8a3a' },
+    cabrio: { name: 'Cabrio', vmax: 230, acc: 10.5, hp: 95, kind: 'car', big: true, len: 4.4, wid: 1.85, off: 0.5, h: 1.1, wr: 0.36, open: true },
     quad: { name: 'Straßen-Quad', vmax: 275, acc: 22, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.25, off: 0.75 },
     atv: { name: 'Gelände-ATV', vmax: 400, acc: 27, hp: 140, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.3, off: 1 },
     // Polizei (unzerstörbar, nur KI): 500 km/h
@@ -1346,6 +1390,33 @@
       mkWheel(0, 0.5, -1.0, 0.5, 0.5);
       seat = { x: 0, y: 0.25, z: -0.35 };
       seats = [seat, { x: 0, y: 0.32, z: -0.85 }];
+    } else if (t.big) {
+      // neue Fahrzeuge (Lastwagen, Bus, Kleinbus, Monstertruck, Buggy, Gokart, Traktor, Cabrio)
+      const L2 = t.len, W = t.wid, wr = t.wr, lift = (t.lift || 0) + wr * 0.6, c = t.body || color, bh = Math.max(0.35, t.h - wr - (t.lift || 0) - 0.2);
+      if (t.open) {
+        part(box, c, W, 0.45, L2, 0, lift + 0.25, 0, root);
+        if (type === 'buggy') { for (const s of [-1, 1]) { part(box, '#222', 0.08, 1.1, 0.08, s * W * 0.42, lift + 1.0, -L2 * 0.1, root); part(box, '#222', 0.08, 1.1, 0.08, s * W * 0.42, lift + 1.0, L2 * 0.2, root); } part(box, '#222', W * 0.9, 0.08, L2 * 0.35, 0, lift + 1.55, L2 * 0.05, root); }
+        if (type === 'cabrio') part(box, '#1d2228', W * 0.85, 0.35, 0.06, 0, lift + 0.7, L2 * 0.1, root, { opacity: 0.7 });
+      } else if (type === 'lkw') {
+        part(box, c, W, 1.6, L2 * 0.28, 0, lift + 1.1, L2 * 0.34, root); part(box, '#1d2228', W * 0.9, 0.6, 0.06, 0, lift + 1.4, L2 * 0.48, root, { opacity: 0.8 });
+        part(box, '#d8d8d8', W, 2.3, L2 * 0.66, 0, lift + 1.45, -L2 * 0.15, root); part(box, '#c02a2a', W * 1.01, 0.3, L2 * 0.66, 0, lift + 0.6, -L2 * 0.15, root);
+      } else if (type === 'traktor') {
+        part(box, c, W * 0.7, 1.0, L2 * 0.5, 0, lift + 0.6, L2 * 0.2, root); part(box, '#1d2228', W * 0.75, 1.0, L2 * 0.32, 0, lift + 1.6, -L2 * 0.12, root, { opacity: 0.6 }); part(box, c, W * 0.8, 0.08, L2 * 0.36, 0, lift + 2.15, -L2 * 0.12, root);
+        part(G().cyl, '#333', 0.08, 1.0, 0.08, W * 0.2, lift + 1.6, L2 * 0.35, root);
+      } else {
+        part(box, c, W, bh, L2, 0, lift + bh / 2 + 0.1, 0, root);
+        const nW = type === 'bus' ? Math.floor(L2 / 1.4) : 3;
+        for (const s of [-1, 1]) for (let k = 0; k < nW; k++) part(box, '#1d2228', 0.03, bh * 0.35, L2 / nW * 0.7, s * (W / 2 + 0.005), lift + bh * 0.72, -L2 / 2 + (k + 0.5) * L2 / nW, root, { noShadow: true });
+        part(box, '#1d2228', W * 0.85, bh * 0.4, 0.04, 0, lift + bh * 0.7, L2 / 2 + 0.01, root, { opacity: 0.8 });
+      }
+      for (const s of [-1, 1]) { part(box, '#fff8d0', 0.25, 0.14, 0.05, s * W * 0.32, lift + 0.4, L2 / 2 + 0.02, root, { basic: true, noShadow: true }); part(box, '#c01010', 0.25, 0.12, 0.05, s * W * 0.34, lift + 0.4, -L2 / 2 - 0.02, root, { basic: true, noShadow: true }); }
+      const wz = L2 * 0.33, ww = wr * (type === 'monstertruck' ? 0.9 : 0.6);
+      for (const s of [-1, 1]) { steer.push(mkWheel(s * W * 0.5, wr, wz, wr, ww)); mkWheel(s * W * 0.5, type === 'traktor' ? wr * 1.5 : wr, -wz, type === 'traktor' ? wr * 1.5 : wr, ww * (type === 'traktor' ? 1.4 : 1)); }
+      const sy = lift + 0.2 - 0.45;
+      seat = { x: W * 0.22, y: sy, z: L2 * 0.15 };
+      seats = [seat, { x: -W * 0.22, y: sy, z: L2 * 0.15 }];
+      if (type === 'bus' || type === 'van' || type === 'lkw') seats.push({ x: W * 0.22, y: sy, z: -L2 * 0.1 }, { x: -W * 0.22, y: sy, z: -L2 * 0.1 });
+      glassZ = L2 * 0.3;
     } else if (t.kind === 'car') {
       const L2 = t.len, W = t.wid, low = type === 'sportwagen';
       part(box, color, W, low ? 0.55 : 0.7, L2, 0, low ? 0.55 : 0.7, 0, root);
