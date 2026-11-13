@@ -42,7 +42,7 @@
   const C1 = new T.Color(), C2 = new T.Color();
   function rnd(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   const mat = (c, o) => L.mat(c, o);
-  function inst(geo, color, n) { const m = new T.InstancedMesh(geo, mat('#ffffff'), n); m.castShadow = true; m.receiveShadow = true; m.count = 0; m.userData.col = color; return m; }
+  function inst(geo, color, n) { const m = new T.InstancedMesh(geo, mat('#ffffff'), n); m.instanceColor = new T.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3); m.castShadow = true; m.receiveShadow = true; m.count = 0; m.userData.col = color; return m; }
   const DUMMY = new T.Object3D();
   function addInst(m, x, y, z, sx, sy, sz, ry, color, rx) {
     DUMMY.position.set(x, y, z); DUMMY.scale.set(sx, sy, sz); DUMMY.rotation.set(rx || 0, ry || 0, 0); DUMMY.updateMatrix();

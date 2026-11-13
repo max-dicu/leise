@@ -7,7 +7,8 @@
   const C1 = new T.Color();
   const DUMMY = new T.Object3D();
   function hash(a, b, s) { let h = (a * 374761393 + b * 668265263 + (s || 0) * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return () => { h = (h + 0x6D2B79F5) | 0; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-  function inst(geo, n, o) { const m = new T.InstancedMesh(geo, o || L.mat('#ffffff'), n); m.count = 0; return m; }
+  // Farbspeicher gleich in voller Größe anlegen (sonst ist er leer, weil count = 0 – dann wäre alles schwarz)
+  function inst(geo, n, o) { const m = new T.InstancedMesh(geo, o || L.mat('#ffffff'), n); m.instanceColor = new T.InstancedBufferAttribute(new Float32Array(n * 3).fill(1), 3); m.count = 0; return m; }
   function add(m, x, y, z, sx, sy, sz, ry, color, rx) { DUMMY.position.set(x, y, z); DUMMY.scale.set(sx, sy, sz); DUMMY.rotation.set(rx || 0, ry || 0, 0); DUMMY.updateMatrix(); m.setMatrixAt(m.count, DUMMY.matrix); if (color) m.setColorAt(m.count, C1.set(color)); m.count++; }
   function done(g, list) { for (const m of list) { if (!m.count) { g.remove(m); continue; } m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }
 
