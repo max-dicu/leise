@@ -79,23 +79,30 @@
     bang(x, y, z, kind === 'text');
   }
   // ---------- Text am Himmel: Punkte formen die Buchstaben ----------
-  function skyText(x, y, z, text) {
-    text = String(text).slice(0, 40); if (!text.trim()) text = '🎆';
-    const c = document.createElement('canvas'), g = c.getContext('2d'); const fs = 64;
-    g.font = 'bold ' + fs + 'px Arial'; const w = Math.min(2048, Math.ceil(g.measureText(text).width) + 20); c.width = w; c.height = fs + 24;
-    g.font = 'bold ' + fs + 'px Arial'; g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(text, 10, c.height / 2);
-    const data = g.getImageData(0, 0, c.width, c.height).data, step = Math.max(3, Math.round(Math.sqrt(c.width * c.height / 1800)));
+  // o: { max, width (Meter), gentle (ohne Knall, langsam einblenden), gold, life } – mehrere Zeilen mit \n
+  function skyText(x, y, z, text, o) {
+    o = o || {};
+    text = String(text).slice(0, o.max || 40); if (!text.trim()) text = '🎆';
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const c = document.createElement('canvas'), g = c.getContext('2d'); const fs = 64, lh = Math.round(fs * 1.18);
+    g.font = 'bold ' + fs + 'px Arial'; let mw = 0; for (const l of lines) mw = Math.max(mw, g.measureText(l).width);
+    c.width = Math.min(2600, Math.ceil(mw) + 20); c.height = lines.length * lh + 24;
+    g.font = 'bold ' + fs + 'px Arial'; g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'center';
+    lines.forEach((l, i) => g.fillText(l, c.width / 2, 12 + lh * (i + 0.5)));
+    const data = g.getImageData(0, 0, c.width, c.height).data, step = Math.max(3, Math.round(Math.sqrt(c.width * c.height / (o.gentle ? 4200 : 1800))));
     const pts = []; for (let yy = 0; yy < c.height; yy += step) for (let xx = 0; xx < c.width; xx += step) if (data[(yy * c.width + xx) * 4 + 3] > 128) pts.push([xx - c.width / 2, c.height / 2 - yy]);
-    const scale = Math.min(0.35, 70 / c.width);
+    const scale = Math.min(0.35, (o.width || 70) / c.width);
     const n = pts.length, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), cc = new T.Color();
-    for (let i = 0; i < n; i++) { cc.setHex(PAL[(i * 7) % PAL.length]); cc.lerp(new T.Color(1, 1, 1), 0.35); col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b; }
+    for (let i = 0; i < n; i++) { if (o.gold) cc.setHex(i % 3 ? 0xffd870 : 0xffffff); else { cc.setHex(PAL[(i * 7) % PAL.length]); cc.lerp(new T.Color(1, 1, 1), 0.35); } col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b; }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
-    const mat = new T.PointsMaterial({ size: 3.2, map: dotTex(), vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false });
+    const mat = new T.PointsMaterial({ size: o.gentle ? 3.0 : 3.2, map: dotTex(), vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false });
     const ptsM = new T.Points(geo, mat); ptsM.frustumCulled = false;
     const grp = new T.Group(); grp.position.set(x, y, z); grp.add(ptsM); L.scene.add(grp);
-    texts.push({ grp, geo, mat, tgt: pts.map(([a, b]) => [a * scale, b * scale]), t: 0, life: 7 });
-    burst(x, y, z, sphereDirs(120), [0xffffff, 0xffd040], { speed: 30, life: 1.4, size: 1.2 });
+    const life = o.life || 7;
+    texts.push({ grp, geo, mat, tgt: pts.map(([a, b]) => [a * scale, b * scale]), t: 0, life, fadeIn: o.gentle ? 2.2 : 0.6, gentle: !!o.gentle });
+    if (!o.gentle) burst(x, y, z, sphereDirs(120), [0xffffff, 0xffd040], { speed: 30, life: 1.4, size: 1.2 });
   }
+  L.fwSkyText = skyText;
   // ---------- Raketen-Aufstieg ----------
   // fliegt schräg nach vorne (fx/fz = Blickrichtung beim Abfeuern), damit man die Explosion vor sich sieht
   function launch(kind, x, z, y0, seed, text, net, fx, fz) {
@@ -174,14 +181,16 @@
     }
     for (let i = texts.length - 1; i >= 0; i--) {
       const s = texts[i]; s.t += dt; s.grp.quaternion.copy(L.camera.quaternion);
-      const p = s.geo.attributes.position.array, u = Math.min(1, s.t / 0.6), e = 1 - Math.pow(1 - u, 3), fall = Math.max(0, s.t - 5) * 1.5;
+      const p = s.geo.attributes.position.array, u = Math.min(1, s.t / s.fadeIn), e = 1 - Math.pow(1 - u, 3), fall = Math.max(0, s.t - (s.life - 2)) * 1.5;
       for (let j = 0; j < s.tgt.length; j++) { p[j * 3] = s.tgt[j][0] * e; p[j * 3 + 1] = s.tgt[j][1] * e - fall * (0.5 + (j % 5) * 0.2); p[j * 3 + 2] = 0; }
       s.geo.attributes.position.needsUpdate = true;
-      s.mat.opacity = s.t < 5 ? 0.85 + Math.random() * 0.15 : Math.max(0, 1 - (s.t - 5) / 2);
+      s.mat.opacity = s.t < s.life - 2 ? (s.gentle ? Math.min(1, s.t / s.fadeIn) * (0.9 + Math.random() * 0.1) : 0.85 + Math.random() * 0.15) : Math.max(0, 1 - (s.t - (s.life - 2)) / 2);
       if (s.t >= s.life) { L.scene.remove(s.grp); s.geo.dispose(); s.mat.dispose(); texts.splice(i, 1); }
     }
   };
   L._fw = { bursts, texts, rockets };
+  L.fwLaunch = (kind, x, z, y0, seed, text, fx, fz) => launch(kind, x, z, y0, seed, text, true, fx, fz);
+  L.fwBattery = (x, z, y0, seed) => battery(x, z, y0, seed, true);
   L.clearFireworks = function () {
     for (const r of rockets) L.scene.remove(r.m); rockets.length = 0;
     for (const b of bursts) { L.scene.remove(b.pts); b.geo.dispose(); } bursts.length = 0;
