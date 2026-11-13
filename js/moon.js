@@ -247,7 +247,7 @@
     if (!bern || !(bern.hp > 0) || !(dmg > 0)) return;
     bern.hp -= dmg; if (L.showBossHp) L.showBossHp('😈 BERNHARD', bern.hp, BERN_HP);
     if (bern.hp <= 0) {
-      bern.hp = 0; bern.killed = true; if (L.gotKillCoins) L.gotKillCoins(1000);
+      bern.hp = 0; bern.killed = true; if (L.gotBossCoins) L.gotBossCoins(1000, 'Bernhard');
       if (L.bossReward) L.bossReward('bernhard', P.x + 3, P.z + 3, P.y || 0, 'defeat');
       L.banner('🏆 BERNHARD IST BESIEGT!', 'Und jetzt holt MAMA IVA sich den Rest …');
       startIvaEnd();

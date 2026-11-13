@@ -253,7 +253,7 @@
       L.explode(x, 4, z, 18, 0, null, true); L.shake = Math.max(L.shake, 1.5);
       L.banner('🏆 ' + b.name + ' BESIEGT!', 'Unglaublich! Sammle die Beute ein.');
       for (let i = 0; i < 4; i++) L.spawnItem(i < 2 ? 'artefakt' : 'gold', x + L.rand(-8, 8), z + L.rand(-8, 8), 1);
-      if (src === P && L.gotKillCoins) L.gotKillCoins(300);
+      if (src === P && L.gotBossCoins) L.gotBossCoins(300, b.name);
       if (L.bossReward) L.bossReward(boss.id, x, z, 0, 'defeat');
       despawn(null);
     }

@@ -153,7 +153,7 @@
     if (src) alertTo(src.x, src.z, true);
     if (C.hp <= 0) {
       C.dead = true; C.deadT = 0; L.banner('🖤 DIE WAHRE CAROLINA IST BESIEGT', 'In 4 Minuten ist sie wieder da …');
-      if (src === P && L.gotKillCoins) L.gotKillCoins(400);
+      if (src === P && L.gotBossCoins) L.gotBossCoins(400, 'die wahre Carolina');
       for (const t of ['sniper', 'scharfmuni', 'lmg', 'medkit']) L.spawnItem(t, C.x + L.rand(-3, 3), C.z + L.rand(-3, 3), 1);
     }
   };

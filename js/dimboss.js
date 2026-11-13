@@ -63,8 +63,7 @@
     W.state = 'die'; W.st = 0; W.ent.dead = true; W.wasKilled = true;
     L.banner('🪱 LEERENWURM BESIEGT!', 'Das Portal ist wieder offen – flieh nach Hause!');
     if (L.snd.bossRoar) L.snd.bossRoar({ x: P.x, y: 5, z: P.z });
-    if (L.round) L.round.coins = (L.round.coins || 0) + 50;
-    L.msg('🪙 +50 Münzen für den Leerenwurm (nur wenn du entkommst)', 5000);
+    if (inDim() && P.alive && L.gotBossCoins) L.gotBossCoins(1000, 'den Leerenwurm');
     if (!inDim()) L.msg('🪱 Der Leerenwurm ist gestorben.', 3500);
   }
 

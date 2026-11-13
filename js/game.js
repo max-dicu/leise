@@ -338,6 +338,12 @@
     if (src === P) L.gotKillCoins(n);
     else if (isRemote(src) && src.pid !== undefined && L.mp && L.mp.sendTo) L.mp.sendTo(src.pid, { t: 'kc', n });
   }
+  // Boss-Belohnung: sofort fest gespeichert (geht auch beim Sterben nicht verloren)
+  L.gotBossCoins = function (n, who) {
+    n = Math.floor(+n); if (!(n > 0) || n > 100000) return;
+    L.save.coins = (L.save.coins || 0) + n; L.persist();
+    L.msg('🪙 +' + n + ' Münzen für ' + (who || 'den Boss') + ' – sofort gespeichert! (jetzt ' + L.save.coins + ')', 6000); if (L.snd.codeOk) L.snd.codeOk();
+  };
   L.gotKillCoins = function (n) {
     n = Math.floor(+n); if (!(n > 0) || n > 1000 || !L.round || L.state !== 'game') return;
     L.round.coins = (L.round.coins || 0) + n;
