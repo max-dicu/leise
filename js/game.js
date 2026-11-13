@@ -649,7 +649,7 @@
       P.drownT = (P.drownT || 0) - dt;
     }
     // weit draußen zieht eine starke Strömung zurück zur Küste
-    if (Math.max(Math.abs(P.x), Math.abs(P.z)) > L.FAR - 150) {
+    if (!L.inDim(P.x) && Math.max(Math.abs(P.x), Math.abs(P.z)) > L.FAR - 150) { // nicht auf dem Mond / in der Dimension
       const a = Math.atan2(-P.x, -P.z); P.x += Math.sin(a) * 4 * dt; P.z += Math.cos(a) * 4 * dt;
       if (!(P.curT > 0)) { P.curT = 6; L.msg('🌊 Die Strömung ist zu stark – sie drückt dich zurück zur Küste.', 3000); }
     }
