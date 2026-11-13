@@ -37,9 +37,10 @@
   function loot(c) {
     const R = Math.random(), out = [];
     const coins = Math.round((c.under ? 30 : 8) + Math.random() * (c.under ? 90 : 45));
-    const guns = c.under ? ['gewehr', 'schrotflinte', 'pistole'] : ['minipistole', 'pistole', 'schrotflinte', 'gewehr'];
+    const guns = c.under ? ['gewehr', 'schrotflinte', 'pistole', 'sniper', 'minigun', 'raketenwerfer', 'lmg'] : ['minipistole', 'pistole', 'schrotflinte', 'gewehr', 'taschenpistole', 'revolver', 'mp', 'pumpgun', 'sniper', 'lmg', 'armbrust', 'flammenwerfer', 'raketenwerfer', 'minigun'];
     if (R < (c.under ? 0.55 : 0.35)) { const w = L.pick(guns); out.push([w, 1, Math.floor(L.ITEMS[w].mag * 0.6)]); }
-    const ammo = ['9mm', 'schrot', 'gewehrmuni']; for (let k = 0, n = 1 + Math.floor(Math.random() * 3); k < n; k++) out.push([L.pick(ammo), 1]);
+    const ammo = ['9mm', 'schrot', 'gewehrmuni', 'scharfmuni', 'bolzen', 'treibstoff', 'raketen'];
+    if (Math.random() < 0.35) out.push([L.pick(['blendgranate', 'rauchgranate', 'molotow']), 1 + Math.floor(Math.random() * 2)]); for (let k = 0, n = 1 + Math.floor(Math.random() * 3); k < n; k++) out.push([L.pick(ammo), 1]);
     if (Math.random() < 0.4) out.push(['granate', 1 + Math.floor(Math.random() * 2)]);
     if (Math.random() < 0.45) out.push([L.pick(['bandage', 'verband', 'medkit', 'spritze']), 1]);
     if (c.under && Math.random() < 0.6) out.push(['gold', 1 + Math.floor(Math.random() * 2)]);

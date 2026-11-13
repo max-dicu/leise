@@ -146,6 +146,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     }
     camera.lookAt(s.lx, s.ly, s.lz);
     camera.far = L.inDim(P.x) ? 60000 : L.S().view + 1200;
+    { const zf = L.weaponZoom ? L.weaponZoom() : 1, fov = 70 / zf; camera.fov += (fov - camera.fov) * Math.min(1, dt * 10); }
     camera.updateProjectionMatrix();
     if (P.rig) P.rig.root.visible = true;
     return true;

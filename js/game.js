@@ -274,6 +274,7 @@
   // ---------- Schaden ----------
   L.hurtPlayer = function (dmg, cause, fx, fz) {
     if (L.suitOn && L.suitOn()) return;
+    if (L.titanOn && L.titanOn()) dmg *= 0.3;
     if (!P.alive || dmg <= 0 || L.cine) return;
     P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
     L.snd.hurt(); L.shake = Math.min(1.2, L.shake + dmg / 60);
@@ -434,12 +435,14 @@
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
     L.scene.add(P.rig.root);
     if (L.suitOn()) { P.hot[1] = { type: 'donneraxt', count: 1, mag: 1 }; P.bag = new Array(75).fill(null); }
+    if (L.titanOn()) { P.hot[1] = { type: 'repulsor', count: 1, mag: 1 }; P.hot[2] = { type: 'schulterkanone', count: 1, mag: 1 }; P.hot[3] = { type: 'minirakete', count: 1, mag: 1 }; P.hot[4] = { type: 'brustlaser', count: 1, mag: 1 }; }
   }
   function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
   function selType() { const it = selItem(); return it ? it.type : null; }
   L.selType = selType;
   // 🛡️ Der Wächter-Anzug (nur mit freigeschaltetem Skin): unverwundbar, fliegt, teleportiert, Donneraxt
   L.suitOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
+  L.titanOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'titan' && L.titanToken && L.titanToken());
   function freeSpot(x, z, y) { return !L.queryBoxes(x, z, 0.7).some((b) => (b.y0 || 0) <= (y || 0) + 1.6 && b.h > (y || 0)); }
   function suitTeleport() {
     const cp = P.flying ? Math.cos(P.camPitch) : 1, up = P.flying ? -Math.sin(P.camPitch) : 0;
@@ -524,14 +527,14 @@
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     // 🛡️ Fliegen – nur mit dem freigeschalteten Wächter-Skin. V = abheben / landen
-    const canFly = !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
+    const canFly = !!(L.suitOn() || L.titanOn());
     if (!canFly) P.flying = false;
     if (!block && canFly && L.hit('KeyV')) {
       if (!P.flying) { P.flying = 1; P.vy = 6; P.air = false; P.stance = 'stand'; L.msg('🦸 Du fliegst! Leertaste = hoch · C = runter · Shift = schnell · V = landen', 4000); L.snd.teleport && L.snd.teleport({ x: P.x, y: P.y + 1, z: P.z }); }
       else if (P.flying === 1) { P.flying = 2; L.msg('🛬 Landeanflug …', 1500); }
     }
-    if (!block && canFly && L.hit('KeyT')) suitTeleport();
-    if (canFly) { P.hp = 100; P.food = Math.max(P.food, 60); P.water = Math.max(P.water, 60); }
+    if (!block && L.suitOn() && L.hit('KeyT')) suitTeleport();
+    if (L.suitOn()) { P.hp = 100; P.food = Math.max(P.food, 60); P.water = Math.max(P.water, 60); }
     if (P.flying) { updateFlying(dt, block); return; }
     flySpeedUi(false);
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
@@ -661,7 +664,7 @@
       if (L.hit('Minus') || L.hit('NumpadSubtract') || L.hit('Slash')) L.save.flySpeed = Math.max(1, L.save.flySpeed - stp);
     }
     flySpeedUi(true);
-    const sp = L.save.flySpeed / 3.6;
+    const sp = (L.titanOn() && !L.suitOn() ? Math.min(L.save.flySpeed, 400) : L.save.flySpeed) / 3.6;
     // in Blickrichtung: nach oben schauen = steigen, nach unten schauen = sinken
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(P.camPitch), spp = Math.sin(P.camPitch);
     let mx = sy * cp * fIn - cy * rIn, my = -spp * fIn, mz = cy * cp * fIn + sy * rIn;
@@ -778,7 +781,7 @@
     const w = curWeapon(); P.reloadW = w;
     if (!w || P.reloadT >= 0) return;
     const d = ITEMS[w.type];
-    if (w.mag >= d.mag) return;
+    if (d.energy || w.mag >= d.mag) return;
     if (L.countBag(d.ammo) <= 0) { L.msg('Keine ' + ITEMS[d.ammo].name + ' im Rucksack!'); return; }
     P.reloadT = 0; L.snd.reload();
   }
@@ -799,6 +802,7 @@
   function fire() {
     const w = selItem(), d = ITEMS[w.type];
     if (w.type === 'donneraxt') { thorStrike(); return; }
+    if (L.weaponFire && L.weaponFire(w, d)) return;
     if (w.mag <= 0) { L.snd.empty(); P.fireCd = 0.3; if (L.countBag(d.ammo) > 0) reload(); else L.msg('Keine Munition!'); return; }
     w.mag--; P.fireCd = d.rate;
     const cam = L.camera, o = cam.position, dir = V1;
@@ -822,16 +826,17 @@
     P.camPitch -= d.pellets ? 0.05 : 0.012; L.shake = Math.max(L.shake, d.pellets ? 0.25 : 0.06);
   }
   function throwGrenade() {
-    const f = findItem((x) => x.type === 'granate');
-    if (!f) { L.msg('Keine Granate dabei.'); return; }
+    const gt = L.throwableType ? L.throwableType() : 'granate';
+    const f = findItem((x) => x.type === gt);
+    if (!f) { L.msg('Keine ' + ITEMS[gt].name + ' dabei.'); return; }
     if (P.throwT >= 0) return;
     const g = f.arr[f.i];
     g.count--; if (g.count <= 0) f.arr[f.i] = null;
     P.throwT = 0;
     const dir = V1; L.camera.getWorldDirection(dir);
-    const m = L.buildItem('granate'); m.scale.setScalar(1.4);
+    const m = L.buildItem(gt); m.scale.setScalar(1.4);
     m.position.set(P.x + Math.sin(P.yaw) * 0.5, P.y + 1.7, P.z + Math.cos(P.yaw) * 0.5); L.scene.add(m);
-    E.grenades.push({ m, vx: dir.x * 17 + P.vx, vy: dir.y * 17 + 4, vz: dir.z * 17 + P.vz, fuse: 2.8 });
+    E.grenades.push({ m, vx: dir.x * 17 + P.vx, vy: dir.y * 17 + 4, vz: dir.z * 17 + P.vz, fuse: gt === 'molotow' ? 1.4 : 2.8, type: gt });
     L.snd.swing();
   }
   function updateGrenades(dt) {
@@ -843,7 +848,7 @@
       if (RES.hit) { p.x = RES.x; p.z = RES.z; const dn = g.vx * RES.nx + g.vz * RES.nz; g.vx -= 1.6 * dn * RES.nx; g.vz -= 1.6 * dn * RES.nz; }
       g.m.rotation.x += dt * 8;
       g.fuse -= dt;
-      if (g.fuse <= 0) { L.scene.remove(g.m); E.grenades.splice(i, 1); L.explode(p.x, p.y, p.z, 9, 160, P); }
+      if (g.fuse <= 0) { L.scene.remove(g.m); E.grenades.splice(i, 1); if (L.grenadeBlow) L.grenadeBlow(g.type || 'granate', p.x, p.y, p.z); else L.explode(p.x, p.y, p.z, 9, 160, P); }
     }
   }
   L.explode = function (x, y, z, rad, dmg, src, big, fromNet) {
@@ -1556,6 +1561,7 @@
     if (spd > 0.5 && moved < spd * dt * 0.3 && e.stuckT <= 0) { e.stuckT = 1.5; e.detour = (Math.random() < 0.5 ? -1 : 1) * L.rand(1, 1.8); }
   }
   function updateMonster(m, dt) {
+    if (m.stunT > 0 && !m.dead) { m.stunT -= dt; m.state = 'search'; m.prey = null; m.cd = Math.max(m.cd || 0, 0.5); if (Math.random() < dt * 4) L.fx('#ffffaa', m.x, 2.6, m.z, 1, 0.5, { basic: true, size: 0.12, life: 0.5 }); }
     if (m.fly) return updateFlier(m, dt);
     const D = MK[m.kind];
     const dP = L.dist(P.x, P.z, m.x, m.z), rig = m.rig, dN = nearDist(m.x, m.z, dP);
@@ -2772,7 +2778,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); if (L.clearWeapons) L.clearWeapons(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -3038,6 +3044,7 @@
     if (L.updateMoon) L.updateMoon(dt);
     if (L.updateTentacles) L.updateTentacles(dt);
     if (L.updateSuitPortals) L.updateSuitPortals(dt);
+    if (L.updateWeapons) L.updateWeapons(dt);
     updateAdminTag();
     L.updateOcean2(dt);
     L.updateNav(dt);
@@ -3094,6 +3101,7 @@
   L.updateMenuFx = updateFx;
   // interne Funktionen für den Mehrspieler-Teil (mp.js)
   L._drive = (v, dt, thr, str, hb) => driveVehicle(v, dt, thr, str, hb, false);
+  L._targets = () => allTargets().filter((e) => e.kind !== 'remote');
   L._players = () => players(); L._killPlayer = (c) => killPlayer(c); L.safeIn = (x, z) => safeIn(x, z); L._isHost = () => isHost(); L._isClient = () => isClient();
   L._g = { spawnMonster, spawnWalker, spawnNpc, spawnVehicle, clearAll, resetPlayer, removeItem, initGait, gait, MDIFF, NDIFF, players, farSpot };
 })();

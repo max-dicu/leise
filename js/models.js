@@ -286,7 +286,32 @@
 
   // Exklusive Skins: Der Wächter, Viktor, Daniel, Richard
   L.GUARD_APP = { name: 'Der Wächter', skin: '#c98e65', hair: 'kurz', hairColor: '#1a1a1a', top: 'anzug', topColor: '#1a1a24', pants: 'anzughose', pantsColor: '#1a1a24', shoeType: 'stiefel', shoes: '#1a1a1a', build: 'muskuloes', height: 'gross', glasses: 'skibrille', glassesColor: '#2a2a3a', hat: 'keine', beard: 'kein', mouth: 'ernst', brows: 'boese' };
-  L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard'], ['baer', '🧸 Pinker Bär']];
+  // Titan-Rüstung (eigener Entwurf, nur mit Code)
+  const TK = '1lyhs3egh7x';
+  L.titanOk = (app) => !!(app && typeof app.tk === 'string' && L.hash53(app.tk) === TK);
+  L.titanToken = () => { const k = L.save && L.save.titanKey; return k && L.hash53(L.hash53(k)) === TK ? L.hash53(k) : null; };
+  L.titanCheck = (code) => L.hash53(L.hash53(code)) === TK;
+  function buildTitan(app) {
+    const r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, { name: app.name, build: 'muskuloes', height: 'gross', hair: 'glatze', top: 'jacke', topColor: '#2a2e36', pants: 'cargo', pantsColor: '#2a2e36', shoeType: 'stiefel', shoes: '#2a2e36', skin: '#2a2e36' }));
+    const metal = '#7a8494', dark = '#3a404c', glow = '#ff8a20', blue = '#40e0ff', ns = { noShadow: true };
+    const T0 = r.torso;
+    part(G().box, metal, 0.66, 0.66, 0.42, 0, 0.32, 0, T0); part(G().box, dark, 0.5, 0.12, 0.44, 0, 0.12, 0, T0);
+    for (const s of [-1, 1]) { part(G().box, metal, 0.28, 0.16, 0.36, s * 0.33, 0.62, 0, T0); part(G().box, glow, 0.08, 0.04, 0.02, s * 0.14, 0.42, 0.22, T0, { basic: true, noShadow: true }); }
+    part(G().box, '#1a1c22', 0.36, 0.5, 0.18, 0, 0.32, -0.28, T0);
+    for (const s of [-1, 1]) part(G().cyl, '#222', 0.06, 0.2, 0.06, s * 0.1, 0.1, -0.36, T0);
+    // Schulter-Minigun rechts
+    const sc = new T.Group(); sc.position.set(-0.32, 0.78, -0.05); T0.add(sc);
+    part(G().box, dark, 0.14, 0.12, 0.2, 0, 0, 0, sc); for (let k = 0; k < 4; k++) { const a = k / 4 * 6.283, b = part(G().cyl, '#111', 0.02, 0.4, 0.02, Math.cos(a) * 0.04, Math.sin(a) * 0.04 + 0.03, 0.22, sc); b.rotation.x = Math.PI / 2; }
+    r.scannon = sc;
+    // Helm mit Visier
+    part(G().box, metal, 0.29, 0.33, 0.3, 0, 0.16, 0, r.head); part(G().box, blue, 0.2, 0.035, 0.02, 0, 0.19, 0.152, r.head, { basic: true, noShadow: true });
+    part(G().box, dark, 0.22, 0.06, 0.02, 0, 0.08, 0.152, r.head, ns);
+    for (const a of r.arms) { part(G().box, metal, 0.16, 0.34, 0.17, 0, -0.16, 0, a.arm); part(G().box, metal, 0.15, 0.3, 0.16, 0, -0.15, 0, a.elbow); part(G().box, blue, 0.05, 0.05, 0.02, 0, -0.34, 0.08, a.elbow, { basic: true, noShadow: true }); }
+    for (const l of r.legs) { part(G().box, metal, 0.2, 0.44, 0.21, 0, -0.22, 0, l.leg); part(G().box, metal, 0.18, 0.42, 0.19, 0, -0.22, 0, l.knee); part(G().box, glow, 0.1, 0.03, 0.1, 0, -0.52, 0, l.knee, { basic: true, noShadow: true }); }
+    r.app = Object.assign({}, r.app, { special: 'titan', tk: app.tk });
+    return r;
+  }
+  L.SKINS = [['', '🙂 Eigener'], ['waechter', '🛡️ Der Wächter'], ['titan', '🤖 Titan-Rüstung'], ['viktor', '🧟 Viktor'], ['daniel', '👮 Daniel'], ['richard', '💪 Richard'], ['baer', '🧸 Pinker Bär']];
   // Pinker Kuschelbär mit genähten X-Augen (eigener Entwurf)
   function buildBear(app) {
     const pk = '#f4a6c8', dk = '#d87aa8', lt = '#ffd6e8', box = G().box, sph = G().sph, ns = { noShadow: true };
@@ -328,6 +353,7 @@
     const sp = app.special;
     if (sp === 'baer') return buildBear(app);
     if (sp === 'richard') { const r = L.buildHuman(Object.assign({}, L.RICHARD_APP || {}, { name: app.name })); r.app = Object.assign({}, r.app, { special: 'richard' }); return r; }
+    if (sp === 'titan') return (force || L.titanOk(app)) ? buildTitan(app) : L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter' && !force && !L.waechterOk(app)) return L.buildHuman(Object.assign({}, app, { special: '' }));
     if (sp === 'waechter') {
       const r = L.buildHuman(Object.assign({}, L.GUARD_APP, { name: app.name }));
@@ -356,7 +382,7 @@
     return pcs;
   }
   L.buildHuman = function (app, force) {
-    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter' || app.special === 'baer')) return buildSpecial(app, force);
+    if (app && app.special && (app.special === 'viktor' || app.special === 'daniel' || app.special === 'richard' || app.special === 'waechter' || app.special === 'baer' || app.special === 'titan')) return buildSpecial(app, force);
     const A = Object.assign({}, L.DEFAULT_CHAR, app || {});
     const bw = { duenn: 0.75, schmal: 0.87, normal: 1, kraeftig: 1.2, muskuloes: 1.32, extrem: 1.8 }[A.build] || 1;
     const hs = { sehr_klein: 0.85, klein: 0.92, mittel: 1, gross: 1.08, sehr_gross: 1.15 }[A.height] || 1;
@@ -1521,6 +1547,20 @@
         part(box, '#7a7a80', 0.06, 0.07, 0.17, 0, -0.32, 0.02, g);
         break;
       case 'minipistole': gun(0.16, 0.1, '#2a2a2a'); break;
+      case 'taschenpistole': gun(0.12, 0.08, '#8a8a90'); break;
+      case 'revolver': gun(0.28, 0.12, '#5a5a62'); part(cyl, '#3a3a40', 0.06, 0.08, 0.06, 0, 0.0, 0.08, g).rotation.x = Math.PI / 2; break;
+      case 'mp': gun(0.42, 0.1, '#2a2a2e', true); break;
+      case 'pumpgun': gun(0.8, 0.1, '#1a1a1a'); part(box, '#3a2a1a', 0.07, 0.07, 0.25, 0, -0.06, 0.4, g); break;
+      case 'sniper': gun(1.05, 0.1, '#3a4a30', true); part(cyl, '#111', 0.04, 0.32, 0.04, 0, 0.09, 0.3, g).rotation.x = Math.PI / 2; part(box, '#3a4a30', 0.06, 0.12, 0.3, 0, -0.02, -0.18, g); break;
+      case 'minigun': { part(box, '#3a3a40', 0.18, 0.18, 0.4, 0, 0, 0.1, g); for (let k = 0; k < 6; k++) { const a = k / 6 * 6.283; const b = part(cyl, '#222', 0.025, 0.6, 0.025, Math.cos(a) * 0.06, Math.sin(a) * 0.06, 0.55, g); b.rotation.x = Math.PI / 2; } part(box, '#c8a020', 0.06, 0.12, 0.2, 0.12, -0.08, 0.05, g); break; }
+      case 'lmg': gun(0.95, 0.12, '#2a3a28', true); part(box, '#222', 0.1, 0.1, 0.12, 0, -0.1, 0.2, g); break;
+      case 'armbrust': { gun(0.55, 0.08, '#5a3a1a'); const bow = part(box, '#3a2a1a', 0.7, 0.04, 0.05, 0, 0.02, 0.5, g); bow.rotation.y = 0; break; }
+      case 'raketenwerfer': { const tb = part(cyl, '#4a5a3a', 0.09, 1.1, 0.09, 0, 0.05, 0.25, g); tb.rotation.x = Math.PI / 2; part(box, '#2a2a2a', 0.05, 0.14, 0.06, 0, -0.08, 0.1, g); break; }
+      case 'flammenwerfer': { gun(0.7, 0.1, '#5a4a30'); part(cyl, '#c02a2a', 0.07, 0.3, 0.07, 0, -0.1, -0.05, g); break; }
+      case 'blendgranate': part(cyl, '#d8d8d8', 0.05, 0.12, 0.05, 0, 0, 0, g); break;
+      case 'rauchgranate': part(cyl, '#5a7a5a', 0.05, 0.12, 0.05, 0, 0, 0, g); break;
+      case 'molotow': part(cyl, '#3a7a3a', 0.04, 0.18, 0.04, 0, 0, 0, g, { opacity: 0.8 }); part(box, '#e8e0c0', 0.02, 0.06, 0.02, 0, 0.12, 0, g); break;
+      case 'repulsor': case 'schulterkanone': case 'minirakete': case 'brustlaser': part(sph, '#40e0ff', 0.06, 0.06, 0.06, 0, 0, 0.05, g, { basic: true }); break;
       case 'pistole': gun(0.22, 0.12, '#1a1a1a'); break;
       case 'schrotflinte': gun(0.85, 0.1, '#5a3a1a'); part(box, '#3a2a1a', 0.06, 0.12, 0.25, 0, -0.03, -0.15, g); break;
       case 'gewehr': gun(0.75, 0.1, '#2f3a28', true); part(box, '#2f3a28', 0.06, 0.12, 0.22, 0, -0.02, -0.14, g); break;
