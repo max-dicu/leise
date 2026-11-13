@@ -1373,7 +1373,7 @@
       const BAL = 1.25, FLIP = 1.6, ground = !(alt > 0.5) && v.hp > 0 && v.speed > 2;
       let wh = v.wh || 0, wv = v.whv || 0;
       if (ground || wh > 0) {
-        const push = ground && v.whIn ? (thr > 0 ? 4.0 : 3.5) - (t.scooter ? 0.25 : 0) : 0;
+        const push = ground && v.whIn ? (thr > 0 ? 6.0 : 5.2) - (t.scooter ? 0.3 : 0) : 0;
         const grav = -3.8 * Math.sin(BAL - wh) - (wh < 0.5 ? 0.6 : 0);
         wv += (push + grav + (thr < 0 ? -3.5 : 0)) * dt;
         wv *= Math.exp(-3 * dt);

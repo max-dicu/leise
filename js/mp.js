@@ -767,6 +767,6 @@
       e.stopPropagation();
       return;
     }
-    if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash' || e.key === '/') && N.connected && L.state === 'game' && !L.uiBlock && !L.paused) { openChat(); e.preventDefault(); }
+    if ((e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Slash' || e.key === '/') && N.connected && L.state === 'game' && !L.uiBlock && !L.paused && !((e.code === 'Enter' || e.code === 'NumpadEnter') && !L.player.alive)) { openChat(); e.preventDefault(); }
   }, true);
 })();

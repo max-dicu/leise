@@ -20,11 +20,11 @@
   const bar = document.createElement('div'); bar.id = 'revBar'; bar.hidden = true; bar.innerHTML = '<i></i>'; document.body.appendChild(bar);
   let specIdx = 0, lastHtml = '';
   function nextSpec() { const f = aliveFriends(); if (!f.length) return; specIdx = (specIdx + 1) % f.length; L.spectate = f[specIdx]; }
-  let giveUp = false, unlocked = false;
+  let giveUp = false, giveUpT = 0, unlocked = false;
   box.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.self) selfRevive(b.dataset.self);
-    else if (b.dataset.give) giveUp = true;
+    else if (b.dataset.give) { giveUp = true; giveUpT = P.deathT; }
     else nextSpec();
   });
   // Heilzeug, mit dem man sich selbst wiederbeleben kann (schwächstes zuerst)
@@ -46,7 +46,9 @@
   // vom Tod-Zweig in updatePlayer aufgerufen: true = liegen bleiben (zuschauen / selbst wiederbeleben), false = Runde für mich vorbei
   L.updateDown = function (dt) {
     const f = online() ? aliveFriends() : [], own = selfItems();
-    if (giveUp || (!f.length && !own.length)) { box.hidden = true; L.spectate = null; giveUp = false; unlocked = false; return false; }
+    // aufgegeben bleibt aufgegeben (bis zum nächsten Tod) – sonst käme das Menü sofort wieder
+    if (giveUp && P.deathT + 0.001 < giveUpT) giveUp = false;
+    if (giveUp || (!f.length && !own.length)) { if (giveUp) P.deathT = Math.max(P.deathT, 3.6); box.hidden = true; L.spectate = null; unlocked = false; lastHtml = ''; return false; }
     if (P.deathT < 2) return true; // erst kurz die eigene Leiche sehen
     if (f.length) { if (!L.spectate || !f.includes(L.spectate)) { specIdx = Math.min(specIdx, f.length - 1); L.spectate = f[specIdx]; } }
     else { L.spectate = null; if (!unlocked && L.unlock) { L.unlock(); unlocked = true; } }
@@ -54,8 +56,9 @@
       if (f.length && (L.hit('Space') || L.hit('ArrowRight') || L.mouse.click)) nextSpec();
       if (own.length && L.hit('KeyE')) { selfRevive(own[own.length - 1][0]); return true; }
       if (own.length && L.hit('KeyQ')) { selfRevive(own[0][0]); return true; }
-      if (L.hit('Enter') || L.hit('NumpadEnter')) { giveUp = true; return true; }
     }
+    // Aufgeben geht immer (außer beim Chat-Schreiben)
+    if (!L.chatOpen && (L.hit('Enter') || L.hit('NumpadEnter'))) { giveUp = true; giveUpT = P.deathT; if (L.ui && L.ui.closeOverlays) L.ui.closeOverlays(); return true; }
     // umschauen mit der Maus
     const sens = 0.0022 * L.S().sens;
     P.camYaw -= L.mouse.dx * sens; P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, -0.2, 1.1);

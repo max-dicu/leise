@@ -49,6 +49,10 @@
   }
 
   // Tasten für Fenster direkt im Ereignis (nötig für Mauszeiger-Sperre)
+  // Endbildschirm: Enter/Leertaste = Weiter
+  addEventListener('keydown', (e) => {
+    if (L.state === 'end' && !e.repeat && (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') && !$('endScreen').hidden) { e.preventDefault(); $('endOk').click(); }
+  });
   addEventListener('keydown', (e) => {
     if (L.state !== 'game' || L.paused) return;
     if (e.target && e.target.tagName === 'INPUT') return;
