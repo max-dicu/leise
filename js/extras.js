@@ -92,37 +92,66 @@
     for (let k = 0; k < 120; k++) { const a = k * 0.75, d = 7 + k * 0.6, x = cx + Math.sin(a) * d, z = cz + Math.cos(a) * d; if (L.waterDepth(x, z) < -0.2 && !L.queryBoxes(x, z, 3).length) return { x, z }; }
     return { x: cx + 6, z: cz };
   }
+  // Sonnendeck: Pool, Liegen, Schirme, Bar, Palmen, Tanzfläche, Lichterketten, Reling
+  function decorateDeck(g, w, d, h) {
+    const box = L.GEO.boxB, add = (c, sx, sy, sz, x, y, z, o) => { const m = new T.Mesh(box, L.mat(c, o)); m.scale.set(sx, sy, sz); m.position.set(x, y, z); g.add(m); return m; };
+    for (const s of [-1, 1]) add('#d8dde2', 0.12, 1.1, d * 0.96, s * (w / 2 - 0.1), h, 0);
+    add('#d8dde2', w, 1.1, 0.12, 0, h, -d / 2 + 0.2); add('#d8dde2', w, 1.1, 0.12, 0, h, d / 2 - 0.2);
+    add('#c8a070', w - 0.6, 0.05, d * 0.9, 0, h + 0.01, 0);
+    const towels = ['#ff5a8a', '#40a0ff', '#ffd040', '#60e080'];
+    for (let k = 0; k < 10; k++) { const x = (k % 2 ? 1 : -1) * (w * 0.3), z = d * 0.05 + Math.floor(k / 2) * 4.5; add('#f2f2f2', 1.2, 0.45, 2.4, x, h + 0.05, z); add(towels[k % 4], 1.0, 0.06, 1.8, x, h + 0.5, z + 0.1); }
+    for (let k = 0; k < 4; k++) { const x = (k % 2 ? 1 : -1) * (w * 0.3) + 1.8, z = d * 0.08 + Math.floor(k / 2) * 9; const p = new T.Mesh(L.GEO.cylB, L.mat('#888')); p.scale.set(0.06, 2.6, 0.06); p.position.set(x, h, z); g.add(p); const u = new T.Mesh(L.GEO.cone, L.mat(k % 2 ? '#ff5a5a' : '#ffd040')); u.scale.set(1.8, 0.6, 1.8); u.position.set(x, h + 2.7, z); g.add(u); }
+    add('#5a3a20', 6, 1.1, 1.2, 0, h, -d * 0.12); add('#2a2a2a', 6.2, 0.1, 1.4, 0, h + 1.1, -d * 0.12);
+    for (let k = 0; k < 5; k++) add('#c02a2a', 0.5, 0.75, 0.5, -2.4 + k * 1.2, h, -d * 0.12 + 1.2);
+    for (const [c, x] of [['#40c0ff', -1.8], ['#ff8a2a', 0], ['#60e080', 1.8]]) add(c, 0.3, 0.35, 0.3, x, h + 1.2, -d * 0.12);
+    for (const s of [-1, 1]) for (let k = 0; k < 3; k++) { const x = s * (w / 2 - 1.5), z = -d * 0.05 + k * 10; add('#8a5a3a', 0.9, 0.7, 0.9, x, h, z); const tr = new T.Mesh(L.GEO.cylB, L.mat('#7a5a3a')); tr.scale.set(0.18, 3.4, 0.18); tr.position.set(x, h + 0.7, z); g.add(tr); for (let l = 0; l < 5; l++) { const lf = new T.Mesh(L.GEO.box, L.mat('#2e8a3a')); lf.scale.set(0.3, 0.06, 2.2); lf.position.set(x + Math.sin(l * 1.26) * 0.9, h + 4.1, z + Math.cos(l * 1.26) * 0.9); lf.rotation.y = l * 1.26; lf.rotation.x = 0.35; g.add(lf); } }
+    const df = new T.Group(); df.position.set(0, h + 0.03, -d * 0.3); g.add(df); g.userData.dance = [];
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { const t2 = new T.Mesh(L.GEO.boxB, new T.MeshBasicMaterial({ color: 0xffffff })); t2.scale.set(1.4, 0.05, 1.4); t2.position.set((i - 2.5) * 1.45, 0, (j - 2.5) * 1.45); df.add(t2); g.userData.dance.push(t2); }
+    for (const s of [-1, 1]) for (let k = 0; k < 20; k++) { const b = new T.Mesh(L.GEO.sph, new T.MeshBasicMaterial({ color: [0xff4060, 0xffd040, 0x40c0ff, 0x60ff80][k % 4] })); b.scale.setScalar(0.12); b.position.set(s * (w / 2 - 0.3), h + 3.2 - Math.abs(Math.sin(k / 19 * Math.PI)) * 0.6, -d * 0.45 + k * d * 0.045); g.add(b); }
+    for (const s of [-1, 1]) add('#3a2a4a', 4, 0.7, 1.6, s * 4, h, d * 0.38);
+  }
   function sail(from, to) {
-    const m = shipModel(24, 110, 22.4); L.scene.add(m);
+    const W0 = 24, D0 = 110, H0 = 22.4, m = shipModel(W0, D0, H0); decorateDeck(m, W0, D0, H0); L.scene.add(m);
     const a0 = Math.atan2(to.sx - from.sx, to.sz - from.sz);
-    voyage = { m, from, to, t: 0, dur: 11, yaw: a0, veh: myVehNear(from) };
+    voyage = { m, from, to, t: 0, dur: 45, yaw: a0, veh: myVehNear(from), W: W0, D: D0, H: H0, lx: 0, lz: 8, first: true };
     if (voyage.veh) { voyage.veh.rig.root.visible = false; voyage.veh.x = voyage.veh.z = 1e7; }
     L.snd.horn({ x: from.sx, y: 20, z: from.sz });
-    L.banner('🛳️ LEINEN LOS!', 'Kurs auf ' + to.name);
-    L.startCine('KREUZFAHRT NACH ' + to.name.replace(/^\S+ /, '').toUpperCase(), voyage.dur, (t) => {
-      const V = voyage; if (!V) return null;
-      const k = t / V.dur, e = k * k * (3 - 2 * k);
-      const x = L.lerp(V.from.sx, V.to.sx, e), z = L.lerp(V.from.sz, V.to.sz, e);
-      const side = V.yaw + Math.PI / 2, d = 140 - Math.sin(k * Math.PI) * 40;
-      return { x: x + Math.sin(side + t * 0.08) * d, y: 40 + Math.sin(k * Math.PI) * 30, z: z + Math.cos(side + t * 0.08) * d, lx: x, ly: 8, lz: z };
-    });
+    L.banner('🛳️ LEINEN LOS!', 'Kurs auf ' + to.name + ' – 45 Sekunden chillen an Deck: Pool, Bar, Tanzfläche!');
+    L.voyageOn = true;
   }
+  // an Deck stehen: Boden ist das Sonnendeck
+  const ofa = L.floorAt;
+  L.floorAt = function (x, z, y) {
+    const V = voyage;
+    if (V && L.voyageOn) { const c = Math.cos(V.yaw), s = Math.sin(V.yaw), dx = x - V.m.position.x, dz = z - V.m.position.z, lx = dx * c - dz * s, lz = dx * s + dz * c; if (Math.abs(lx) < V.W / 2 + 0.5 && Math.abs(lz) < V.D / 2 + 0.5) return V.H + V.m.position.y + 0.06; }
+    return ofa ? ofa(x, z, y) : null;
+  };
   function updateVoyage(dt) {
     const V = voyage; if (!V) return;
+    const px0 = V.m.position.x, pz0 = V.m.position.z;
     V.t += dt;
     const k = Math.min(1, V.t / V.dur), e = k * k * (3 - 2 * k);
     const x = L.lerp(V.from.sx, V.to.sx, e), z = L.lerp(V.from.sz, V.to.sz, e);
-    V.m.position.set(x, Math.sin(V.t * 0.8) * 0.4, z); V.m.rotation.set(Math.sin(V.t * 0.6) * 0.02, V.yaw, Math.sin(V.t * 0.5) * 0.03);
+    V.m.position.set(x, Math.sin(V.t * 0.8) * 0.4, z); V.m.rotation.set(0, V.yaw, Math.sin(V.t * 0.5) * 0.015);
     if (Math.random() < dt * 20) L.fx('#f0f8ff', x - Math.sin(V.yaw) * 60, 0, z - Math.cos(V.yaw) * 60, 3, 3, { size: 1, life: 1.5 });
-    // Spieler fährt mit (für Inseln, Wetter, Musik unterwegs)
-    P.x = x; P.z = z; P.y = 0;
-    if (V.t >= V.dur || !L.cine) {
-      L.scene.remove(V.m);
+    // Tanzfläche blinkt
+    const tt = performance.now() / 1000; (V.m.userData.dance || []).forEach((t2, i) => t2.material.color.setHSL(((i * 0.13 + Math.floor(tt * 3) * 0.17) % 1), 1, 0.55));
+    // der Spieler bleibt an Deck (fährt mit, kann herumlaufen)
+    const c = Math.cos(V.yaw), s = Math.sin(V.yaw);
+    if (V.first) { V.first = false; V.lx = 0; V.lz = 8; }
+    else { const dx = P.x - px0, dz = P.z - pz0; V.lx = dx * c - dz * s; V.lz = dx * s + dz * c; }
+    V.lx = L.clamp(V.lx, -V.W / 2 + 0.8, V.W / 2 - 0.8); V.lz = L.clamp(V.lz, -V.D / 2 + 1, V.D / 2 - 1);
+    P.x = x + V.lx * c + V.lz * s; P.z = z - V.lx * s + V.lz * c;
+    if (P.y < V.H - 1) { P.y = V.H + 0.5; P.vy = 0; }
+    if (P.vehicle && L._leaveVehicle) L._leaveVehicle(true);
+    if (Math.floor(V.t) % 15 === 0 && Math.floor(V.t - dt) % 15 !== 0 && V.t < V.dur - 2) L.msg('🛳️ Ankunft in ' + Math.ceil(V.dur - V.t) + ' s – ' + V.to.name, 2500);
+    if (V.t >= V.dur) {
+      L.scene.remove(V.m); L.voyageOn = false;
       P.x = V.to.land.x; P.z = V.to.land.z; P.y = 0.5; P.vx = P.vz = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 10);
       L.msg('🛳️ Angekommen: ' + V.to.name, 5000);
       if (V.veh) {
-        const s = landSpot(V.to.land.x, V.to.land.z), v = V.veh;
-        v.x = s.x; v.z = s.z; v.yaw = Math.atan2(V.to.land.x - V.to.sx, V.to.land.z - V.to.sz); v.speed = 0; v.lat = 0; v.alt = 0; v.vy = 0; v.sink = 0; v.isl = L.islandAt ? L.islandAt(s.x, s.z) : null;
+        const sp = landSpot(V.to.land.x, V.to.land.z), v = V.veh;
+        v.x = sp.x; v.z = sp.z; v.yaw = Math.atan2(V.to.land.x - V.to.sx, V.to.land.z - V.to.sz); v.speed = 0; v.lat = 0; v.alt = 0; v.vy = 0; v.sink = 0; v.isl = L.islandAt ? L.islandAt(sp.x, sp.z) : null;
         v.rig.root.visible = true; v.rig.root.position.set(v.x, 0, v.z); v.rig.root.rotation.set(0, v.yaw, 0);
         if (L.mp && L.mp.send) L.mp.send({ t: 'vmove', id: v.id, x: v.x, z: v.z, yaw: v.yaw });
         L.msg('🚗 Dein ' + v.t.name + ' steht neben dir an Land.', 5000);

@@ -415,6 +415,7 @@
   };
   // Timer-Text für die Anzeige
   L.islandBossText = function () {
+    if (L.inMoon && L.inMoon(P.x)) return L.moonBossText ? L.moonBossText() : null;
     if (L.inDim(P.x)) return L.dimBossText ? L.dimBossText() : null;
     const I = L.curIsland; if (!I || I.dim || !BY_ISL[I.id]) return null;
     if (boss && boss.I === I) return `${boss.b.icon} ${boss.b.name} ist da – noch ${L.fmt(Math.max(0, boss.life))} · 🛡️ Zuflucht = sicher`;
@@ -422,6 +423,6 @@
     return `${nx.icon} ${I.id === 'asgard' ? 'Ein Gott' : nx.name} in ${L.fmt(Math.max(0, I.bossT === undefined ? 90 : I.bossT))}`;
   };
   // Wegweiser zur Zuflucht, solange ein Insel-Boss da ist
-  L.islandNav = function () { const I = L.curIsland; if (!boss || !I || boss.I !== I || !I.shelter || L.islandSafe(P.x, P.z)) return null; return I.shelter; };
+  L.islandNav = function () { const mn = L.moonNav && L.moonNav(); if (mn) return mn; const I = L.curIsland; if (!boss || !I || boss.I !== I || !I.shelter || L.islandSafe(P.x, P.z)) return null; return I.shelter; };
   L.clearIslandBosses = function () { clearNina(); cleanupRavens(); if (boss) { L.scene.remove(boss.m.rig.root); boss = L.islandBoss = null; } for (const f of fx) { if (f.mesh) L.scene.remove(f.mesh); if (f.m) L.scene.remove(f.m.rig.root); } fx.length = 0; for (const I of L.ISL || []) { I.bossT = undefined; I.warned = false; } };
 })();

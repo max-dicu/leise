@@ -1238,6 +1238,8 @@
     gokart: { name: 'Gokart', vmax: 130, acc: 12, hp: 60, kind: 'car', big: true, len: 2.2, wid: 1.3, off: 0.6, h: 0.5, wr: 0.2, open: true },
     traktor: { name: 'Traktor', vmax: 45, acc: 3.5, hp: 300, kind: 'car', big: true, len: 4, wid: 2.2, off: 1, h: 2.6, wr: 0.75, body: '#2a8a3a' },
     cabrio: { name: 'Cabrio', vmax: 230, acc: 10.5, hp: 95, kind: 'car', big: true, len: 4.4, wid: 1.85, off: 0.5, h: 1.1, wr: 0.36, open: true },
+    mondrover: { name: 'Mond-Rover', vmax: 140, acc: 8, hp: 250, kind: 'car', big: true, open: true, len: 4.6, wid: 2.6, off: 1, h: 2.0, wr: 0.7, body: '#e8e8ec' },
+    mondbuggy: { name: 'Mond-Buggy', vmax: 180, acc: 11, hp: 160, kind: 'car', big: true, open: true, len: 3.6, wid: 2.0, off: 1, h: 1.4, wr: 0.55, body: '#c8c8d0' },
     quad: { name: 'Straßen-Quad', vmax: 275, acc: 22, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.25, off: 0.75 },
     atv: { name: 'Gelände-ATV', vmax: 400, acc: 27, hp: 140, kind: 'bike', quad: true, wheelie: true, len: 2.4, wid: 1.3, off: 1 },
     // Polizei (unzerstörbar, nur KI): 500 km/h

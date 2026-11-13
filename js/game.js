@@ -578,7 +578,7 @@
     } else L.underwaterDive = false;
     if (!P.air && Math.abs(P.y - gY) < 0.8 && !L.underwaterDive) P.y = gY;
     if (P.air || P.y > gY) {
-      P.vy -= 20 * dt; P.y += P.vy * dt;
+      P.vy -= (L.inMoon && L.inMoon(P.x) ? 4.5 : 20) * dt; P.y += P.vy * dt;
       if (P.y <= gY) {
         const hs = Math.hypot(P.vx, P.vz), impact = depth > 0.8 ? 0 : -P.vy;
         P.y = gY; P.vy = 0; P.air = false;
@@ -891,6 +891,7 @@
     const wh = L.wsHint && L.wsHint(); if (wh) return wh;
     const rh = L.reviveHint && L.reviveHint(); if (rh) return rh;
     const kh = L.crateHint && L.crateHint(); if (kh) return kh;
+    const mh = L.moonHint && L.moonHint(); if (mh) return mh;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) return 'E: ' + L.containerName(cont) + ' öffnen';
     const v = nearestVehicle();
@@ -926,6 +927,7 @@
     }
     if (L.reviveInteract && L.reviveInteract()) return;
     if (L.crateInteract && L.crateInteract()) return;
+    if (L.moonInteract && L.moonInteract()) return;
     if (L.cruiseInteract && L.cruiseInteract()) return;
     const cont = L.nearestContainer && L.nearestContainer();
     if (cont) { L.openContainer(cont); return; }
@@ -2757,7 +2759,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -3020,6 +3022,7 @@
     if (L.updateDimBoss) L.updateDimBoss(dt);
     if (L.updatePolice) L.updatePolice(dt);
     if (L.updateCrates) L.updateCrates(dt);
+    if (L.updateMoon) L.updateMoon(dt);
     L.updateOcean2(dt);
     L.updateNav(dt);
     L.updateInteriors(dt);

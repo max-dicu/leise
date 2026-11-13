@@ -269,7 +269,7 @@
     const inSub = P.vehicle && P.vehicle.t.sub, shelter = L.islandNav && L.islandNav(), navT = shelter || (L.towerCall ? L.TOWER : inSub ? L.PORTAL : null);
     tn.hidden = !navT;
     if (navT) {
-      tn.childNodes[1].textContent = shelter ? ' 🛡️ ' : L.towerCall ? ' 🗼 ' : ' 🌀 '; tn.querySelector('b').textContent = shelter ? 'ZUR ZUFLUCHT' : L.towerCall ? 'ZUM TURM' : 'ZUM PORTAL (Tiefe ' + Math.round(-L.PORTAL.y) + ' m)';
+      tn.childNodes[1].textContent = shelter ? ' 🛡️ ' : L.towerCall ? ' 🗼 ' : ' 🌀 '; tn.querySelector('b').textContent = shelter ? (L.inMoon && L.inMoon(P.x) ? 'IN DEN BURGER!' : 'ZUR ZUFLUCHT') : L.towerCall ? 'ZUM TURM' : 'ZUM PORTAL (Tiefe ' + Math.round(-L.PORTAL.y) + ' m)';
       const dx = navT.x - P.x, dz = navT.z - P.z, cy = Math.cos(P.camYaw), sy = Math.sin(P.camYaw);
       const fwd = dx * sy + dz * cy, right = dx * -cy + dz * sy;
       $('tnArrow').style.transform = 'rotate(' + Math.atan2(right, fwd).toFixed(2) + 'rad)';

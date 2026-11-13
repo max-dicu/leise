@@ -268,7 +268,7 @@
     for (const h of I.holes) h.rotation.z += dt * 0.1;
     if (L.dimPortal) L.dimPortal.swirl.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.5 : -1.2); });
     // in die Leere gefallen
-    if (L.inDim(P.x) && P.y < -90 && P.alive && !P.vehicle) {
+    if (L.inDim(P.x) && !(L.inMoon && L.inMoon(P.x)) && P.y < -90 && P.alive && !P.vehicle) {
       const c = L.dimCheckpoint(); P.x = c.x; P.z = c.z; P.y = 2; P.vy = 0; P.air = true;
       L.hurtPlayer(30, 'In die unendliche Leere gefallen');
       L.msg('🌌 Du bist in die Leere gefallen – zurück zum Checkpoint.', 4000);
