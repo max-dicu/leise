@@ -29,7 +29,7 @@
     const m = shipModel(B.w, B.d, B.h); m.position.set(B.x, 0, B.z); L.scene.add(m);
     // Laufsteg vom Strand
     const plank = new T.Mesh(L.GEO.boxB, L.mat('#7a5a3a')); plank.scale.set(B.x - B.w / 2 - 1480, 0.25, 2.4); plank.position.set((1480 + B.x - B.w / 2) / 2, -0.2, L.doorPos(B)); L.scene.add(plank);
-    docks.push({ id: 'home', name: '🏠 Heimat (Altheim)', x: B.x - B.w / 2 + 3, z: L.doorPos(B), sx: B.x, sz: B.z, land: { x: 1490, z: L.doorPos(B) } });
+    docks.push({ id: 'home', name: '🏠 Heimat (Altheim)', x: B.x - B.w / 2 + 3, z: L.doorPos(B), sx: B.x, sz: B.z, yaw: 0, model: m, land: { x: 1490, z: L.doorPos(B) } });
     for (const I of L.ISL) {
       if (I.dim) continue;
       const a = Math.atan2(-I.x, -I.z);
@@ -40,7 +40,7 @@
   function buildIslandDock(d) {
     if (d.built || !d.I || !d.I.built) return;
     d.built = true;
-    const m = shipModel(24, 110, 22.4); m.position.set(d.sx, 0, d.sz); m.rotation.y = d.yaw; d.I.group.add(m);
+    const m = shipModel(24, 110, 22.4); m.position.set(d.sx, 0, d.sz); m.rotation.y = d.yaw; d.I.group.add(m); d.model = m;
     const sign = new T.Mesh(L.GEO.boxB, L.mat('#1e3a6a')); sign.scale.set(0.2, 3, 0.2); sign.position.set(d.x, 0, d.z); d.I.group.add(sign);
     const board = new T.Mesh(new T.PlaneGeometry(3, 1.2), new T.MeshLambertMaterial({ map: L.textTex('⚓ KREUZFAHRT', 256, 100, '#1e3a6a', '#ffffff', 'bold 30px sans-serif'), side: T.DoubleSide }));
     board.position.set(d.x, 3.4, d.z); board.rotation.y = d.yaw; d.I.group.add(board);
@@ -110,10 +110,14 @@
     for (const s of [-1, 1]) for (let k = 0; k < 20; k++) { const b = new T.Mesh(L.GEO.sph, new T.MeshBasicMaterial({ color: [0xff4060, 0xffd040, 0x40c0ff, 0x60ff80][k % 4] })); b.scale.setScalar(0.12); b.position.set(s * (w / 2 - 0.3), h + 3.2 - Math.abs(Math.sin(k / 19 * Math.PI)) * 0.6, -d * 0.45 + k * d * 0.045); g.add(b); }
     for (const s of [-1, 1]) add('#3a2a4a', 4, 0.7, 1.6, s * 4, h, d * 0.38);
   }
+  L._cruise = { docks, sail: (a, b) => sail(a, b), get voyage() { return voyage; } };
   function sail(from, to) {
     const W0 = 24, D0 = 110, H0 = 22.4, m = shipModel(W0, D0, H0); decorateDeck(m, W0, D0, H0); L.scene.add(m);
     const a0 = Math.atan2(to.sx - from.sx, to.sz - from.sz);
-    voyage = { m, from, to, t: 0, dur: 45, yaw: a0, veh: myVehNear(from), W: W0, D: D0, H: H0, lx: 0, lz: 8, first: true };
+    // startet genau dort, wo das geparkte Schiff liegt (das wird solange ausgeblendet), dreht dann Richtung Ziel
+    voyage = { m, from, to, t: 0, dur: 45, yaw: from.yaw || 0, a0, veh: myVehNear(from), W: W0, D: D0, H: H0, lx: 0, lz: 8, first: true };
+    if (from.model) from.model.visible = false;
+    m.position.set(from.sx, 0, from.sz); m.rotation.set(0, voyage.yaw, 0);
     if (voyage.veh) { voyage.veh.rig.root.visible = false; voyage.veh.x = voyage.veh.z = 1e7; }
     L.snd.horn({ x: from.sx, y: 20, z: from.sz });
     L.banner('🛳️ LEINEN LOS!', 'Kurs auf ' + to.name + ' – 45 Sekunden chillen an Deck: Pool, Bar, Tanzfläche!');
@@ -126,27 +130,45 @@
     if (V && L.voyageOn) { const c = Math.cos(V.yaw), s = Math.sin(V.yaw), dx = x - V.m.position.x, dz = z - V.m.position.z, lx = dx * c - dz * s, lz = dx * s + dz * c; if (Math.abs(lx) < V.W / 2 + 0.5 && Math.abs(lz) < V.D / 2 + 0.5) return V.H + V.m.position.y + 0.06; }
     return ofa ? ofa(x, z, y) : null;
   };
+  const angLerp = (a, b, u) => a + L.angDiff(a, b) * u;
+  // Kurs: erst vom Anleger wegdrehen, geradeaus fahren, am Ende in die Liegeposition eindrehen
+  function courseYaw(V, e) {
+    const ys = V.from.yaw || 0, ye = V.to.yaw || 0;
+    if (e < 0.12) return angLerp(ys, V.a0, e / 0.12);
+    if (e > 0.86) return angLerp(V.a0, ye, (e - 0.86) / 0.14);
+    return V.a0;
+  }
+  let fadeEl = null;
+  function fade() {
+    if (!fadeEl) { fadeEl = document.createElement('div'); fadeEl.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:40;transition:opacity .35s'; document.body.appendChild(fadeEl); }
+    fadeEl.style.opacity = '1'; setTimeout(() => { fadeEl.style.opacity = '0'; }, 450);
+  }
   function updateVoyage(dt) {
     const V = voyage; if (!V) return;
-    const px0 = V.m.position.x, pz0 = V.m.position.z;
+    const px0 = V.m.position.x, pz0 = V.m.position.z, yaw0 = V.yaw;
     V.t += dt;
     const k = Math.min(1, V.t / V.dur), e = k * k * (3 - 2 * k);
     const x = L.lerp(V.from.sx, V.to.sx, e), z = L.lerp(V.from.sz, V.to.sz, e);
-    V.m.position.set(x, Math.sin(V.t * 0.8) * 0.4, z); V.m.rotation.set(0, V.yaw, Math.sin(V.t * 0.5) * 0.015);
+    V.yaw = courseYaw(V, e);
+    V.m.position.set(x, Math.sin(V.t * 0.8) * 0.4 * (1 - Math.max(0, (e - 0.9) * 10)), z); V.m.rotation.set(0, V.yaw, Math.sin(V.t * 0.5) * 0.015);
+    // geparkte Schiffe: Abfahrt wieder zeigen, sobald wir weg sind – Ziel ausblenden, wenn wir ankommen (sonst fährt man hinein)
+    if (V.from.model && !V.from.model.visible && Math.hypot(x - V.from.sx, z - V.from.sz) > 250) V.from.model.visible = true;
+    if (V.to.model && V.to.model.visible && Math.hypot(x - V.to.sx, z - V.to.sz) < 400) V.to.model.visible = false;
     if (Math.random() < dt * 20) L.fx('#f0f8ff', x - Math.sin(V.yaw) * 60, 0, z - Math.cos(V.yaw) * 60, 3, 3, { size: 1, life: 1.5 });
     // Tanzfläche blinkt
     const tt = performance.now() / 1000; (V.m.userData.dance || []).forEach((t2, i) => t2.material.color.setHSL(((i * 0.13 + Math.floor(tt * 3) * 0.17) % 1), 1, 0.55));
     // der Spieler bleibt an Deck (fährt mit, kann herumlaufen)
-    const c = Math.cos(V.yaw), s = Math.sin(V.yaw);
+    const c = Math.cos(V.yaw), s = Math.sin(V.yaw), c0 = Math.cos(yaw0), s0 = Math.sin(yaw0);
     if (V.first) { V.first = false; V.lx = 0; V.lz = 8; }
-    else { const dx = P.x - px0, dz = P.z - pz0; V.lx = dx * c - dz * s; V.lz = dx * s + dz * c; }
+    else { const dx = P.x - px0, dz = P.z - pz0; V.lx = dx * c0 - dz * s0; V.lz = dx * s0 + dz * c0; }
     V.lx = L.clamp(V.lx, -V.W / 2 + 0.8, V.W / 2 - 0.8); V.lz = L.clamp(V.lz, -V.D / 2 + 1, V.D / 2 - 1);
     P.x = x + V.lx * c + V.lz * s; P.z = z - V.lx * s + V.lz * c;
     if (P.y < V.H - 1) { P.y = V.H + 0.5; P.vy = 0; }
     if (P.vehicle && L._leaveVehicle) L._leaveVehicle(true);
     if (Math.floor(V.t) % 15 === 0 && Math.floor(V.t - dt) % 15 !== 0 && V.t < V.dur - 2) L.msg('🛳️ Ankunft in ' + Math.ceil(V.dur - V.t) + ' s – ' + V.to.name, 2500);
     if (V.t >= V.dur) {
-      L.scene.remove(V.m); L.voyageOn = false;
+      L.scene.remove(V.m); L.voyageOn = false; fade();
+      if (V.to.model) V.to.model.visible = true; if (V.from.model) V.from.model.visible = true;
       P.x = V.to.land.x; P.z = V.to.land.z; P.y = 0.5; P.vx = P.vz = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 10);
       L.msg('🛳️ Angekommen: ' + V.to.name, 5000);
       if (V.veh) {
@@ -202,5 +224,5 @@
     updateVoyage(dt);
     updateGuard(dt);
   };
-  L.clearExtras = function () { if (voyage) { L.scene.remove(voyage.m); voyage = null; } closePicker(); };
+  L.clearExtras = function () { if (voyage) { L.scene.remove(voyage.m); voyage = null; } L.voyageOn = false; for (const d of docks) if (d.model) d.model.visible = true; closePicker(); };
 })();

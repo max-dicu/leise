@@ -685,7 +685,8 @@
         } else if (impact > 13) L.hurtPlayer((impact - 13) * 4, 'Gestürzt');
       }
     }
-    P.tumble = P.tumble > 0 ? P.tumble + dt * 9 : 0;
+    // Umfallen dreht nur in der Luft weiter – am Boden (oder nach dem Fliegen) sofort beenden
+    P.tumble = P.tumble > 0 && P.air ? P.tumble + dt * 9 : 0;
     // Bewegung mit Kollision
     L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38, P.y, RES);
     P.x = RES.x; P.z = RES.z;
@@ -760,7 +761,7 @@
     L.clampWorld(P, true);
     const hsp = Math.hypot(P.vx, P.vz);
     if (hsp > 0.5) P.yaw += L.angDiff(P.yaw, Math.atan2(P.vx, P.vz)) * Math.min(1, dt * 6);
-    P.mode = 'walk'; P.air = false; P.stance = 'stand'; P.knockT = 0;
+    P.mode = 'walk'; P.air = false; P.stance = 'stand'; P.knockT = 0; P.tumble = 0; P.ejected = false;
     if (!block) playerActions(dt);
     updateActions(dt);
     // Superhelden-Pose: nach vorne geneigt, ein Arm voraus, Beine gestreckt
