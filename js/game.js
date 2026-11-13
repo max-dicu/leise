@@ -517,6 +517,7 @@
   L.selType = selType;
   // 🛡️ Der Wächter-Anzug (nur mit freigeschaltetem Skin): unverwundbar, fliegt, teleportiert, Donneraxt
   L.suitOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
+  L.bearOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'baer' && L.baerToken && L.baerToken());
   L.titanOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'titan' && L.titanToken && L.titanToken());
   function freeSpot(x, z, y) { return !L.queryBoxes(x, z, 0.7).some((b) => (b.y0 || 0) <= (y || 0) + 1.6 && b.h > (y || 0)); }
   function suitTeleport() {
@@ -1688,7 +1689,7 @@
     if (m.kind === 'langer' && m.state === 'chase' && !(m.alertT > 0)) {
       m.blinkT = (m.blinkT === undefined ? 3 : m.blinkT) - dt;
       const dT = L.dist(m.x, m.z, m.tx, m.tz);
-      if (m.blinkT <= 0 && dT > 14) {
+      if (m.blinkT <= 0 && dT > 14 && !(m.prey === P && L.bearOn())) {
         m.blinkT = L.rand(2.5, 4.5);
         const k = Math.min(10, dT - 6) / dT, nx = m.x + (m.tx - m.x) * k, nz = m.z + (m.tz - m.z) * k;
         if (!L.queryBoxes(nx, nz, 0.6).length && !safeIn(nx, nz)) { m.x = nx; m.z = nz; if (dP < 90) L.snd.radio({ x: m.x, y: 2, z: m.z }); }
@@ -3156,6 +3157,7 @@
       const d = L.dist(P.x, P.z, m.x, m.z); if (d > 40) continue;
       stat = Math.max(stat, (1 - d / 40) * (lookedAt(m) ? 1 : 0.35));
     }
+    if (stat > 0 && L.bearOn()) { if (!L._bearTold) { L._bearTold = true; L.msg('🐻 Der Gesichtslose versucht dich zu hypnotisieren – aber dem Bären ist das egal!', 5000); } stat = 0; }
     L.staticAmt = stat;
     if (stat > 0.25 && Math.random() < dt * stat * 3) L.snd.langerIdle({ x: P.x, y: 1.5, z: P.z });
     if (!P.alive) L.music.set('night');
