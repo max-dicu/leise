@@ -254,6 +254,7 @@
       L.banner('🏆 ' + b.name + ' BESIEGT!', 'Unglaublich! Sammle die Beute ein.');
       for (let i = 0; i < 4; i++) L.spawnItem(i < 2 ? 'artefakt' : 'gold', x + L.rand(-8, 8), z + L.rand(-8, 8), 1);
       if (src === P && L.gotKillCoins) L.gotKillCoins(300);
+      if (L.bossReward) L.bossReward(boss.id, x, z, 0, 'defeat');
       despawn(null);
     }
   };
@@ -387,7 +388,11 @@
   function updateBoss(dt) {
     const b = boss.b, m = boss.m, I = boss.I;
     boss.life -= dt; boss.cd -= dt; boss.ph += dt;
-    if (boss.life <= 0) { despawn(b.icon + ' ' + b.name + ' zieht sich zurück … (' + I.name + ')'); return; }
+    if (boss.life <= 0) {
+      // überlebt: Riesenkiste an der Zuflucht der Insel
+      if (P.alive && !P.gone && L.curIsland === I && L.bossReward) { const S = I.shelter || { x: I.x, z: I.z }; L.bossReward(boss.id, S.x + 5, S.z, 0.5, 'survive'); }
+      despawn(b.icon + ' ' + b.name + ' zieht sich zurück … (' + I.name + ')'); return;
+    }
     const tgt = seeTarget();
     let tx = boss.tx, tz = boss.tz;
     if (tgt) { tx = tgt.x; tz = tgt.z; boss.lastSeen = 0; }

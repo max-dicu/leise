@@ -239,7 +239,8 @@
     if (!bern || !(bern.hp > 0) || !(dmg > 0)) return;
     bern.hp -= dmg; if (L.showBossHp) L.showBossHp('😈 BERNHARD', bern.hp, BERN_HP);
     if (bern.hp <= 0) {
-      bern.hp = 0; if (L.gotKillCoins) L.gotKillCoins(1000);
+      bern.hp = 0; bern.killed = true; if (L.gotKillCoins) L.gotKillCoins(1000);
+      if (L.bossReward) L.bossReward('bernhard', P.x + 3, P.z + 3, P.y || 0, 'defeat');
       L.banner('🏆 BERNHARD IST BESIEGT!', 'Und jetzt holt MAMA IVA sich den Rest …');
       startIvaEnd();
     }
@@ -510,6 +511,9 @@
     const V = iva; if (!V) return;
     L.scene.remove(V.rig.root); L.scene.remove(V.maw); L.scene.remove(V.glow); for (const m of V.tend) L.scene.remove(m); for (const c of V.chunks) L.scene.remove(c);
     iva = null; bern.phase = 'gone'; bern.g.visible = false; bern.g.scale.setScalar(1);
+    // überlebt (nicht besiegt): Riesenkiste im Burger
+    if (!bern.killed && P.alive && !P.gone && L.inMoon(P.x) && L.bossReward) L.bossReward('bernhard', BURGER.x, BURGER.z, 0.2, 'survive');
+    bern.killed = false;
     moonIsl.earth.visible = true; moonIsl.atmo.visible = true;
     L.msg('👹 MAMA IVA hat Bernhard gefressen … Er kommt in 3 Minuten wieder. Wenn er sich traut.', 7000);
   }
