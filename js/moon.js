@@ -97,12 +97,20 @@
       L.addBox(x - 1.4, z - 1.4, x + 1.4, z + 1.4, 5, 'building');
     }
     part(G().cyl, '#f2e0b0', B.r, 0.2, B.r, B.x, 0.1, B.z, g);
-    // Patty, Käse, Salat, Tomate, oberes Brötchen mit Sesam
-    part(G().cyl, '#5a3220', B.r + 1.6, 2.4, B.r + 1.6, B.x, 6.2, B.z, g);
-    const ch = part(G().box, '#ffcc30', (B.r + 2) * 2, 0.6, (B.r + 2) * 2, B.x, 7.6, B.z, g); ch.rotation.y = 0.785;
-    part(G().cyl, '#5ab040', B.r + 2.4, 0.9, B.r + 2.4, B.x, 8.2, B.z, g);
-    for (let k = 0; k < 6; k++) { const a = k * 1.05; part(G().cyl, '#d83a2a', 3, 0.6, 3, B.x + Math.sin(a) * B.r * 0.7, 8.9, B.z + Math.cos(a) * B.r * 0.7, g); }
-    const top = part(G().sph, bun, B.r + 1.4, 8, B.r + 1.4, B.x, 9.2, B.z, g);
+    // HOHL: Patty, Käse, Salat, Tomate nur als Ringe am Rand, innen eine helle Brot-Schicht, oberes Brötchen als Kuppel
+    const ringM = (c, r, h, y, side) => { const m = new T.Mesh(new T.CylinderGeometry(r, r, h, 48, 1, true), new T.MeshLambertMaterial({ color: c, side: side || T.FrontSide })); m.position.set(B.x, y, B.z); g.add(m); return m; };
+    ringM('#5a3220', B.r + 1.6, 2.4, 6.2);
+    for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283, drip = part(G().box, '#ffcc30', 2.2, 0.5 + (k % 3) * 0.35, 0.25, B.x + Math.sin(a) * (B.r + 1.8), 7.4 - (k % 3) * 0.15, B.z + Math.cos(a) * (B.r + 1.8), g); drip.rotation.y = a; }
+    ringM('#ffcc30', B.r + 1.75, 0.45, 7.6);
+    ringM('#5ab040', B.r + 2.3, 0.9, 8.2);
+    for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283 + 0.2, tm = part(G().cyl, '#d83a2a', 1.6, 0.55, 1.6, B.x + Math.sin(a) * (B.r + 2.3), 8.9, B.z + Math.cos(a) * (B.r + 2.3), g); }
+    // Innenwand (helles Brot) von unten bis zur Kuppel – von innen sichtbar
+    ringM('#e8c890', B.r + 0.2, 4.4, 7.2, T.BackSide);
+    const dome = new T.Mesh(new T.SphereGeometry(1, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshLambertMaterial({ color: bun })); dome.scale.set(B.r + 1.4, 8, B.r + 1.4); dome.position.set(B.x, 9.2, B.z); g.add(dome);
+    const domeIn = new T.Mesh(new T.SphereGeometry(1, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshLambertMaterial({ color: '#f0d8a8', side: T.BackSide })); domeIn.scale.set(B.r + 1.1, 7.7, B.r + 1.1); domeIn.position.set(B.x, 9.2, B.z); g.add(domeIn);
+    // Boden der Kuppel offen lassen, aber Rand schließen (sonst sieht man von innen zwischen Patty und Kuppel hinaus)
+    const lip = new T.Mesh(new T.RingGeometry(B.r + 0.1, B.r + 1.5, 48), new T.MeshLambertMaterial({ color: '#e8c890', side: T.DoubleSide })); lip.rotation.x = -Math.PI / 2; lip.position.set(B.x, 9.2, B.z); g.add(lip);
+    const lip2 = lip.clone(); lip2.position.y = 5.0; g.add(lip2);
     for (let k = 0; k < 30; k++) { const a = Math.random() * 6.28, d = Math.random() * B.r * 0.9; part(G().sph, '#fff6e0', 0.5, 0.25, 0.8, B.x + Math.sin(a) * d, 9.2 + Math.sqrt(Math.max(0, 1 - (d / (B.r + 1.4)) ** 2)) * 8, B.z + Math.cos(a) * d, g, { noShadow: true }); }
     const sign = new T.Sprite(new T.SpriteMaterial({ map: L.textTex('🍔 SICHER', 512, 96, '#3a1a08', '#ffd040', 'bold 64px Arial'), fog: false })); sign.scale.set(16, 3, 1); sign.position.set(B.x, 21, B.z); g.add(sign);
     const lamp = new T.PointLight(0xffd080, 1.2, 30); lamp.position.set(B.x, 4, B.z); g.add(lamp);
@@ -318,6 +326,7 @@
     g.traverse((o) => { if (o.isMesh) { o.material.fog = false; o.frustumCulled = false; o.castShadow = false; } });
     L.scene.add(g);
     g.userData = { body, belly, arms, head, jaw, eyes, drool, sweat, headY: BR + 900 };
+    g.traverse((o) => { if (o.isMesh && o.material && o.material.fog !== false) { o.material = o.material.clone(); o.material.fog = false; } o.frustumCulled = false; });
     return g;
   }
   // Bewegung jeden Frame: atmen, schmatzen, Arme schwingen, auf dich schauen

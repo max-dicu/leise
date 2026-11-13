@@ -1140,7 +1140,8 @@
     E.sun.color.setRGB(1, 0.92 + day * 0.05 - dusk * 0.2, 0.85 - dusk * 0.35).lerp(cTmp.setRGB(0.6, 0.7, 1), nightAmt);
     E.hemi.intensity = 0.3 + day * 0.3 * (1 - E.cloud * 0.3) + E.bolt * 1.6;
     E.hemi.color.copy(cSky).lerp(cTmp.setRGB(1, 1, 1), 0.4);
-    E.stars.position.copy(cam.position);
+    E.hemi.groundColor.setHex(0x4a5a3a);
+    E.stars.position.copy(cam.position); E.stars.scale.setScalar(L.inDim(cam.position.x) ? 50 : 1); // auf Mond/Dimension hinter Bernhard & Planeten
     E.stars.material.opacity = nightAmt * (1 - E.cloud * 0.9);
     if (E.milky) { E.milky.position.copy(cam.position); E.milky.material.opacity = nightAmt * 0.8 * (1 - E.cloud * 0.9); }
     if (E.planets) { E.planets.position.copy(cam.position); const po = nightAmt * (1 - E.cloud * 0.85); E.planets.visible = po > 0.02; for (const m of E.planets.children) m.material.opacity = po; }
@@ -1156,6 +1157,13 @@
     if (L.inDim(cam.position.x)) {
       E.stars.material.opacity = 1; E.sunDisc.material.opacity = 0; E.moon.material.opacity = 0;
       E.hemi.intensity = 0.55; E.sun.intensity = 0.5; E.sun.color.setRGB(0.8, 0.7, 1);
+      if (cam.position.x > 100000) {
+        // Mond: hell genug zum Sehen (kaltes Erdlicht), Himmel bleibt schwarz → dunkle Stimmung
+        E.hemi.intensity = 1.05; E.hemi.color.setRGB(0.75, 0.8, 1); E.hemi.groundColor.setRGB(0.3, 0.3, 0.36);
+        E.sun.intensity = 1.0; E.sun.color.setRGB(0.88, 0.9, 1);
+        L.scene.background.setRGB(0.01, 0.01, 0.025); L.scene.fog.color.setRGB(0.04, 0.04, 0.07);
+        L.scene.fog.near = 150; L.scene.fog.far = 1400;
+      }
     }
     const uw = L.WATER_Y - cam.position.y;
     L.underwater = uw > 0.15 && !L.inDim(cam.position.x);
