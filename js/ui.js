@@ -361,7 +361,7 @@
     const hb = $('hotbar'); hb.innerHTML = '';
     P.hot.forEach((it, i) => hb.appendChild(slotEl(it, { key: i + 1, sel: P.sel === i, label: ' ', name: false })));
     const w = P.sel >= 0 ? P.hot[P.sel] : null, wd = w && L.ITEMS[w.type];
-    if (wd && wd.slot === 'waffe') $('ammo').innerHTML = `${wd.energy ? '∞ Energie' : P.reloadT >= 0 ? 'lädt …' : w.mag + ' / ' + L.countBag(wd.ammo)}<small>${wd.name}</small>`;
+    if (wd && wd.slot === 'waffe') $('ammo').innerHTML = `${wd.fw ? '× ' + (w.count || 1) : wd.energy ? '∞ Energie' : P.reloadT >= 0 ? 'lädt …' : w.mag + ' / ' + L.countBag(wd.ammo)}<small>${wd.name}</small>`;
     else if (wd && w.count > 1) $('ammo').innerHTML = `${wd.icon} ${w.count}<small>${wd.name}</small>`;
     else if (wd) $('ammo').innerHTML = `<small>${wd.name}</small>`;
     else $('ammo').innerHTML = '<small>✋ Hand leer</small>';

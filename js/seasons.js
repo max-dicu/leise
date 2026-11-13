@@ -46,12 +46,69 @@
       tintInst(L.instLeafy, (cc) => cc.lerp(snow, 0.7));
       tintInst(L.instPine, (cc) => cc.lerp(snow, 0.45));
       tintInst(L.instRoof, (cc) => cc.lerp(snow, 0.75));
+      winterDeco();
     } else if (id === 'herbst') {
       tintInst(L.instLeafy, (cc, i) => cc.set(AUT[(i * 7) % AUT.length]));
     } else if (id === 'fruehling') {
       tintInst(L.instLeafy, (cc, i) => (i % 4 === 0 ? cc.set(i % 8 === 0 ? '#f4b8d0' : '#ffffff') : cc.lerp(new T.Color('#8ad060'), 0.45)));
     } else {
       tintInst(L.instLeafy, (cc) => cc.lerp(new T.Color('#2a6a20'), 0.25));
+    }
+  }
+
+  // ---------- Winter: Schneemänner und geschmückte Tannen ----------
+  const snowmen = []; let balls = null, stars = null, twT = 0, baseCols = null;
+  function snowman(x, z, rot) {
+    const g = new T.Group(), W = L.mat('#f4f7fb'), blk = L.mat('#1a1a1a');
+    const add = (geo, mt, sx, sy, sz, px, py, pz) => { const m = new T.Mesh(geo, mt); m.scale.set(sx, sy, sz); m.position.set(px, py, pz); m.castShadow = true; g.add(m); return m; };
+    add(L.GEO.sph, W, 0.85, 0.8, 0.85, 0, 0.75, 0); add(L.GEO.sph, W, 0.62, 0.6, 0.62, 0, 1.95, 0); add(L.GEO.sph, W, 0.45, 0.45, 0.45, 0, 2.85, 0);
+    for (const s of [-1, 1]) add(L.GEO.sph, blk, 0.06, 0.06, 0.06, s * 0.15, 2.95, 0.4);
+    for (let k = 0; k < 3; k++) add(L.GEO.sph, blk, 0.07, 0.07, 0.07, 0, 1.75 + k * 0.25, 0.6 - Math.abs(k - 1) * 0.04);
+    const nose = add(L.GEO.cone, L.mat('#ff7a20'), 0.07, 0.35, 0.07, 0, 2.85, 0.55); nose.rotation.x = Math.PI / 2;
+    add(L.GEO.cyl, blk, 0.32, 0.45, 0.32, 0, 3.45, 0); add(L.GEO.cyl, blk, 0.48, 0.05, 0.48, 0, 3.25, 0);
+    const sc = new T.Mesh(new T.TorusGeometry(0.42, 0.1, 6, 16), L.mat('#d02a2a')); sc.rotation.x = Math.PI / 2; sc.position.y = 2.5; g.add(sc);
+    for (const s of [-1, 1]) { const a = add(L.GEO.cyl, L.mat('#5a3a20'), 0.04, 0.9, 0.04, s * 0.85, 2.1, 0); a.rotation.z = s * 1.0; }
+    g.position.set(x, 0, z); g.rotation.y = rot; L.scene.add(g); snowmen.push(g);
+  }
+  function winterDeco() {
+    // 30 Schneemänner auf freien Flächen
+    for (let i = 0, n = 0; i < 3000 && n < 30; i++) {
+      const x = L.rand(-1400, 1400), z = L.rand(-1400, 1400);
+      if (L.queryBoxes(x, z, 3).length || L.mountainH(x, z) > 0 || L.waterDepth(x, z) > -0.2 || L.inTower(x, z, 8)) continue;
+      snowman(x, z, Math.random() * 6.28); n++;
+    }
+    // Tannen als Weihnachtsbäume: Kugeln/Lichter und ein Stern oben
+    const pm = L.instPine; if (!pm) return;
+    const N = Math.min(pm.count, 1600), mtx = new T.Matrix4(), pos = new T.Vector3(), q = new T.Quaternion(), sc = new T.Vector3(), o = new T.Object3D(), cc = new T.Color();
+    balls = new T.InstancedMesh(new T.SphereGeometry(1, 6, 5), new T.MeshBasicMaterial(), N * 7);
+    stars = new T.InstancedMesh(new T.OctahedronGeometry(1, 0), new T.MeshBasicMaterial({ color: 0xffd040 }), N);
+    let bi = 0;
+    const COLS = ['#ff2a3a', '#ffd040', '#3aa0ff', '#ff40c0', '#ffffff', '#40ff80', '#ff8a20'];
+    for (let i = 0; i < N; i++) {
+      pm.getMatrixAt(i, mtx); mtx.decompose(pos, q, sc);
+      if (Math.abs(pos.x) > 1500 || Math.abs(pos.z) > 1500) continue;
+      for (let k = 0; k < 7; k++) {
+        const hh = 0.15 + (k / 7) * 0.7, rr = sc.x * (1 - hh) * 0.92, a = k * 2.4 + i;
+        o.position.set(pos.x + Math.cos(a) * rr, pos.y + sc.y * hh, pos.z + Math.sin(a) * rr); o.rotation.set(0, 0, 0); o.scale.setScalar(Math.max(0.12, sc.x * 0.09)); o.updateMatrix();
+        balls.setMatrixAt(bi, o.matrix); balls.setColorAt(bi, cc.set(COLS[(i + k) % COLS.length])); bi++;
+      }
+      o.position.set(pos.x, pos.y + sc.y + 0.25, pos.z); o.scale.set(sc.x * 0.18, sc.x * 0.25, sc.x * 0.08); o.updateMatrix(); stars.setMatrixAt(i, o.matrix);
+    }
+    balls.count = bi; balls.instanceMatrix.needsUpdate = true; if (balls.instanceColor) balls.instanceColor.needsUpdate = true; balls.frustumCulled = false;
+    stars.count = N; stars.instanceMatrix.needsUpdate = true; stars.frustumCulled = false;
+    L.scene.add(balls); L.scene.add(stars);
+    if (balls.instanceColor) baseCols = Float32Array.from(balls.instanceColor.array);
+  }
+  function updateWinter(dt) {
+    twT -= dt;
+    if (twT > 0) return; twT = 0.5;
+    const P = L.player;
+    for (const s of snowmen) s.visible = Math.abs(s.position.x - P.x) < 180 && Math.abs(s.position.z - P.z) < 180;
+    // Lichterkette blinkt (nachts besonders schön)
+    if (balls && balls.instanceColor) {
+      const arr = balls.instanceColor, a = arr.array;
+      for (let k = 0; k < 500 && baseCols; k++) { const i = Math.floor(Math.random() * balls.count) * 3, f = Math.random() < 0.4 ? 0.3 : 1; a[i] = baseCols[i] * f; a[i + 1] = baseCols[i + 1] * f; a[i + 2] = baseCols[i + 2] * f; }
+      arr.needsUpdate = true;
     }
   }
 
@@ -62,6 +119,7 @@
     oue(dt, cam, focus, paused);
     if (!applied && L.ground && L.instLeafy) apply();
     if (paused || L.state !== 'game' || !cam || !onHome(cam.position.x)) return;
+    if (id === 'winter') updateWinter(dt);
     const P = L.player, E = L.env, wind = L.WEATHER && L.WEATHER[E.weather] && L.WEATHER[E.weather].wind;
     const px = cam.position.x, pz = cam.position.z, R = L.rand;
     if (id === 'herbst' && Math.random() < dt * (wind ? 30 : 8)) L.fx(AUT[Math.floor(Math.random() * AUT.length)], px + R(-25, 25), R(6, 14), pz + R(-25, 25), 1, wind ? 4 : 1, { size: 0.18, life: 5, g: 0.6 });
