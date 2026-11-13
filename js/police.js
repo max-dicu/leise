@@ -48,6 +48,21 @@
     if (L.safeIn && L.safeIn(p.x, p.z)) return false;
     return Math.abs(p.x) < 1550 && Math.abs(p.z) < 1550;
   }
+  // Höhe über dem Boden (Fliegen, Flugzeug, Heli, Sprung …)
+  function heightOf(p) {
+    if (isP(p)) { const v = P.vehicle; if (v) return Math.max(v.alt || 0, v.y || 0); const y = P.y || 0, f = L.floorAt ? L.floorAt(P.x, P.z, y) : null; return y - (typeof f === 'number' ? f : 0); }
+    return Math.max(0, p.y || 0);
+  }
+  // In der Luft: Polizei schießt (aus dem Streifenwagen) – festnehmen geht nur am Boden
+  function shoot(v, p, h, d) {
+    const from = new THREE.Vector3(v.x, 1.7, v.z), hit = Math.random() < Math.max(0.15, 0.55 - d / 350);
+    const to = new THREE.Vector3(p.x + (hit ? 0 : L.rand(-3, 3)), h + 1 + (hit ? 0 : L.rand(-2, 3)), p.z + (hit ? 0 : L.rand(-3, 3)));
+    if (L.tracer) L.tracer(from, to);
+    L.snd.gun && L.snd.gun('pistole', { x: v.x, y: 1.6, z: v.z });
+    if (!hit) return;
+    if (isP(p)) { if (P.vehicle) { P.vehicle.hp -= 14; if (Math.random() < 0.35) L.hurtPlayer(4, 'Von der Polizei abgeschossen'); } else L.hurtPlayer(7, 'Von der Polizei abgeschossen'); }
+    else if (p.pid !== undefined && L.mp && L.mp.sendTo) L.mp.sendTo(p.pid, { t: 'pvp', dmg: 7, by: 'der Polizei' });
+  }
   function los(ax, az, bx, bz) {
     const d = Math.hypot(bx - ax, bz - az), n = Math.ceil(d / 3);
     for (let i = 1; i < n; i++) { const t = i / n; if (L.blockedAt(L.lerp(ax, bx, t), 1.6, L.lerp(az, bz, t))) return false; }
@@ -140,9 +155,16 @@
     if (a.camp.t > 25) { if (Math.hypot(v.x - a.camp.x, v.z - a.camp.z) < 10 && a.state !== 'chase' && farFromPlayers(v.x, v.z, 120)) relocate(v); a.camp = { x: v.x, z: v.z, t: 0 }; }
     L._drive(v, dt, thr, str, hb);
     v.hp = v.t.hp;
-    // Festnahme: Berührung
+    // in der Luft: schießen
+    a.fireCd = (a.fireCd || 0) - dt;
+    if (a.state === 'chase' && a.target && valid(a.target) && a.fireCd <= 0) {
+      const p = a.target, h = heightOf(p), d = Math.hypot(p.x - v.x, p.z - v.z);
+      if (h > 3 && d < 170 && los(v.x, v.z, p.x, p.z)) { a.fireCd = 0.9 + Math.random() * 0.7; shoot(v, p, h, d); }
+    }
+    // Festnahme: Berührung – nur wenn man wirklich unten am Boden ist
     for (const p of L._players()) {
       if (!valid(p)) continue;
+      if (heightOf(p) > 2.5) continue;
       const pr = isP(p) ? (P.vehicle ? P.vehicle.t.len * 0.5 : 0.5) : (p.inVeh ? 2.2 : 0.5);
       if (Math.hypot(p.x - v.x, p.z - v.z) < v.t.len * 0.5 + pr + 0.3) arrest(p, v);
     }
