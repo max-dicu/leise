@@ -232,6 +232,8 @@
     else if (v === 'auge') { for (let k = 0; k < 9; k++) { const x = L.rand(-1.1, 1.1), y = L.rand(0.2, 1.1), z = L.rand(-1.5, 1.6); part(sph, '#ffffff', 0.25, 0.25, 0.25, x, y, z, bd, { noShadow: true }); part(sph, '#111', 0.11, 0.11, 0.11, x * 1.08, y * 1.08, z + 0.15, bd, { noShadow: true }); } }
     else if (v === 'gold') { L.tintRig(r.root, '#d4af37', 0.35); part(cone, '#ffd040', 0.4, 0.5, 0.4, 0, 0.75, -0.1, r.head, { noShadow: true }); }
   }
+  L.decorateWalross = decorate;
+  L.WALROSS_VARS = ['zimt', 'roller', 'naegel', 'locken', 'schaum', 'strick', 'kaktus', 'auge', 'gold', ''];
   const STATS = { zimt: { dmg: 22, slow: 2.5 }, roller: { dmg: 25 }, naegel: { dmg: 40 }, locken: { dmg: 25 }, schaum: { dmg: 22, knock: 18 }, strick: { dmg: 28 }, kaktus: { dmg: 34 }, auge: { dmg: 25, hear: 1.6 }, gold: { dmg: 30 } };
   const NAMES = { zimt: 'Zimtschnecken-Walross', roller: 'E-Roller-Walross', naegel: 'Fingernagel-Walross', locken: 'Lockenwickler-Walross', schaum: 'Schaum-Walross', strick: 'Strickpulli-Walross', kaktus: 'Kaktus-Walross', auge: 'Hundert-Augen-Walross', gold: 'Gold-Walross' };
   function summon(lk, n) {

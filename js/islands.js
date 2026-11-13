@@ -171,6 +171,7 @@
       const [x, z] = spot(90), m = g.spawnMonster(k, x, z, k === 'viktor' ? L.pick(['grey', 'red', 'blue', 'lange']) : undefined);
       m.isl = I; L.tintRig(m.rig.root, I.monTint, 0.45);
     }
+    for (let i = 0; i < 10; i++) { const [x, z] = spot(80), m = g.spawnMonster('walross', x, z, L.pick(L.WALROSS_VARS || [''])); m.isl = I; }
     for (let i = 0; i < 8; i++) {
       const [x, z] = spot(40), a = L.randomAppearance();
       a.top = L.pick(I.npc.top); a.topColor = L.pick(I.npc.topColor); a.hat = L.pick(I.npc.hat);

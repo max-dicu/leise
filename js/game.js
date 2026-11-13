@@ -470,6 +470,7 @@
     const cam = L.camera, dir = V1; cam.getWorldDirection(dir);
     const h = L.rayHit(cam.position, dir, 260 + P.camDist, P.camDist + 0.3), end = new T.Vector3().copy(cam.position).addScaledVector(dir, h.t);
     const hand = V2; P.rig.hand.getWorldPosition(hand);
+    if (L.axeThrow) L.axeThrow(hand.clone(), end.clone());
     // Blitz
     const pts = [], n = 10; for (let i = 0; i <= n; i++) { const u = i / n; pts.push(new T.Vector3(L.lerp(hand.x, end.x, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0), L.lerp(hand.y, end.y, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0), L.lerp(hand.z, end.z, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0))); }
     const ln = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: 0x9ae0ff, fog: false })); L.scene.add(ln); setTimeout(() => L.scene.remove(ln), 180);
@@ -652,6 +653,7 @@
       pitch: -P.camPitch * 0.6, swing: P.swing, throwT: P.throwT, eat: P.eatT >= 0
     };
     L.animHuman(r, P.animSt);
+    if (L.afterPlayerAnim) L.afterPlayerAnim(r, dt);
   }
   // Flug des Wächters: frei durch die Luft, sanfte Landung, Umhang weht
   function updateFlying(dt, block) {
@@ -691,7 +693,8 @@
     L.setHeld(r, selType());
     P.phase += dt * 3;
     P.animSt = { mode: 'run', phase: P.phase, speed: 1 };
-    L.animHuman(r, { mode: 'walk', phase: P.phase, speed: 0.05 });
+    L.animHuman(r, { mode: 'walk', phase: P.phase, speed: 0.05, aim: P.fireCd > 0 && selType() && ITEMS[selType()].slot === 'waffe', pitch: -P.camPitch * 0.6 });
+    if (L.afterPlayerAnim) L.afterPlayerAnim(r, dt);
     for (const l of r.legs) { l.leg.rotation.x = 0.08 + Math.sin(P.phase) * 0.05; l.knee.rotation.x = 0.15; }
     if (tilt > 0.2) { r.arms[0].arm.rotation.x = -2.9 * tilt; r.arms[1].arm.rotation.x = 0.3; } else { r.arms[0].arm.rotation.z = 0.5; r.arms[1].arm.rotation.z = -0.5; }
     if (r.cape) r.cape.rotation.x = 0.3 + tilt * 1.1 + Math.sin(P.phase * 6) * 0.08;
@@ -804,7 +807,7 @@
     if (w.type === 'donneraxt') { thorStrike(); return; }
     if (L.weaponFire && L.weaponFire(w, d)) return;
     if (w.mag <= 0) { L.snd.empty(); P.fireCd = 0.3; if (L.countBag(d.ammo) > 0) reload(); else L.msg('Keine Munition!'); return; }
-    w.mag--; P.fireCd = d.rate;
+    w.mag--; P.fireCd = d.rate; P.recoil = Math.min(1.2, (P.recoil || 0) + (d.dmg >= 60 ? 1 : 0.45));
     const cam = L.camera, o = cam.position, dir = V1;
     cam.getWorldDirection(dir);
     const hand = V2; P.rig.hand.getWorldPosition(hand);
@@ -1455,7 +1458,7 @@
       cause: 'Ein Marsianer hat dich gepackt', voice: (p) => L.snd.marsianer(p), idle: (p) => L.snd.marsianerIdle(p), hit: [[1.55, 0.85, 1], [1.7, 0.3, 2]] },
     starrende: { build: () => L.buildStarrende(), anim: (r, s) => L.animBeast(r, s), spd: [1.2, 6, 11], hp: 120, r: 0.4, reach: 2.4, grab: 2.2, atk: 0.6, wind: 0.3, dmg: 50, veh: 40, knock: 9, up: 4, view: 260,
       cause: 'Die Starrende hat dich erwischt, als du weggeschaut hast', voice: (p) => L.snd.starrende(p), idle: (p) => L.snd.starrendeIdle(p), hit: [[1.2, 0.3, 1], [1.9, 0.25, 1], [2.3, 0.2, 2]] },
-    walross: { build: () => { const r = L.buildWalross(); r.root.scale.setScalar(0.85); return r; }, anim: (r, s) => L.animWalrossMon(r, s), spd: [1.0, 3.6, 6.2], hp: 320, r: 1.3, reach: 3.2, grab: 2.8, atk: 1.0, wind: 0.5, dmg: 45, veh: 45, knock: 13, up: 5, heavy: true, view: 260,
+    walross: { build: (v) => { const r = L.buildWalross(); if (v && L.decorateWalross) L.decorateWalross(r, v); r.root.scale.setScalar(0.85); return r; }, anim: (r, s) => L.animWalrossMon(r, s), spd: [1.0, 3.6, 6.2], hp: 320, r: 1.3, reach: 3.2, grab: 2.8, atk: 1.0, wind: 0.5, dmg: 45, veh: 45, knock: 13, up: 5, heavy: true, view: 260,
       cause: 'Ein Walross hat dich platt gemacht', voice: (p) => { L.tn({ f: 120, fTo: 90, dur: 0.35, type: 'sawtooth', vol: 0.2, pos: p }); L.tn({ f: 120, fTo: 90, dur: 0.35, type: 'sawtooth', vol: 0.2, pos: p, delay: 0.45 }); }, idle: (p) => L.nz({ dur: 0.4, f: 300, type: 'bandpass', q: 2, vol: 0.12, pos: p }), hit: [[1.0, 1.2, 1], [1.4, 0.5, 2]] },
     flieger: { build: () => L.buildFlieger(), anim: (r, s) => L.animBeast(r, s), spd: [7, 13, 16], hp: 300, r: 3, fly: true, metal: true, view: 520,
       cause: 'Im schwarzen Rauch erstickt', voice: (p) => L.snd.flieger(p), idle: (p) => L.snd.fliegerIdle(p), hit: [[16, 3.4, 1], [15.4, 0.9, 2]] }
@@ -2849,8 +2852,8 @@
     let n = 0;
     for (const s of spots) {
       // fünfmal so viel Beute wie früher (früher jeder ~5. Platz)
-      const k = Math.random() < 0.1 ? 2 : 1;
-      for (let j = 0; j < k; j++) L.spawnItem(rollLoot(s.poi), s.x + (j ? L.rand(-1.5, 1.5) : 0), s.z + (j ? L.rand(-1.5, 1.5) : 0));
+      const rr = Math.random(), k = rr < 0.12 ? 3 : rr < 0.45 ? 2 : 1;
+      for (let j = 0; j < k; j++) L.spawnItem(L.rollLoot(s.poi), s.x + (j ? L.rand(-1.5, 1.5) : 0), s.z + (j ? L.rand(-1.5, 1.5) : 0));
       n += k;
     }
     const mil = spots.filter((s) => s.poi === 'militaer');
@@ -2898,7 +2901,7 @@
         else { x = L.rand(-1450, 1450); z = L.rand(-1450, 1450); }
         if (L.dist(x, z, P.x, P.z) < 120 || L.queryBoxes(x, z, 1.2).length) continue;
         if (L.inTower(x, z, 4)) continue;
-        spawnMonster(kind, x, z, kind === 'viktor' ? randVariant() : undefined);
+        spawnMonster(kind, x, z, kind === 'viktor' ? randVariant() : kind === 'walross' && L.WALROSS_VARS ? L.pick(L.WALROSS_VARS) : undefined);
         if (kind === 'blockling') for (let k = 0; k < 2; k++) spawnMonster(kind, x + L.rand(-4, 4), z + L.rand(-4, 4));
         made++;
       }
@@ -2923,7 +2926,7 @@
     place('schwelle', NK);
     place('greifer', NK);
     place('flieger', NK);
-    place('walross', NK);
+    place('walross', NK * 3);
     place('marsianer', Math.round(NK / 2));
     L.frenzy = false; smokes.length = 0; L.towerRestore(); clearCyls(); L.clearNature(); L.round.cylT = L.rand(60, 90);
     for (let i = 0; i < Math.max(6, Math.round(20 * L.md.count)); i++) {
