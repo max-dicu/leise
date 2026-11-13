@@ -29,7 +29,8 @@
     sicherung: { name: 'Sicherung', slot: 'bag', icon: '🔌', stack: 3 },
     gold: { name: 'Goldbarren', slot: 'bag', icon: '🪙', stack: 10 },
     uhr: { name: 'Taschenuhr', slot: 'bag', icon: '⌚', stack: 5 },
-    artefakt: { name: 'Alien-Artefakt', slot: 'bag', icon: '🔮', stack: 3 }
+    artefakt: { name: 'Alien-Artefakt', slot: 'bag', icon: '🔮', stack: 3 },
+    donneraxt: { name: 'Donneraxt', slot: 'waffe', icon: '🪓', dmg: 0, rate: 0.7, noise: 40, range: 260, ammo: null, mag: 1, spread: 0 }
   };
   const ITEMS = L.ITEMS;
   // Schnellleiste: 5 freie Plätze, jeder Gegenstand passt überall hin. P.sel = -1 heißt: nichts in der Hand
@@ -245,7 +246,7 @@
   L.rayHit = function (o, d, maxD, minT) {
     let best = null, bt = maxD;
     for (const e of allTargets()) {
-      if (L.dist(o.x, o.z, e.x, e.z) > maxD + 30) continue;
+      if (e.kind !== 'dwurm' && L.dist(o.x, o.z, e.x, e.z) > maxD + 30) continue;
       for (const s of spheres(e)) {
         const cx = s[0] - o.x, cy = s[1] - o.y, cz = s[2] - o.z;
         const t = cx * d.x + cy * d.y + cz * d.z;
@@ -268,6 +269,7 @@
 
   // ---------- Schaden ----------
   L.hurtPlayer = function (dmg, cause, fx, fz) {
+    if (L.suitOn && L.suitOn()) return;
     if (!P.alive || dmg <= 0 || L.cine) return;
     P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
     L.snd.hurt(); L.shake = Math.min(1.2, L.shake + dmg / 60);
@@ -275,6 +277,7 @@
     if (P.hp <= 0) { P.hp = 0; killPlayer(cause); }
   };
   function killPlayer(cause) {
+    if (L.suitOn && L.suitOn()) { P.hp = 100; P.alive = true; return; }
     P.alive = false; P.deathT = 0; P.cause = cause;
     // Tod: MAMA IVA fängt wieder bei Stufe 1 an
     L.save.ivaLvl = 0; L.save.walLvl = 0; L.save.vikLvl = 0; L.save.danLvl = 0; L.persist();
@@ -425,10 +428,53 @@
     if (P.rig) L.scene.remove(P.rig.root);
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
     L.scene.add(P.rig.root);
+    if (L.suitOn()) { P.hot[1] = { type: 'donneraxt', count: 1, mag: 1 }; }
   }
   function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
   function selType() { const it = selItem(); return it ? it.type : null; }
   L.selType = selType;
+  // 🛡️ Der Wächter-Anzug (nur mit freigeschaltetem Skin): unverwundbar, fliegt, teleportiert, Donneraxt
+  L.suitOn = () => !!(P.rig && P.rig.app && P.rig.app.special === 'waechter' && L.waechterToken && L.waechterToken());
+  function freeSpot(x, z, y) { return !L.queryBoxes(x, z, 0.7).some((b) => (b.y0 || 0) <= (y || 0) + 1.6 && b.h > (y || 0)); }
+  function suitTeleport() {
+    if (P.tpCd > 0) { L.msg('⏳ Teleport lädt noch … ' + Math.ceil(P.tpCd) + ' s', 1200); return; }
+    const cp = P.flying ? Math.cos(P.camPitch) : 1, up = P.flying ? -Math.sin(P.camPitch) : 0;
+    for (let d = 70; d >= 10; d -= 5) {
+      const x = P.x + Math.sin(P.camYaw) * cp * d, z = P.z + Math.cos(P.camYaw) * cp * d, y = Math.max(0, (P.y || 0) + up * d);
+      if (!freeSpot(x, z, y)) continue;
+      L.fx('#a050ff', P.x, (P.y || 0) + 1, P.z, 30, 5, { basic: true, size: 0.25, life: 0.8 });
+      P.x = x; P.z = z; if (P.flying) P.y = y; P.tpCd = 2;
+      L.fx('#a050ff', x, (P.y || 0) + 1, z, 40, 6, { basic: true, size: 0.3, life: 0.9 }); L.snd.teleport && L.snd.teleport({ x, y: 1, z }); return;
+    }
+    L.msg('🚫 Kein freier Platz zum Teleportieren.', 1500);
+  }
+  L.suitTeleportTo = function (x, z) {
+    if (!L.suitOn() || !P.alive) return;
+    if (P.vehicle) leaveVehicle(true);
+    L.fx('#a050ff', P.x, (P.y || 0) + 1, P.z, 30, 5, { basic: true, size: 0.25, life: 0.8 });
+    P.x = x; P.z = z; P.y = Math.max(0, L.seaFloor(x, z)); P.vx = P.vz = P.vy = 0; P.air = true;
+    if (!freeSpot(x, z, P.y)) { P.y += 40; P.flying = 1; }
+    L.fx('#a050ff', P.x, P.y + 1, P.z, 40, 6, { basic: true, size: 0.3, life: 0.9 }); L.snd.teleport && L.snd.teleport({ x, y: 1, z });
+    L.msg('🌀 Teleportiert!', 1500);
+  };
+  // Donneraxt: Blitz trifft das Ziel – danach hat es nur noch 1 Leben
+  function thorStrike() {
+    P.fireCd = 0.7;
+    const cam = L.camera, dir = V1; cam.getWorldDirection(dir);
+    const h = L.rayHit(cam.position, dir, 260 + P.camDist, P.camDist + 0.3), end = new T.Vector3().copy(cam.position).addScaledVector(dir, h.t);
+    const hand = V2; P.rig.hand.getWorldPosition(hand);
+    // Blitz
+    const pts = [], n = 10; for (let i = 0; i <= n; i++) { const u = i / n; pts.push(new T.Vector3(L.lerp(hand.x, end.x, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0), L.lerp(hand.y, end.y, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0), L.lerp(hand.z, end.z, u) + (i && i < n ? L.rand(-1.2, 1.2) : 0))); }
+    const ln = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: 0x9ae0ff, fog: false })); L.scene.add(ln); setTimeout(() => L.scene.remove(ln), 180);
+    L.env.bolt = 1; L.snd.thunder && L.snd.thunder(0.02); L.fx('#c8f0ff', end.x, end.y, end.z, 30, 10, { basic: true, size: 0.5, life: 0.6 });
+    if (h.ent) {
+      const e = h.ent;
+      if (e.kind === 'dwurm') L.damageEnt(e, Math.max(0, (e.hp - 1)) / 0.35, P.x, P.z, P);
+      else if (e.kind === 'remote') L.mp.sendTo(e.pid, { t: 'pvp', dmg: 95, by: (L.save.char || {}).name || 'Mitspieler' });
+      else if (typeof e.hp === 'number' && e.hp > 1) L.damageEnt(e, e.hp - 1, P.x, P.z, P);
+      L.msg('⚡ Donnerschlag! Nur noch 1 Leben übrig.', 1500);
+    }
+  }
   const SPEED = { crawl: 1.1, crouch: 2.1, walk: 4.0, run: 7.3, idle: 0 };
   const STEP = { crawl: [0.5, 0, 0.015], crouch: [0.6, 0, 0.03], walk: [0.75, 7, 0.1], run: [1.1, 24, 0.22] };
   function updatePlayer(dt) {
@@ -456,7 +502,7 @@
     if (P.vehicle) { if (P.seat > 0) updatePassenger(dt); else updateDriving(dt); return; }
     const S = L.S(), sens = 0.0022 * S.sens;
     P.camYaw -= L.mouse.dx * sens;
-    P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, P.flying ? -1.4 : -0.6, P.flying ? 1.4 : 1.2);
+    P.camPitch = L.clamp(P.camPitch + L.mouse.dy * sens, P.flying ? -1.4 : -1.3, P.flying ? 1.4 : 1.2);
     const block = L.uiBlock;
     if (!block) {
       if (L.hit('KeyC')) P.stance = P.stance === 'crouch' ? 'stand' : 'crouch';
@@ -470,6 +516,8 @@
       if (!P.flying) { P.flying = 1; P.vy = 6; P.air = false; P.stance = 'stand'; L.msg('🦸 Du fliegst! Leertaste = hoch · C = runter · Shift = schnell · V = landen', 4000); L.snd.teleport && L.snd.teleport({ x: P.x, y: P.y + 1, z: P.z }); }
       else if (P.flying === 1) { P.flying = 2; L.msg('🛬 Landeanflug …', 1500); }
     }
+    if (!block && canFly && L.hit('KeyT')) suitTeleport();
+    if (canFly) { P.hp = 100; P.food = Math.max(P.food, 60); P.water = Math.max(P.water, 60); }
     if (P.flying) { updateFlying(dt, block); return; }
     flySpeedUi(false);
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
@@ -588,7 +636,7 @@
     if (!(L.save.flySpeed >= 1)) L.save.flySpeed = 80;
     if (!block) {
       const stp = (L.keys.ShiftLeft || L.keys.ShiftRight) ? 100 : 10;
-      if (L.hit('Equal') || L.hit('NumpadAdd') || L.hit('BracketRight')) L.save.flySpeed = Math.min(999, L.save.flySpeed + stp);
+      if (L.hit('Equal') || L.hit('NumpadAdd') || L.hit('BracketRight')) L.save.flySpeed = Math.min(1000, L.save.flySpeed + stp);
       if (L.hit('Minus') || L.hit('NumpadSubtract') || L.hit('Slash')) L.save.flySpeed = Math.max(1, L.save.flySpeed - stp);
     }
     flySpeedUi(true);
@@ -631,7 +679,7 @@
     if (!fsEl) {
       fsEl = document.createElement('div'); fsEl.id = 'flySpd';
       fsEl.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;padding:6px 12px;border-radius:10px;z-index:9;font-weight:700;text-align:center;font-size:14px';
-      fsEl.innerHTML = '🦸 Flugtempo: <b></b> km/h <small>(+ / −, Shift = 100er)</small><br><input type="range" min="1" max="999" style="width:min(320px,70vw)">';
+      fsEl.innerHTML = '🦸 Flugtempo: <b></b> km/h <small>(+ / −, Shift = 100er)</small><br><input type="range" min="1" max="1000" style="width:min(320px,70vw)">';
       document.body.appendChild(fsEl);
       const inp = fsEl.querySelector('input'); inp.oninput = () => { L.save.flySpeed = +inp.value; L.persist(); };
     }
@@ -729,6 +777,7 @@
   }
   function fire() {
     const w = selItem(), d = ITEMS[w.type];
+    if (w.type === 'donneraxt') { thorStrike(); return; }
     if (w.mag <= 0) { L.snd.empty(); P.fireCd = 0.3; if (L.countBag(d.ammo) > 0) reload(); else L.msg('Keine Munition!'); return; }
     w.mag--; P.fireCd = d.rate;
     const cam = L.camera, o = cam.position, dir = V1;
@@ -928,6 +977,7 @@
     L.snd.key();
     if (seat > 0) { L.msg(`👥 Du fährst bei ${driverName(v)} mit${v.t.kind === 'car' ? ' – B zum Anschnallen!' : ' – halt dich fest!'}`); return; }
     if (L.onEnterVehicle) L.onEnterVehicle(v);
+    if (v.t.jetFly) setTimeout(() => L.msg('🚀 ' + v.t.name + ': E drücken zum Fliegen (' + (v.t.jetInf ? 'unbegrenzt' : '30 s, dann 30 s Pause') + ') · fährt auch über Wasser', 5000), 1600);
     if (v.t.wheelie) { L.msg(`${v.t.quad ? '🏍️' : '🏍️'} ${v.t.name} – Shift halten = Wheelie! Ohne Gurt, fahr vorsichtig.`); L.snd.key(); return; }
     L.msg(v.t.kind === 'car' ? `🚗 ${v.t.name} – B zum Anschnallen!` : v.t.scooter ? `🛴 ${v.t.name} – fast lautlos, bis 100 km/h. Ohne Gurt, fahr vorsichtig!` : `🏍️ ${v.t.name} – ohne Gurt, fahr vorsichtig!`);
     L.snd.key();
@@ -1058,9 +1108,9 @@
       v.jetCd = Math.max(0, (v.jetCd || 0) - dt);
       if (!block && L.hit('KeyE') && !v.jetOn && !v.jetLand) {
         if (v.jetCd > 0) L.msg('⏳ Die Düsen kühlen noch ab … ' + Math.ceil(v.jetCd) + ' s', 1500);
-        else { v.jetOn = true; v.jetT = 30; v.vy = 8; L.msg('🚀 ' + t.name + ' fliegt! 30 Sekunden – E/R hoch, C runter', 3000); L.snd.teleport && L.snd.teleport({ x: v.x, y: 1, z: v.z }); }
+        else { v.jetOn = true; v.jetT = 30; v.vy = 8; L.msg('🚀 ' + t.name + ' fliegt! ' + (t.jetInf ? 'Unbegrenzt – ' : '30 Sekunden – ') + 'E/R hoch, C runter' + (t.jetInf ? ', zum Landen C halten' : ''), 3000); L.snd.teleport && L.snd.teleport({ x: v.x, y: 1, z: v.z }); }
       }
-      if (v.jetOn) { v.jetT -= dt; if (v.jetT <= 0) { v.jetOn = false; v.jetLand = true; v.jetCd = 30; L.msg('⚠️ Flugzeit vorbei – Landung! 30 s Pause', 3000); } }
+      if (v.jetOn) { if (!t.jetInf) v.jetT -= dt; if (v.jetT <= 0) { v.jetOn = false; v.jetLand = true; v.jetCd = 30; L.msg('⚠️ Flugzeit vorbei – Landung! 30 s Pause', 3000); } }
       if (v.jetOn) updateFlight(v, dt, !block && (L.keys.KeyE || L.keys.KeyR), !block && L.keys.KeyC);
       else if (v.jetLand) { updateFlight(v, dt, false, true); const fl = flyFloor(v.x, v.z); if ((v.alt || 0) <= Math.max(fl, L.waterDepth(v.x, v.z) > 0.3 ? 0 : fl) + 0.05) { v.jetLand = false; v.alt = 0; v.vy = 0; } }
     }
@@ -1208,11 +1258,11 @@
       // Wheelie-Physik: Shift drückt das Vorderrad hoch – je länger, desto steiler. Die Schwerkraft zieht es wieder runter,
       // aber nur bis zum Kipppunkt: wer darüber hinaus zieht, kippt nach hinten um (je schneller, desto gefährlicher).
       // Durch kurzes, wiederholtes Drücken kann man den Wheelie halten.
-      const BAL = 1.2, FLIP = 1.45, ground = !(alt > 0.5) && v.hp > 0 && v.speed > 2;
+      const BAL = 1.25, FLIP = 1.6, ground = !(alt > 0.5) && v.hp > 0 && v.speed > 2;
       let wh = v.wh || 0, wv = v.whv || 0;
       if (ground || wh > 0) {
-        const push = ground && v.whIn ? (thr > 0 ? 3.6 : 3.1) - (t.scooter ? 0.25 : 0) : 0;
-        const grav = -3.0 * Math.sin(BAL - wh);
+        const push = ground && v.whIn ? (thr > 0 ? 4.0 : 3.5) - (t.scooter ? 0.25 : 0) : 0;
+        const grav = -3.8 * Math.sin(BAL - wh) - (wh < 0.5 ? 0.6 : 0);
         wv += (push + grav + (thr < 0 ? -3.5 : 0)) * dt;
         wv *= Math.exp(-3 * dt);
         wh += wv * dt;

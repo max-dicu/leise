@@ -33,7 +33,7 @@
   ui.closeOverlays = closeOverlays;
 
   L.onUnlock = function () {
-    if (L.state === 'game' && !L.paused && !L.mpPause && !L.chatOpen && !anyOverlay() && L.round && !L.round.over) pause();
+    if (L.state === 'game' && !L.paused && !L.mpPause && !L.chatOpen && !L.uiBlock && !anyOverlay() && L.round && !L.round.over) pause();
   };
   const online = () => L.net && L.net.role !== 'solo' && L.net.connected;
   // Zu zweit läuft die Welt in der Pause weiter (der Freund spielt ja weiter)
@@ -220,7 +220,9 @@
   $('bigmap').addEventListener('click', (e) => {
     const c = $('bigmap'), r = c.getBoundingClientRect(), X = L.bigMapXform; if (!X) return;
     const px = (e.clientX - r.left) * c.width / r.width, py = (e.clientY - r.top) * c.height / r.height;
-    L.setWaypoint(px / X.k - X.ox, py / X.k - X.ox);
+    const wx = px / X.k - X.ox, wz = py / X.k - X.ox;
+    if (L.suitOn && L.suitOn() && L.mapTp !== false && L.suitTeleportTo) { L.suitTeleportTo(wx, wz); drawBigMap(); return; }
+    L.setWaypoint(wx, wz);
     drawBigMap();
   });
   function drawBigMap() {
@@ -347,7 +349,7 @@
       $('vehHp').textContent = `${v.t.name} · Zustand ${Math.max(0, Math.round(v.hp / v.t.hp * 100))}%`
         + (v.t.teleport ? (P.tpCd > 0 ? ` · 🌀 Teleport in ${Math.ceil(P.tpCd)} s` : ' · 🌀 T: Teleport bereit') : '')
         + (v.t.fly ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m (E hoch, C/Shift runter, Leertaste driften)` : '')
-        + (v.t.jetFly ? (v.jetOn ? ` · 🚀 Flug noch ${Math.ceil(v.jetT)} s, Höhe ${Math.round(v.alt || 0)} m (E hoch, C runter)` : v.jetLand ? ' · 🛬 Landung …' : v.jetCd > 0 ? ` · 🚀 Düsen kühlen ab: ${Math.ceil(v.jetCd)} s` : ' · 🚀 E = 30 s fliegen · fährt über Wasser') : '')
+        + (v.t.jetFly ? (v.jetOn ? (v.t.jetInf ? ' · 🚀 Fliegt (unbegrenzt),' : ` · 🚀 Flug noch ${Math.ceil(v.jetT)} s,`) + ` Höhe ${Math.round(v.alt || 0)} m (E hoch, C runter)` : v.jetLand ? ' · 🛬 Landung …' : v.jetCd > 0 ? ` · 🚀 Düsen kühlen ab: ${Math.ceil(v.jetCd)} s` : ' · 🚀 E = 30 s fliegen · fährt über Wasser') : '')
         + (v.t.plane ? ` · ✈️ Höhe ${Math.round(v.alt || 0)} m – ab 80 km/h: E steigen, C/Shift sinken` : '')
         + (v.t.sub ? ` · ⚓ Tiefe ${Math.max(0, Math.round(-(v.alt || 0)))} m · ⚡ Nitro ${L.nitro || 0}/3 (Leertaste) · E hoch, C/Shift runter` : '');
     }

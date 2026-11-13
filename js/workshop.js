@@ -95,9 +95,9 @@
     ['tires', '🛞 Reifen', [['std', 'Standard', 0], ['slick', 'Slicks', 160], ['offroad', 'Stollen', 120], ['weisswand', 'Weißwand', 140], ['monster', 'Monster', 450]]],
     ['rimStyle', '⚙️ Felgen', [['std', 'Standard', 0], ['speiche', 'Speichen', 100], ['tief', 'Tiefbett', 180], ['chrom', 'Chrom', 250], ['gold', 'Gold', 500]]],
     ['led', '💡 Unterboden-LED', LEDS],
-    ['ledFx', '✨ LED-Effekt', [['static', 'Leuchten', 0], ['puls', 'Pulsieren', 150], ['blink', 'Blinken', 120], ['regenbogen', 'Regenbogen', 600], ['bluete', '🌸 Blossom', 900]]],
+    ['ledFx', '✨ LED-Effekt', [['static', 'Leuchten', 0], ['puls', 'Pulsieren', 150], ['blink', 'Blinken', 120], ['regenbogen', 'Regenbogen', 600], ['bluete', '🌸 Blossom', 900], ['schwarzweiss', '🖤🤍 Black & White', 700], ['galaxie', '🌌 Galaxie', 1000], ['feuer', '🔥 Feuerspur', 800], ['eis', '❄️ Eisspur', 750], ['disco', '🪩 Disco', 650]]],
     ['light', '🔦 Lichter', [['std', 'Standard', 0], ['doppel', 'Doppel', 120], ['bar', 'Lichtleiste', 180], ['neon', 'Neon-Rand', 260]]],
-    ['decal', '🖌️ Muster', [['none', 'Keins', 0], ['streifen', 'Rennstreifen', 90], ['sterne', 'Sterne', 130], ['blitz', 'Blitze', 160], ['camo', 'Camo', 180], ['flammen', 'Flammen', 220], ['bluete', '🌸 Blüten', 350]]],
+    ['decal', '🖌️ Muster', [['none', 'Keins', 0], ['streifen', 'Rennstreifen', 90], ['sterne', 'Sterne', 130], ['blitz', 'Blitze', 160], ['camo', 'Camo', 180], ['flammen', 'Flammen', 220], ['bluete', '🌸 Blüten', 350], ['zebra', '🦓 Black & White Zebra', 300], ['schach', '🏁 Schachbrett', 250], ['galaxie', '🌌 Galaxie', 450], ['pinkcamo', '💗 Pink-Camo', 280], ['herzen', '💕 Herzen', 220]]],
     ['bar', '🔧 Lenker', [['std', 'Standard', 0], ['tief', 'Tief', 90], ['hoch', 'Hoch (Ape)', 110], ['drag', 'Drag', 140]]],
     ['exhaust', '🔥 Auspuff', [['std', 'Standard', 0], ['sport', 'Sport', 200], ['doppel', 'Doppelrohr', 320], ['turbo', 'Turbo mit Flammen', 550]], 'quad'],
     ['extra', '🧩 Extras', [['none', 'Nichts', 0], ['korb', 'Korb', 60], ['flagge', 'Fahne', 70], ['gepaeck', 'Gepäckträger', 80], ['spoiler', 'Spoiler', 150], ['hupe', 'Fanfare', 110]]]
@@ -146,6 +146,20 @@
     } else if (kind === 'blitz') {
       g.fillStyle = '#ffe24a'; g.strokeStyle = '#000'; g.lineWidth = 3;
       for (let i = 0; i < 3; i++) { const x = 20 + i * 85; g.beginPath(); g.moveTo(x, 10); g.lineTo(x + 40, 10); g.lineTo(x + 25, 42); g.lineTo(x + 50, 42); g.lineTo(x + 5, 90); g.lineTo(x + 18, 52); g.lineTo(x - 5, 52); g.closePath(); g.fill(); g.stroke(); }
+    } else if (kind === 'zebra') {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, 256, 96); g.fillStyle = '#111111';
+      for (let i = 0; i < 12; i++) { const x = i * 24 + rnd() * 8; g.beginPath(); g.moveTo(x, 0); g.quadraticCurveTo(x + 18 + rnd() * 10, 48, x + 4, 96); g.lineTo(x + 12, 96); g.quadraticCurveTo(x + 26, 48, x + 10, 0); g.closePath(); g.fill(); }
+    } else if (kind === 'schach') {
+      for (let i = 0; i < 16; i++) for (let j = 0; j < 6; j++) { g.fillStyle = (i + j) % 2 ? '#111111' : '#ffffff'; g.fillRect(i * 16, j * 16, 16, 16); }
+    } else if (kind === 'galaxie') {
+      const gr = g.createLinearGradient(0, 0, 256, 96); gr.addColorStop(0, '#1a0a3a'); gr.addColorStop(0.5, '#4a1a8a'); gr.addColorStop(1, '#0a2a5a'); g.fillStyle = gr; g.fillRect(0, 0, 256, 96);
+      for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? 'rgba(255,80,200,0.35)' : 'rgba(80,200,255,0.35)'; g.beginPath(); g.ellipse(rnd() * 256, rnd() * 96, 30 + rnd() * 30, 12 + rnd() * 12, rnd() * 3, 0, 6.283); g.fill(); }
+      g.fillStyle = '#ffffff'; for (let i = 0; i < 70; i++) { const r = rnd() * 1.8 + 0.4; g.beginPath(); g.arc(rnd() * 256, rnd() * 96, r, 0, 6.283); g.fill(); }
+    } else if (kind === 'pinkcamo') {
+      const cols = ['#ff8fc0', '#d04a9a', '#ffd0e8', '#a02a6a'];
+      for (let i = 0; i < 26; i++) { g.fillStyle = cols[i % 4]; g.beginPath(); g.ellipse(rnd() * 256, rnd() * 96, 12 + rnd() * 18, 7 + rnd() * 10, rnd() * 3, 0, 6.283); g.fill(); }
+    } else if (kind === 'herzen') {
+      for (let i = 0; i < 9; i++) { const x = 16 + i * 28, y = 24 + (i % 3) * 24, r = 9; g.fillStyle = i % 2 ? '#ff2a6a' : '#ff8fc0'; g.beginPath(); g.moveTo(x, y + r); g.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.4, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.4, x + r * 1.6, y - r * 0.2, x, y + r); g.fill(); }
     } else if (kind === 'sterne') {
       g.fillStyle = '#ffffff';
       for (let i = 0; i < 8; i++) { const x = 16 + i * 31, y = 20 + (i % 3) * 26, r = 10 - (i % 2) * 3; g.beginPath(); for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283 - 1.57, rr = k % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
@@ -496,6 +510,13 @@
         else if (led.fx === 'blink') op = Math.sin(tt * 9) > 0 ? 0.65 : 0.05;
         else if (led.fx === 'regenbogen') { col = new T.Color().setHSL((tt * 0.25 + v.id * 0.13) % 1, 1, 0.55); }
         else if (led.fx === 'bluete') { col = new T.Color().setHSL(0.92 + Math.sin(tt * 1.5) * 0.03, 1, 0.78); op = 0.45 + Math.sin(tt * 2) * 0.15; }
+        else if (led.fx === 'schwarzweiss') { const w = Math.sin(tt * 6) > 0; col = new T.Color(w ? 0xffffff : 0x222222); op = w ? 0.7 : 0.35; }
+        else if (led.fx === 'galaxie') { col = new T.Color().setHSL(0.7 + Math.sin(tt * 0.8) * 0.12, 1, 0.55); op = 0.55; }
+        else if (led.fx === 'feuer') { col = new T.Color().setHSL(0.04 + Math.random() * 0.06, 1, 0.5); op = 0.45 + Math.random() * 0.3; }
+        else if (led.fx === 'eis') { col = new T.Color().setHSL(0.55, 0.9, 0.75 + Math.sin(tt * 3) * 0.1); op = 0.5; }
+        else if (led.fx === 'disco') { col = new T.Color().setHSL(Math.floor(tt * 4) % 6 / 6, 1, 0.55); op = 0.7; }
+        const trail = { schwarzweiss: [Math.random() < 0.5 ? '#ffffff' : '#111111', 0.14], galaxie: [Math.random() < 0.7 ? '#ffffff' : '#c080ff', 0.1], feuer: [Math.random() < 0.5 ? '#ff6a10' : '#ffd040', 0.16], eis: ['#e8f8ff', 0.12], disco: ['#' + new T.Color().setHSL(Math.random(), 1, 0.6).getHexString(), 0.12] }[led.fx];
+        if (trail && Math.abs(v.speed) > 1.5 && Math.random() < dt * 16) L.fx(trail[0], v.x - Math.sin(v.yaw) * 0.8, 0.5 + (v.alt || 0) + Math.random() * 0.4, v.z - Math.cos(v.yaw) * 0.8, 2, 1.2, { basic: true, size: trail[1], life: 1.2 });
         led.mat.color.copy(col); led.smat.color.copy(col); led.mat.opacity = op;
         if (led.fx === 'bluete' && Math.abs(v.speed) > 1.5 && Math.random() < dt * 14) L.fx(Math.random() < 0.6 ? '#ffb7d5' : '#ff8fc0', v.x - Math.sin(v.yaw) * 0.8, 0.6 + (v.alt || 0), v.z - Math.cos(v.yaw) * 0.8, 2, 1.2, { size: 0.12, life: 1.6 });
       }

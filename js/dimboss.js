@@ -1,176 +1,155 @@
 'use strict';
-// Der Leerenwurm: Boss der Dimension (eigener Entwurf). 1000 Leben, mit Waffen besiegbar:
-// Der Panzer hält fast alles ab – verwundbar ist das leuchtende Maul, wenn er auftaucht, und vor allem der Kopf,
-// wenn er nach einem Sturzangriff kurz benommen am Boden liegt. Solange er lebt, ist das Portal nach Hause versiegelt.
+// Der Leerenwurm: Boss der Dimension (eigener Entwurf), 50-mal so groß wie früher.
+// Allein 250 Leben, zu zweit bis viert 500. Verwundbar ist sein leuchtendes Maul, wenn er auftaucht –
+// und besonders, wenn er brüllt. Solange er lebt, ist das Portal nach Hause versiegelt.
 (function () {
   const L = window.L, T = THREE, P = L.player;
   const G = () => L.GEO;
-  const MAXHP = 1000, RESPAWN = 180, FIRST = 25, NSEG = 22;
-  function part(geo, color, sx, sy, sz, x, y, z, parent, o) { const m = new T.Mesh(geo, L.mat(color, o)); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = !(o && o.noShadow); if (parent) parent.add(m); return m; }
+  const S = 50, NSEG = 22, RESPAWN = 180, FIRST = 25, R0 = 7 * S;
+  const maxHp = () => (L.remotes && [...L.remotes.values()].some((r) => r.inRound) ? 500 : 250);
+  function part(geo, color, sx, sy, sz, x, y, z, parent, o) { const m = new T.Mesh(geo, L.mat(color, o)); m.scale.set(sx, sy, sz); m.position.set(x, y, z); if (parent) parent.add(m); return m; }
   const inDim = () => L.inDim(P.x);
 
-  // ---------- Modell ----------
+  // ---------- Modell (riesig, nicht vom Nebel verschluckt) ----------
   function build() {
     const root = new T.Group(), segs = [];
     const glow = new T.MeshBasicMaterial({ color: 0x40e0ff, fog: false });
     for (let k = 0; k < NSEG; k++) {
-      const s = new T.Group(), r = 7 - k * 0.24;
-      part(G().sph, k % 2 ? '#6a3aa0' : '#52288a', r, r, r * 1.15, 0, 0, 0, s, { emissive: '#2a0a50', ei: 0.6 });
-      const ring = new T.Mesh(new T.TorusGeometry(r * 0.99, 0.45, 6, 24), glow); s.add(ring);
-      if (k > 0 && k % 2 === 0) for (const sd of [-1, 0, 1]) { const c = part(G().cone, '#c080ff', 0.9, 3.6, 0.9, sd * r * 0.45, r * 0.95, 0, s, { emissive: '#6030c0', ei: 0.8 }); c.rotation.z = -sd * 0.4; }
+      const s = new T.Group(), r = R0 * (1 - k * 0.034);
+      part(G().sph, k % 2 ? '#6a3aa0' : '#52288a', r, r, r * 1.15, 0, 0, 0, s, { emissive: '#2a0a50', ei: 0.7 });
+      s.add(new T.Mesh(new T.TorusGeometry(r * 0.99, r * 0.065, 6, 28), glow));
+      if (k > 0 && k % 2 === 0) for (const sd of [-1, 0, 1]) { const c = part(G().cone, '#c080ff', r * 0.13, r * 0.5, r * 0.13, sd * r * 0.45, r * 0.95, 0, s, { emissive: '#6030c0', ei: 0.8 }); c.rotation.z = -sd * 0.4; }
       root.add(s); segs.push(s);
     }
-    // Kopf: rundes Maul mit Zahnringen, leuchtende Augen
-    const h = segs[0];
-    const mouth = part(G().cyl, '#ff40d0', 4.8, 0.5, 4.8, 0, 0, 7.4, h, { basic: true, noShadow: true }); mouth.rotation.x = Math.PI / 2;
-    for (let ring = 0; ring < 2; ring++) for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283, rr = 4.8 - ring * 1.5, t = part(G().cone, '#f4f0ff', 0.45, 2, 0.45, Math.cos(a) * rr, Math.sin(a) * rr, 7.9 - ring * 0.7, h, { noShadow: true }); t.rotation.x = Math.PI / 2; t.rotation.z = a; t.rotateX(-0.6); }
-    for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) part(G().sph, '#40e0ff', 0.6, 0.6, 0.4, sd * 5, 2.2 - k * 1.4, 4.8, h, { basic: true, noShadow: true });
+    const h = segs[0], r = R0;
+    const mouth = part(G().cyl, '#ff40d0', r * 0.68, r * 0.07, r * 0.68, 0, 0, r * 1.06, h, { basic: true }); mouth.rotation.x = Math.PI / 2;
+    for (let ring = 0; ring < 2; ring++) for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283, rr = r * (0.68 - ring * 0.21), t = part(G().cone, '#f4f0ff', r * 0.065, r * 0.28, r * 0.065, Math.cos(a) * rr, Math.sin(a) * rr, r * (1.13 - ring * 0.1), h); t.rotation.x = Math.PI / 2; t.rotation.z = a; t.rotateX(-0.6); }
+    for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) part(G().sph, '#40e0ff', r * 0.085, r * 0.085, r * 0.06, sd * r * 0.71, r * (0.31 - k * 0.2), r * 0.69, h, { basic: true });
+    root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.fog = false; o.castShadow = false; o.frustumCulled = false; } });
     L.scene.add(root);
     return { root, segs, mouth };
   }
 
   // ---------- Zustand ----------
-  const W = { alive: false, hp: MAXHP, t: 0, timer: FIRST, state: 'none', ent: null, trail: [] };
-  L.dimWorm = null;
-  L._dimW = W; // für Tests
+  const W = { alive: false, hp: 250, max: 250, t: 0, timer: FIRST, state: 'none', ent: null, trail: [] };
+  L.dimWorm = null; L._dimW = W;
   function spawn() {
-    const m = build();
-    const ang = Math.random() * 6.28;
-    W.alive = true; W.hp = MAXHP; W.m = m; W.state = 'swim'; W.st = 0; W.ang = ang; W.rad = 140; W.cd = 0;
-    W.head = new T.Vector3(L.DIM.x + Math.sin(ang) * 140, -40, L.DIM.z + Math.cos(ang) * 140);
-    W.trail = []; for (let k = 0; k < NSEG * 6; k++) W.trail.push(W.head.clone());
-    W.ent = { kind: 'dwurm', x: W.head.x, z: W.head.z, hp: MAXHP, dead: false, sph: [] };
+    W.m = build(); W.max = maxHp(); W.hp = W.max; W.alive = true; W.state = 'circle'; W.st = 0; W.ang = Math.random() * 6.28; W.wasKilled = false;
+    W.head = new T.Vector3(L.DIM.x + Math.sin(W.ang) * 2600, -400, L.DIM.z + Math.cos(W.ang) * 2600);
+    W.trail = [W.head.clone()];
+    W.ent = { kind: 'dwurm', x: W.head.x, z: W.head.z, hp: W.hp, dead: false, sph: [] };
     L.dimWorm = W.ent;
     if (inDim()) {
-      L.banner('🪱 DER LEERENWURM', 'Er versiegelt das Portal! Schieß auf das leuchtende Maul – und auf den Kopf, wenn er benommen am Boden liegt.');
-      if (L.snd.bossRoar) L.snd.bossRoar({ x: W.head.x, y: 0, z: W.head.z });
-      L.shake = Math.max(L.shake, 1.2);
+      L.banner('🪱 DER LEERENWURM', 'Riesig! Er versiegelt das Portal. Schieß auf das leuchtende Maul, wenn er auftaucht!');
+      if (L.snd.bossRoar) L.snd.bossRoar({ x: P.x, y: 0, z: P.z });
+      L.shake = Math.max(L.shake, 1.4);
       giveCrate();
     } else L.msg('🪱 Der Leerenwurm ist in der Dimension zurück.', 3500);
   }
-  // Waffenkiste beim Checkpoint, damit man nie ganz ohne Waffen dasteht
   function giveCrate() {
     const c = L.dimCheckpoint(), x = c.x + 10, z = c.z - 6;
-    const list = [['gewehr', 1, 30], ['gewehrmuni', 4], ['gewehrmuni', 4], ['granate', 5], ['schrotflinte', 1, 6], ['schrot', 3], ['medkit', 1], ['bandage', 3]];
-    list.forEach((e, k) => L.spawnItem(e[0], x + (k % 4) * 1.4, z + Math.floor(k / 4) * 1.4, e[1], e[2], undefined, undefined, undefined, true));
+    [['gewehr', 1, 30], ['gewehrmuni', 4], ['gewehrmuni', 4], ['granate', 5], ['schrotflinte', 1, 6], ['schrot', 3], ['medkit', 1], ['bandage', 3]]
+      .forEach((e, k) => L.spawnItem(e[0], x + (k % 4) * 1.4, z + Math.floor(k / 4) * 1.4, e[1], e[2], undefined, undefined, undefined, true));
     L.msg('📦 Beim Checkpoint liegt eine Waffenkiste: Sturmgewehr, Munition, Granaten, Medkit!', 6000);
   }
   function remove() { if (W.m) L.scene.remove(W.m.root); W.m = null; W.ent = null; L.dimWorm = null; }
-
-  // Treffer (von Schüssen und Explosionen über damageEnt)
-  L.dimWormHit = function (dmg, src) {
+  L.dimWormHit = function (dmg) {
     if (!W.alive || W.state === 'die') return;
-    const d = dmg * 0.35;
-    W.hp = Math.max(0, W.hp - d); W.ent.hp = W.hp;
-    L.fx('#ff60e0', W.head.x, W.head.y, W.head.z, 4, 3, { basic: true, size: 0.25, life: 0.5 });
+    W.hp = Math.max(0, W.hp - dmg * 0.35); W.ent.hp = W.hp;
+    L.fx('#ff60e0', P.x + (W.head.x - P.x) * 0.15, 6, P.z + (W.head.z - P.z) * 0.15, 4, 3, { basic: true, size: 0.4, life: 0.5 });
     if (W.hp <= 0) die();
   };
   function die() {
     W.state = 'die'; W.st = 0; W.ent.dead = true; W.wasKilled = true;
     L.banner('🪱 LEERENWURM BESIEGT!', 'Das Portal ist wieder offen – flieh nach Hause!');
-    if (L.snd.bossRoar) L.snd.bossRoar({ x: W.head.x, y: 5, z: W.head.z });
+    if (L.snd.bossRoar) L.snd.bossRoar({ x: P.x, y: 5, z: P.z });
     if (L.round) L.round.coins = (L.round.coins || 0) + 50;
-    if (!inDim()) L.msg('🪱 Der Leerenwurm ist gestorben.', 3500);
     L.msg('🪙 +50 Münzen für den Leerenwurm (nur wenn du entkommst)', 5000);
+    if (!inDim()) L.msg('🪱 Der Leerenwurm ist gestorben.', 3500);
   }
 
-  // ---------- Effekte ----------
-  const fx = [];
-  const ringGeo = new T.RingGeometry(0.8, 1, 40);
+  // ---------- Angriffe ----------
+  const fx = [], ringGeo = new T.RingGeometry(0.8, 1, 40);
   function tele(x, z, r, dur, color, cb) { const m = new T.Mesh(ringGeo, new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false, fog: false })); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.2, z); m.scale.setScalar(r); L.scene.add(m); fx.push({ k: 'tele', t: 0, dur, m, r, cb }); }
-  function orb(from, tx, tz) {
-    const m = new T.Mesh(G().sph, new T.MeshBasicMaterial({ color: 0xff40d0, fog: false })); m.scale.setScalar(1.6); L.scene.add(m);
-    tele(tx, tz, 5, 1.5, 0xff40d0, null);
-    fx.push({ k: 'orb', t: 0, dur: 1.5, m, sx: from.x, sy: from.y, sz: from.z, tx, tz });
-  }
   function hurt(x, z, r, dmg, cause) {
     if (!P.alive || L.cine || !inDim() || (P.spawnProt > 0)) return;
     const d = Math.hypot(P.x - x, P.z - z); if (d > r) return;
     L.hurtPlayer(dmg * (1 - d / r * 0.4) * (L.md ? L.md.dmg : 1), cause);
     if (P.alive && !P.vehicle) { const k = 11; P.vx = (P.x - x) / (d || 1) * k; P.vz = (P.z - z) / (d || 1) * k; P.vy = 6; P.air = true; P.knockT = 0.9; }
   }
+  function orb(tx, tz) {
+    const from = mouthPos(), m = new T.Mesh(G().sph, new T.MeshBasicMaterial({ color: 0xff40d0, fog: false })); m.scale.setScalar(6); L.scene.add(m);
+    tele(tx, tz, 7, 2.2, 0xff40d0, null);
+    fx.push({ k: 'orb', t: 0, dur: 2.2, m, sx: from.x, sy: from.y, sz: from.z, tx, tz });
+  }
   function updateFx(dt) {
     for (let i = fx.length - 1; i >= 0; i--) {
       const f = fx[i]; f.t += dt; const u = Math.min(1, f.t / f.dur);
       if (f.k === 'tele') { f.m.material.opacity = 0.45 + Math.sin(f.t * 18) * 0.35; f.m.scale.setScalar(f.r * (0.3 + 0.7 * u)); if (u >= 1) { L.scene.remove(f.m); fx.splice(i, 1); if (f.cb) f.cb(); } }
       else if (f.k === 'orb') {
-        f.m.position.set(L.lerp(f.sx, f.tx, u), L.lerp(f.sy, 0.8, u) + Math.sin(u * Math.PI) * 12, L.lerp(f.sz, f.tz, u));
-        if (Math.random() < dt * 30) L.fx('#ff80e0', f.m.position.x, f.m.position.y, f.m.position.z, 1, 0.5, { basic: true, size: 0.4, life: 0.6 });
-        if (u >= 1) { L.scene.remove(f.m); fx.splice(i, 1); L.fx('#ff40d0', f.tx, 1, f.tz, 26, 9, { basic: true, size: 0.5, life: 0.8 }); L.snd.explosion({ x: f.tx, y: 1, z: f.tz }); hurt(f.tx, f.tz, 5, 25, 'Von der Leerenkugel des Wurms getroffen'); }
+        f.m.position.set(L.lerp(f.sx, f.tx, u), L.lerp(f.sy, 1, u * u), L.lerp(f.sz, f.tz, u));
+        if (Math.random() < dt * 30) L.fx('#ff80e0', f.m.position.x, f.m.position.y, f.m.position.z, 2, 2, { basic: true, size: 1, life: 0.6 });
+        if (u >= 1) { L.scene.remove(f.m); fx.splice(i, 1); L.fx('#ff40d0', f.tx, 1, f.tz, 30, 12, { basic: true, size: 0.6, life: 0.8 }); L.snd.explosion({ x: f.tx, y: 1, z: f.tz }); hurt(f.tx, f.tz, 7, 25, 'Von der Leerenkugel des Wurms getroffen'); }
       }
     }
   }
 
-  // ---------- Bewegung: der Kopf führt, der Körper folgt seiner Spur ----------
+  // ---------- Bewegung: Kopf führt, der Körper folgt seiner Spur ----------
   const tmp = new T.Vector3();
-  function moveHead(tx, ty, tz, speed, dt) {
-    tmp.set(tx - W.head.x, ty - W.head.y, tz - W.head.z); const d = tmp.length();
-    if (d > 0.01) W.head.addScaledVector(tmp.normalize(), Math.min(d, speed * dt));
-    return d;
-  }
-  function layout(dt) {
-    const tr = W.trail; tr.unshift(W.head.clone()); while (tr.length > NSEG * 6 + 2) tr.pop();
-    const segs = W.m.segs;
+  function moveHead(tx, ty, tz, speed, dt) { tmp.set(tx - W.head.x, ty - W.head.y, tz - W.head.z); const d = tmp.length(); if (d > 0.01) W.head.addScaledVector(tmp.normalize(), Math.min(d, speed * dt)); return d; }
+  function mouthPos() { const s = W.m.segs[0], v = new T.Vector3(0, 0, R0 * 1.05); s.localToWorld(v); return v; }
+  function layout() {
+    const tr = W.trail;
+    if (tr[0].distanceTo(W.head) > 25) { tr.unshift(W.head.clone()); if (tr.length > 600) tr.pop(); }
+    else tr[0].copy(W.head);
+    const segs = W.m.segs; let ti = 0, acc = 0;
     for (let k = 0; k < NSEG; k++) {
-      const p = tr[Math.min(tr.length - 1, k * 6)], q = tr[Math.min(tr.length - 1, k * 6 + 3)];
-      segs[k].position.copy(p);
-      if (q.distanceToSquared(p) > 0.0001) segs[k].lookAt(p.x * 2 - q.x, p.y * 2 - q.y, p.z * 2 - q.z);
+      const want = k * R0 * 1.55;
+      while (ti < tr.length - 1 && acc + tr[ti].distanceTo(tr[ti + 1]) < want) { acc += tr[ti].distanceTo(tr[ti + 1]); ti++; }
+      const p = tr[ti]; segs[k].position.copy(p);
+      const q = tr[Math.min(tr.length - 1, ti + 1)];
+      if (q.distanceToSquared(p) > 1) segs[k].lookAt(p.x * 2 - q.x, p.y * 2 - q.y, p.z * 2 - q.z);
     }
     if (W.lookAt) segs[0].lookAt(W.lookAt.x, W.lookAt.y, W.lookAt.z);
-    // Trefferzonen: Maul (verwundbar), Kopf am Boden (sehr verwundbar), Körper (Panzer)
+    // Trefferzone: das Maul (nur wenn er aufgetaucht ist)
     const sph = W.ent.sph; sph.length = 0;
-    const h = W.head, open = W.state === 'rise' || W.state === 'spit', stun = W.state === 'stun';
-    if (h.y > -6) sph.push([h.x, h.y, h.z, 7, stun ? 1.6 : open ? 1 : 0.2]);
-    for (let k = 2; k < NSEG; k += 3) { const p = segs[k].position; if (p.y > -4) sph.push([p.x, p.y, p.z, 4.5 - k * 0.12, 0.12]); }
-    W.ent.x = h.x; W.ent.z = h.z;
+    if (W.state === 'spit' || W.state === 'roar' || W.state === 'rise') { const mp = mouthPos(); sph.push([mp.x, mp.y, mp.z, R0 * 0.62, W.state === 'roar' ? 1.6 : W.state === 'spit' ? 1 : 0.5]); }
+    W.ent.x = W.head.x; W.ent.z = W.head.z;
   }
-
-  // ---------- Kampf ----------
   function update(dt) {
     W.t += dt; W.st += dt;
-    const D = L.DIM, toP = Math.atan2(P.x - D.x, P.z - D.z);
-    W.m.mouth.material.color.setHex(W.state === 'stun' ? 0xffffff : (W.state === 'rise' || W.state === 'spit') ? 0xff40d0 : 0x6a2060);
+    const D = L.DIM;
+    W.m.mouth.material.color.setHex(W.state === 'roar' ? 0xffffff : (W.state === 'spit' || W.state === 'rise') ? 0xff40d0 : 0x6a2060);
     W.lookAt = null;
-    if (W.state === 'swim') {
-      // kreist in der Leere unter der Insel, taucht mit dem Rücken auf
-      W.ang += dt * 0.35; W.rad = L.lerp(W.rad, 90, dt * 0.3);
-      const cx = P.x + Math.sin(W.ang) * W.rad, cz = P.z + Math.cos(W.ang) * W.rad;
-      moveHead(cx, -10 + Math.sin(W.t * 1.3) * 9, cz, 34, dt);
-      if (Math.random() < dt * 0.6 && L.snd.ruferStep) L.snd.ruferStep({ x: W.head.x, y: 0, z: W.head.z });
-      if (W.st > 6 + Math.random() * 3) { W.state = 'rise'; W.st = 0; const a = Math.atan2(W.head.x - P.x, W.head.z - P.z); W.rx = P.x + Math.sin(a) * 38; W.rz = P.z + Math.cos(a) * 38; L.msg('🪱 Der Leerenwurm taucht auf – ziel auf das leuchtende Maul!', 2200); if (L.snd.screech) L.snd.screech({ x: W.rx, y: 10, z: W.rz }); L.shake = Math.max(L.shake, 0.8); }
+    if (W.state === 'circle') {
+      // zieht riesige Kreise durch die Leere um die Insel
+      W.ang += dt * 0.11;
+      moveHead(D.x + Math.sin(W.ang) * 2600, 150 + Math.sin(W.t * 0.4) * 650, D.z + Math.cos(W.ang) * 2600, 420, dt);
+      if (Math.random() < dt * 0.4) L.shake = Math.max(L.shake, 0.25);
+      if (W.st > 9 + Math.random() * 3) { W.state = 'rise'; W.st = 0; const a = Math.atan2(W.head.x - P.x, W.head.z - P.z); W.rx = P.x + Math.sin(a) * 620; W.rz = P.z + Math.cos(a) * 620; L.msg('🪱 Der Leerenwurm taucht auf – schieß auf das leuchtende Maul!', 2500); if (L.snd.screech) L.snd.screech({ x: P.x, y: 10, z: P.z }); }
     } else if (W.state === 'rise') {
-      moveHead(W.rx, 30, W.rz, 40, dt);
-      W.lookAt = { x: P.x, y: P.y + 1, z: P.z };
-      if (W.st > 1.2) { W.state = 'spit'; W.st = 0; W.spits = 0; }
+      const d = moveHead(W.rx, 300, W.rz, 650, dt);
+      W.lookAt = { x: P.x, y: P.y, z: P.z };
+      if (d < 20 || W.st > 6) { W.state = 'spit'; W.st = 0; W.spits = 0; }
     } else if (W.state === 'spit') {
-      W.lookAt = { x: P.x, y: P.y + 1, z: P.z };
-      W.head.y = 30 + Math.sin(W.t * 2) * 1.5;
-      if (W.st > 0.9 * (W.spits + 1) && W.spits < 3) { W.spits++; orb(W.head, P.x + P.vx * 1.2 + L.rand(-3, 3), P.z + P.vz * 1.2 + L.rand(-3, 3)); }
-      if (W.st > 3.6) { W.state = 'aim'; W.st = 0; W.lx = P.x; W.lz = P.z; tele(W.lx, W.lz, 9, 1.4, 0xff2040, null); L.msg('⚠️ Er stürzt sich auf dich – AUSWEICHEN!', 1400); }
-    } else if (W.state === 'aim') {
-      W.lookAt = { x: W.lx, y: 0, z: W.lz };
-      W.head.y += dt * 6;
-      if (W.st > 1.4) { W.state = 'lunge'; W.st = 0; }
-    } else if (W.state === 'lunge') {
-      const d = moveHead(W.lx, 2, W.lz, 70, dt);
-      if (d < 2) { W.state = 'stun'; W.st = 0; L.shake = 1.6; L.snd.stomp && L.snd.stomp({ x: W.lx, y: 0, z: W.lz }); L.fx('#9a50ff', W.lx, 1, W.lz, 50, 14, { basic: true, size: 0.6, life: 1.2 }); L.decal(W.lx, W.lz, 6, '#1a0a2a'); hurt(W.lx, W.lz, 9, 45, 'Vom Leerenwurm zerschmettert'); L.msg('💫 Der Wurm ist benommen – JETZT auf den Kopf schießen!', 2500); }
-    } else if (W.state === 'stun') {
-      W.head.y = 2.2 + Math.sin(W.st * 8) * 0.3;
-      if (W.st > 3.2) { W.state = 'dive'; W.st = 0; const a = Math.atan2(W.head.x - D.x, W.head.z - D.z); W.dx = D.x + Math.sin(a) * 620; W.dz = D.z + Math.cos(a) * 620; }
-    } else if (W.state === 'dive') {
-      moveHead(W.dx, -60, W.dz, 50, dt);
-      if (W.st > 3) { W.state = 'swim'; W.st = 0; W.ang = Math.atan2(W.head.x - P.x, W.head.z - P.z); W.rad = 160; }
+      W.lookAt = { x: P.x, y: P.y, z: P.z }; W.head.y = 300 + Math.sin(W.t * 1.5) * 12;
+      if (W.st > 1 * (W.spits + 1) && W.spits < 5) { W.spits++; orb(P.x + P.vx * 1.4 + L.rand(-4, 4), P.z + P.vz * 1.4 + L.rand(-4, 4)); }
+      if (W.st > 6) { W.state = 'roar'; W.st = 0; L.msg('💫 Er brüllt – das Maul steht weit offen: JETZT feuern!', 2500); if (L.snd.bossRoar) L.snd.bossRoar({ x: P.x, y: 5, z: P.z }); L.shake = 1.5; for (let k = 0; k < 3; k++) { const x = P.x + L.rand(-14, 14), z = P.z + L.rand(-14, 14); tele(x, z, 10, 1.6 + k * 0.4, 0x9a50ff, () => { L.fx('#9a50ff', x, 1, z, 40, 14, { basic: true, size: 0.7, life: 1 }); hurt(x, z, 10, 30, 'Vom Beben des Leerenwurms erwischt'); }); } }
+    } else if (W.state === 'roar') {
+      W.lookAt = { x: P.x, y: P.y + 40, z: P.z }; W.head.y = 290 + Math.sin(W.st * 9) * 8;
+      if (W.st > 4) { W.state = 'retreat'; W.st = 0; }
+    } else if (W.state === 'retreat') {
+      W.ang = Math.atan2(W.head.x - D.x, W.head.z - D.z);
+      moveHead(D.x + Math.sin(W.ang) * 2600, -300, D.z + Math.cos(W.ang) * 2600, 520, dt);
+      if (W.st > 5) { W.state = 'circle'; W.st = 0; }
     } else if (W.state === 'die') {
-      // Todeskampf: windet sich, leuchtet, dann versinkt er im Boden
       const u = W.st;
-      if (u < 3.5) { W.head.x += Math.sin(u * 9) * dt * 12; W.head.z += Math.cos(u * 7) * dt * 12; W.head.y = 20 + Math.sin(u * 6) * 8; W.lookAt = { x: W.head.x, y: 80, z: W.head.z + 5 }; if (Math.random() < dt * 20) L.fx(Math.random() < 0.5 ? '#ff40d0' : '#40e0ff', W.head.x + L.rand(-6, 6), W.head.y + L.rand(-6, 6), W.head.z + L.rand(-6, 6), 6, 8, { basic: true, size: 0.5, life: 1 }); L.shake = Math.max(L.shake, 0.6); }
-      else { W.head.y -= dt * (8 + (u - 3.5) * 6); if (Math.random() < dt * 25) L.fx('#2a1a3a', W.head.x + L.rand(-5, 5), 1, W.head.z + L.rand(-5, 5), 3, 5, { size: 0.8, life: 1.5 }); }
-      if (u > 3.5 && !W.loot) { W.loot = true; const lx = L.clamp(W.head.x, D.x - 400, D.x + 400), lz = L.clamp(W.head.z, D.z - 400, D.z + 400); for (let k = 0; k < 6; k++) L.spawnItem(k < 3 ? 'artefakt' : 'gold', lx + L.rand(-8, 8), lz + L.rand(-8, 8), 1, undefined, undefined, undefined, undefined, true); }
-      if (u > 9) { W.alive = false; W.loot = false; remove(); W.timer = RESPAWN; return; }
+      if (u < 4) { W.lookAt = { x: W.head.x, y: W.head.y + 2000, z: W.head.z + 200 }; W.head.y += Math.sin(u * 5) * 6; if (Math.random() < dt * 20) L.fx(Math.random() < 0.5 ? '#ff40d0' : '#40e0ff', P.x + L.rand(-60, 60), L.rand(10, 80), P.z + L.rand(-60, 60), 6, 10, { basic: true, size: 1.2, life: 1.2 }); L.shake = Math.max(L.shake, 0.7); }
+      else W.head.y -= dt * (250 + (u - 4) * 200);
+      if (u > 4 && !W.loot) { W.loot = true; for (let k = 0; k < 6; k++) L.spawnItem(k < 3 ? 'artefakt' : 'gold', P.x + L.rand(-10, 10), P.z + L.rand(-10, 10), 1, undefined, undefined, undefined, undefined, true); }
+      if (u > 11) { W.alive = false; W.loot = false; remove(); W.timer = RESPAWN; return; }
     }
-    // Schaden, wenn der Körper dich streift
-    if (W.state !== 'die' && P.alive && inDim()) for (let k = 0; k < NSEG; k += 2) { const p = W.m.segs[k].position; if (p.y > -2 && Math.hypot(P.x - p.x, P.z - p.z) < 4.5 && Math.abs(P.y + 1 - p.y) < 5) { W.touchCd = (W.touchCd || 0) - dt; if (W.touchCd <= 0) { W.touchCd = 1.2; hurt(p.x, p.z, 6, 20, 'Vom Leerenwurm gestreift'); } break; } }
-    layout(dt);
+    layout();
   }
 
   // ---------- jedes Bild ----------
@@ -180,27 +159,21 @@
     updateFx(dt);
     const here = inDim();
     if (W.m) W.m.root.visible = here;
-    if (!W.alive) {
-      // Timer läuft immer – erstes Erscheinen erst, wenn man die Dimension betreten hat
-      if (here) W.seen = true;
-      if (W.seen) { W.timer -= dt; if (W.timer <= 0 && !L.cine) spawn(); }
-    } else if (here && !L.cine) update(dt);
-    else if (!here && W.state === 'die') { W.st += dt; if (W.st > 9) { W.alive = false; W.loot = false; remove(); W.timer = RESPAWN; } }
-    else if (here) layout(0);
+    if (!W.alive) { if (here) W.seen = true; if (W.seen) { W.timer -= dt; if (W.timer <= 0 && !L.cine) spawn(); } }
+    else if (here && !L.cine) update(dt);
+    else if (!here && W.state === 'die') { W.st += dt; if (W.st > 11) { W.alive = false; W.loot = false; remove(); W.timer = RESPAWN; } }
     if (here !== lastIn) { lastIn = here; if (here && W.alive && W.state !== 'die') L.msg('🪱 Der Leerenwurm lauert hier – das Portal ist versiegelt!', 5000); }
     updateBar(here);
-    // Portal nach Hause: rot und versiegelt, solange der Wurm lebt
     if (L.dimPortal && L.dimPortal.disc) L.dimPortal.disc.material.color.setHex(L.dimPortalSealed() ? 0xff2040 : 0x40e0ff);
   };
   L.dimPortalSealed = () => W.alive && W.state !== 'die';
-  // Lebensbalken nur in der Dimension
   const bar = document.createElement('div'); bar.id = 'wormBar'; bar.hidden = true;
   bar.style.cssText = 'position:fixed;left:50%;top:52px;transform:translateX(-50%);width:min(420px,80vw);z-index:7;text-align:center;color:#fff;font-weight:800;text-shadow:0 0 4px #000;pointer-events:none';
   bar.innerHTML = '<div>🪱 LEERENWURM <span></span></div><div style="height:12px;background:#0009;border:2px solid #ff40d0;border-radius:6px;overflow:hidden"><i style="display:block;height:100%;background:linear-gradient(90deg,#ff40d0,#9a50ff)"></i></div>';
   document.body.appendChild(bar);
   function updateBar(here) {
     bar.hidden = !(here && W.alive && W.state !== 'die');
-    if (!bar.hidden) { bar.querySelector('span').textContent = Math.ceil(W.hp) + ' / ' + MAXHP; bar.querySelector('i').style.width = (W.hp / MAXHP * 100).toFixed(1) + '%'; }
+    if (!bar.hidden) { bar.querySelector('span').textContent = Math.ceil(W.hp) + ' / ' + W.max; bar.querySelector('i').style.width = (W.hp / W.max * 100).toFixed(1) + '%'; }
   }
   L.dimBossText = () => (W.alive && W.state !== 'die' ? '🪱 Leerenwurm: Portal versiegelt' : W.seen ? '🪱 Leerenwurm kommt ' + (W.wasKilled ? 'wieder ' : '') + 'in ' + L.fmt(Math.max(0, W.timer)) : '');
   L.clearDimBoss = function () { remove(); for (const f of fx) L.scene.remove(f.m); fx.length = 0; W.alive = false; W.seen = false; W.timer = FIRST; W.loot = false; bar.hidden = true; lastIn = false; };

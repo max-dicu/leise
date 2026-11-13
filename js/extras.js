@@ -68,8 +68,16 @@
       b.onclick = () => { closePicker(); sail(from, d); };
       list.appendChild(b);
     }
+    [...list.querySelectorAll('button')].forEach((b, i) => { b.textContent = (i + 1) + ') ' + b.textContent; });
     overlay.hidden = false; L.uiBlock = true; if (L.unlock) L.unlock();
   }
+  // Ziel auch mit den Zahlentasten wählen (falls die Maus gefangen ist)
+  document.addEventListener('keydown', (e) => {
+    if (!overlay || overlay.hidden) return;
+    const n = parseInt(e.key, 10), bs = [...overlay.querySelectorAll('#cruiseList button')];
+    if (n >= 1 && n <= bs.length) { e.preventDefault(); bs[n - 1].click(); }
+    if (e.key === 'Escape') closePicker();
+  });
   function closePicker() { if (overlay) overlay.hidden = true; L.uiBlock = false; }
   // ---------- Überfahrt als Kurzfilm ----------
   let voyage = null;
@@ -135,7 +143,9 @@
     g.fillStyle = '#141414'; g.beginPath(); g.moveTo(128, 50); g.lineTo(180, 70); g.lineTo(176, 140); g.lineTo(128, 200); g.lineTo(80, 140); g.lineTo(76, 70); g.closePath(); g.fill();
     g.fillStyle = '#ffe070'; g.fillRect(118, 80, 20, 80); g.fillRect(106, 74, 44, 12); g.beginPath(); g.moveTo(108, 160); g.lineTo(148, 160); g.lineTo(128, 182); g.fill();
     const emblem = new T.Mesh(new T.PlaneGeometry(90, 90), new T.MeshBasicMaterial({ map: new T.CanvasTexture(c), transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide }));
-    const beam = new T.Mesh(new T.CylinderGeometry(22, 1.2, 300, 20, 1, true), new T.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.12, blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide }));
+    const sc = document.createElement('canvas'); sc.width = 16; sc.height = 256; const sg2 = sc.getContext('2d'); for (let k = 0; k < 16; k++) { sg2.fillStyle = k % 2 ? '#111111' : '#ffffff'; sg2.fillRect(0, k * 16, 16, 16); }
+    const stripe = new T.CanvasTexture(sc); stripe.wrapS = stripe.wrapT = T.RepeatWrapping; stripe.repeat.set(1, 3);
+    const beam = new T.Mesh(new T.CylinderGeometry(22, 1.2, 300, 20, 1, true), new T.MeshBasicMaterial({ map: stripe, transparent: true, opacity: 0.45, depthWrite: false, fog: false, side: T.DoubleSide }));
     const sg = new T.Group(); sg.add(beam); beam.position.y = 150; sg.add(emblem); emblem.position.y = 300; emblem.rotation.x = -Math.PI / 2 + 0.5;
     sg.position.set(L.TOWER.x, L.TOWER.h + 2, L.TOWER.z); sg.rotation.set(-0.35, 0.6, 0); L.scene.add(sg); signal = sg;
   }
@@ -145,7 +155,7 @@
     const up = L.towerSafe ? L.towerSafe() : true;
     guard.rig.root.visible = up && !L.inDim(P.x);
     // Signal: wenn ein Boss da ist oder es Nacht ist
-    signal.visible = up && !L.inDim(P.x) && ((L.boss && !L.boss.dead) || !!L.wboss || L.env.day < 0.35);
+    signal.visible = up && !L.inDim(P.x) && !(L.onIsl && L.onIsl(P.x, P.z));
     if (signal.visible) signal.rotation.y = 0.6 + Math.sin(performance.now() / 4000) * 0.15;
     guard.ph += dt;
     const near = Math.hypot(P.x - guard.rig.root.position.x, P.z - guard.rig.root.position.z) < 25 && Math.abs((P.y || 0) - L.TOWER.h) < 3;

@@ -313,7 +313,7 @@
   L.setTowerGlow = function (on) {
     const G0 = L.tower.glow; if (!G0) return;
     const k = 0.6 + Math.sin(performance.now() / 250) * 0.4;
-    G0.shell.visible = G0.beam.visible = on;
+    G0.shell.visible = on; G0.beam.visible = false; // nur noch ein Licht: das Wappen-Signal des Wächters
     if (on) { G0.shell.material.opacity = 0.25 + k * 0.3; G0.beam.material.opacity = 0.45 + k * 0.4; }
   };
   L.towerDestroy = function () {
@@ -1002,6 +1002,13 @@
     sg.setAttribute('position', new T.Float32BufferAttribute(sp, 3));
     E.stars = new T.Points(sg, new T.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false }));
     scene.add(E.stars);
+    // Milchstraße und Planeten (nachts sichtbar)
+    { const mg = new T.BufferGeometry(), mp = []; for (let i = 0; i < 2500; i++) { const a = Math.random() * 6.28, b = (Math.random() - 0.5) * 0.25, d = 880; const x = Math.cos(a) * d, y = Math.sin(a) * d * 0.6 + 200, z = Math.sin(b) * d; mp.push(x, Math.abs(y), z); } mg.setAttribute('position', new T.Float32BufferAttribute(mp, 3)); E.milky = new T.Points(mg, new T.PointsMaterial({ color: 0xc8d0ff, size: 1.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false })); scene.add(E.milky); }
+    E.planets = new T.Group(); scene.add(E.planets);
+    [[0xd8a060, 14, 0.5, 0.45, 1], [0x6aa0ff, 9, 2.2, 0.35, 0], [0xff6a40, 7, 3.6, 0.6, 0], [0xe8e0c0, 11, 4.8, 0.3, 0]].forEach(([c, r, a, e, ring]) => {
+      const p = new T.Mesh(new T.SphereGeometry(r, 16, 12), new T.MeshBasicMaterial({ color: c, transparent: true, fog: false })); p.position.set(Math.cos(a) * Math.cos(e) * 820, Math.sin(e) * 820, Math.sin(a) * Math.cos(e) * 820); E.planets.add(p);
+      if (ring) { const rg = new T.Mesh(new T.RingGeometry(r * 1.4, r * 2.2, 32), new T.MeshBasicMaterial({ color: 0xe8d0a0, transparent: true, side: T.DoubleSide, fog: false })); rg.position.copy(p.position); rg.rotation.set(1.2, 0.3, 0); E.planets.add(rg); }
+    });
     E.moon = new T.Mesh(new T.SphereGeometry(25, 16, 12), new T.MeshBasicMaterial({ color: 0xe8ecff, fog: false, transparent: true }));
     scene.add(E.moon);
     E.sunDisc = new T.Mesh(new T.SphereGeometry(30, 16, 12), new T.MeshBasicMaterial({ color: 0xfff0c0, fog: false, transparent: true }));
@@ -1074,6 +1081,8 @@
     E.hemi.color.copy(cSky).lerp(cTmp.setRGB(1, 1, 1), 0.4);
     E.stars.position.copy(cam.position);
     E.stars.material.opacity = nightAmt * (1 - E.cloud * 0.9);
+    if (E.milky) { E.milky.position.copy(cam.position); E.milky.material.opacity = nightAmt * 0.8 * (1 - E.cloud * 0.9); }
+    if (E.planets) { E.planets.position.copy(cam.position); const po = nightAmt * (1 - E.cloud * 0.85); E.planets.visible = po > 0.02; for (const m of E.planets.children) m.material.opacity = po; }
     E.moon.position.set(cam.position.x - sd.x * 700, cam.position.y + Math.max(-el, 0.1) * 500, cam.position.z - sd.z * 700);
     E.moon.material.opacity = nightAmt * (1 - E.cloud * 0.8);
     E.sunDisc.position.set(cam.position.x + sd.x * 750, cam.position.y + el * 600, cam.position.z + sd.z * 750);

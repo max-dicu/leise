@@ -42,7 +42,7 @@
   const isP = (p) => p === P;
   function valid(p) {
     if (!p) return false;
-    if (isP(p)) { if (!P.alive || P.gone || P.spawnProt > 0 || L.cine || caught) return false; }
+    if (isP(p)) { if (!P.alive || P.gone || P.spawnProt > 0 || L.cine || caught || (L.suitOn && L.suitOn())) return false; }
     else if (!p.alive || p.gone || !p.inRound) return false;
     if (L.onIsl && L.onIsl(p.x, p.z)) return false;
     if (L.safeIn && L.safeIn(p.x, p.z)) return false;

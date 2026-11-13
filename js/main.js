@@ -145,7 +145,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       L.shake = Math.max(0, L.shake - dt * 1.8);
     }
     camera.lookAt(s.lx, s.ly, s.lz);
-    camera.far = L.S().view + 1200;
+    camera.far = L.inDim(P.x) ? 60000 : L.S().view + 1200;
     camera.updateProjectionMatrix();
     if (P.rig) P.rig.root.visible = true;
     return true;

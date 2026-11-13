@@ -1211,7 +1211,7 @@
     uboot: { name: 'U-Boot', vmax: 110, acc: 7, hp: 240, kind: 'car', sub: true, len: 10, wid: 2.8, off: 1, h: 3 },
     flugzeug: { name: 'Flugzeug', vmax: 330, acc: 8, hp: 160, kind: 'car', plane: true, len: 9, wid: 2.2, off: 0.8, h: 2.2 },
     joyort10: { name: 'JOYOR T10', vmax: 500, acc: 34, hp: 45, kind: 'bike', scooter: true, electric: true, fly: true, len: 1.3, wid: 0.6, off: 0.55, wheelie: true },
-    nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true, jetFly: true, waterOk: true },
+    nachtfalke: { name: 'Nachtfalke', vmax: 1000, acc: 70, hp: 400, kind: 'car', len: 5.6, wid: 2.4, off: 0.8, h: 1.3, special: true, jetFly: true, jetInf: true, waterOk: true },
     schattenrad: { name: 'Schattenrad', vmax: 700, acc: 52, hp: 160, kind: 'bike', len: 2.8, wid: 1.0, off: 0.75, special: true, wheelie: true, jetFly: true, waterOk: true },
     joyort6e: { name: 'JOYOR T6E Pro', vmax: 300, acc: 24, hp: 50, kind: 'bike', scooter: true, electric: true, teleport: true, len: 1.3, wid: 0.65, off: 0.65, wheelie: true }
   };
@@ -1442,6 +1442,7 @@
       part(box, '#111', 0.03, 0.03, 0.12, 0, 0.02, len, g);
     };
     switch (type) {
+      case 'donneraxt': { part(cyl, '#5a3a20', 0.045, 0.75, 0.045, 0, 0, 0.3, g).rotation.x = Math.PI / 2; const hd = part(box, '#9aa8b8', 0.05, 0.3, 0.22, 0, 0.1, 0.62, g); part(box, '#40c8ff', 0.052, 0.04, 0.24, 0, 0.18, 0.62, g, { basic: true }); part(G().cone, '#c0d0e0', 0.04, 0.16, 0.04, 0, 0.3, 0.62, g); hd.rotation.x = 0; break; }
       case 'hammer':
         part(box, '#8a5a2b', 0.035, 0.36, 0.035, 0, -0.12, 0, g);
         part(box, '#7a7a80', 0.06, 0.07, 0.17, 0, -0.32, 0.02, g);
