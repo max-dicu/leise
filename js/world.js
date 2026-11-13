@@ -932,12 +932,12 @@
       -0.5, 0, -0.5, 0, 1, -0.5, 0, 1, 0.5, -0.5, 0, -0.5, 0, 1, 0.5, -0.5, 0, 0.5,
       0.5, 0, -0.5, 0.5, 0, 0.5, 0, 1, 0.5, 0.5, 0, -0.5, 0, 1, 0.5, 0, 1, -0.5];
     roofGeo.setAttribute('position', new T.Float32BufferAttribute(v, 3)); roofGeo.computeVertexNormals();
-    makeInst(inst.roof, roofGeo, new T.MeshLambertMaterial({ side: T.DoubleSide }), true);
+    L.instRoof = makeInst(inst.roof, roofGeo, new T.MeshLambertMaterial({ side: T.DoubleSide }), true);
     makeInst(inst.door, new T.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new T.MeshLambertMaterial(), false);
     makeInst(inst.pineTrunk, new T.CylinderGeometry(0.22, 0.32, 1, 6).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
-    makeInst(inst.pine, new T.ConeGeometry(1, 1, 7).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
+    L.instPine = makeInst(inst.pine, new T.ConeGeometry(1, 1, 7).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
     makeInst(inst.leafTrunk, new T.CylinderGeometry(0.25, 0.35, 1, 6).translate(0, 0.5, 0), new T.MeshLambertMaterial(), true);
-    makeInst(inst.leafy, new T.IcosahedronGeometry(1, 0), new T.MeshLambertMaterial(), true);
+    L.instLeafy = makeInst(inst.leafy, new T.IcosahedronGeometry(1, 0), new T.MeshLambertMaterial(), true);
     makeInst(inst.wreck, new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial(), true);
     makeInst(inst.wreckTop, new T.BoxGeometry(1, 1, 1), new T.MeshLambertMaterial(), true);
     makeInst(inst.fence, new T.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new T.MeshLambertMaterial({ transparent: true, opacity: 0.55 }), false);
@@ -983,8 +983,15 @@
     gewitter: { cloud: 1, rain: 1, fog: 0.3, storm: true, label: '⛈️ Gewitter' },
     schnee: { cloud: 0.75, rain: 0.8, fog: 0.4, snow: true, label: '❄️ Schnee' },
     sand: { cloud: 0.2, rain: 0, fog: 0.6, label: '🌪️ Sandsturm' },
-    asche: { cloud: 0.9, rain: 0.5, fog: 0.5, snow: true, ash: true, label: '🌋 Asche' }
+    asche: { cloud: 0.9, rain: 0.5, fog: 0.5, snow: true, ash: true, label: '🌋 Asche' },
+    // Jahreszeiten-Wetter (Hauptkarte)
+    frost: { cloud: 0.15, rain: 0, fog: 0.25, label: '🥶 Frost' },
+    schneesturm: { cloud: 1, rain: 1, fog: 0.7, snow: true, label: '🌨️ Schneesturm' },
+    schauer: { cloud: 0.75, rain: 0.45, fog: 0.1, label: '🌦️ Schauer' },
+    hitze: { cloud: 0, rain: 0, fog: 0.12, label: '🌡️ Hitze' },
+    sturm: { cloud: 0.95, rain: 0.4, fog: 0.2, wind: true, label: '🍂 Herbststurm' }
   };
+  L.WEATHER = WEATHER;
   L.env = { time: 8, weather: 'klar', wT: 240, cloud: 0.1, rain: 0, fog: 0, bolt: 0, day: 1, hearMul: 1, nextBolt: 10 };
   L.initEnv = function (scene) {
     const E = L.env;
@@ -1041,6 +1048,7 @@
   };
   L.setWeather = function (w) { L.env.weather = w; L.env.wT = L.rand(180, 360); };
   L.randomWeather = function () {
+    if (L.seasonWeather) { L.setWeather(L.seasonWeather()); return; }
     const r = Math.random();
     L.setWeather(r < 0.35 ? 'klar' : r < 0.6 ? 'wolkig' : r < 0.8 ? 'regen' : r < 0.9 ? 'nebel' : 'gewitter');
   };
@@ -1126,6 +1134,6 @@
     }
     E.hearMul = (1 - E.rain * 0.22) * (W.storm ? 0.8 : 1) * (1 + nightAmt * 0.15);
     L.ambient.set(0.025 + E.cloud * 0.03 + (W.storm ? 0.05 : 0), E.rain * 0.12);
-    E.label = W.label;
+    E.label = (L.SEASON && !L.curIsland && !L.inDim(cam.position.x) ? L.SEASON.name + ' · ' : '') + W.label;
   };
 })();
