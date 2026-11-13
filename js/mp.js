@@ -260,7 +260,17 @@
           }
         }
         break;
-      case 'pvp': if (P.alive && !P.gone && L.state === 'game') L.hurtPlayer(m.dmg, 'Von ' + String(m.by).slice(0, 18) + ' getroffen'); break;
+      case 'pvp':
+        if (!(P.alive && !P.gone && L.state === 'game')) break;
+        if (m.thor) {
+          // Donneraxt: erst auf 1 Leben, beim nächsten Treffer tot
+          const by = 'Vom Donnerschlag von ' + String(m.by).slice(0, 18) + ' getroffen';
+          if (L.suitOn && L.suitOn()) break;
+          if (P.hp > 1.01) { P.hp = 1; L.snd.hurt && L.snd.hurt(); L.shake = Math.max(L.shake, 0.8); L.msg('⚡ ' + by + ' – du hast nur noch 1 Leben!', 3000); }
+          else L.hurtPlayer(99999, by);
+          break;
+        }
+        L.hurtPlayer(m.dmg, 'Von ' + String(m.by).slice(0, 18) + ' getroffen'); break;
       case 'dmg':
         if (host && R) { const e = m.id === 'boss' ? L.boss : L.byId.get(m.id); if (e && !e.dead) L.damageEnt(e, m.dmg, R.x, R.z, R); }
         break;

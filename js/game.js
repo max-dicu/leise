@@ -562,12 +562,20 @@
     L.env.bolt = 1; L.snd.thunder && L.snd.thunder(0.02); L.fx('#c8f0ff', end.x, end.y, end.z, 30, 10, { basic: true, size: 0.5, life: 0.6 });
     if (h.ent) {
       const e = h.ent;
-      if (e.kind === 'dwurm') L.damageEnt(e, Math.max(0, (e.hp - 1)) / 0.35, P.x, P.z, P);
-      else if (e.kind === 'remote') L.mp.sendTo(e.pid, { t: 'pvp', dmg: 95, by: (L.save.char || {}).name || 'Mitspieler' });
-      else if (typeof e.hp === 'number' && e.hp > 1) L.damageEnt(e, e.hp - 1, P.x, P.z, P);
-      L.msg('⚡ Donnerschlag! Nur noch 1 Leben übrig.', 1500);
+      // 1. Schlag: nur noch 1 Leben · 2. Schlag (oder schon bei 1 Leben): tot
+      const second = e.thorHit || (typeof e.hp === 'number' && e.hp <= 1.01);
+      if (e.kind === 'remote') { L.mp.sendTo(e.pid, { t: 'pvp', thor: 1, dmg: 0, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, (e.y || 0) + 1.2, e.z, 10); L.msg('⚡ Donnerschlag! ' + (e.thorHit ? 'Wenn noch 1 Leben übrig war: erledigt.' : 'Nur noch 1 Leben übrig.'), 1500); e.thorHit = true; return; }
+      if (second) { L.damageEnt(e, 1e9, P.x, P.z, P); L.msg('⚡ Zweiter Donnerschlag – erledigt!', 1500); }
+      else {
+        if (e.kind === 'dwurm') L.damageEnt(e, Math.max(0, (e.hp - 1)) / 0.35, P.x, P.z, P);
+        else if (typeof e.hp === 'number') L.damageEnt(e, e.hp - 1, P.x, P.z, P);
+        else L.damageEnt(e, 1e9, P.x, P.z, P);
+        L.msg('⚡ Donnerschlag! Nur noch 1 Leben übrig – noch ein Schlag und es ist vorbei.', 1800);
+      }
+      e.thorHit = true;
     }
   }
+  L._thorStrike = thorStrike;
   // ADMIN-Schild über dem eigenen Kopf (nur mit dem Anzug)
   let adminTag = null;
   function updateAdminTag() {
