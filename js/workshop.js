@@ -202,12 +202,21 @@
   }
   function shade(hex, f) { const c = new T.Color(hex); c.multiplyScalar(f); c.r = Math.min(1, c.r); c.g = Math.min(1, c.g); c.b = Math.min(1, c.b); return '#' + c.getHexString(); }
   // LED-Unterboden
+  let _glow = null;
+  function glowTex() { if (_glow) return _glow; const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); _glow = new T.CanvasTexture(cv); return _glow; }
+  function decalTop(parent, kind, accent, w, h, x, y, z) { const m = decalPlane(parent, kind, accent, w, h, x, y, z, 0); if (m) m.rotation.x = -Math.PI / 2; return m; }
   function underglow(root, c, w, l, y) {
     if (c.led === 'none') return;
-    const mat = new T.MeshBasicMaterial({ color: c.led, transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false, fog: false });
-    const pl = new T.Mesh(new T.PlaneGeometry(w * 1.9, l * 1.4), mat); pl.rotation.x = -Math.PI / 2; pl.position.y = 0.04; root.add(pl);
+    const mat = new T.MeshBasicMaterial({ color: c.led, map: glowTex(), transparent: true, opacity: 0.85, blending: T.AdditiveBlending, depthWrite: false, fog: false });
+    const pl = new T.Mesh(new T.PlaneGeometry(w * 2.6, l * 1.7), mat); pl.rotation.x = -Math.PI / 2; pl.position.y = 0.03; pl.renderOrder = 2; root.add(pl);
     const smat = new T.MeshBasicMaterial({ color: c.led, fog: false });
-    for (const s of [-1, 1]) { const b = new T.Mesh(G().box, smat); b.scale.set(0.03, 0.03, l * 0.8); b.position.set(s * w * 0.45, y, 0); root.add(b); }
+    const housing = L.mat('#111');
+    for (const s of [-1, 1]) {
+      const hb = new T.Mesh(G().box, housing); hb.scale.set(0.05, 0.025, l * 0.82); hb.position.set(s * w * 0.45, y + 0.02, 0); root.add(hb);
+      const n = Math.max(6, Math.round(l * 10));
+      for (let k = 0; k < n; k++) { const d = new T.Mesh(G().sph, smat); d.scale.set(0.018, 0.012, 0.018); d.position.set(s * w * 0.45, y, -l * 0.4 + k * (l * 0.8) / (n - 1)); root.add(d); }
+    }
+    for (const z of [-1, 1]) { const hb = new T.Mesh(G().box, housing); hb.scale.set(w * 0.8, 0.025, 0.05); hb.position.set(0, y + 0.02, z * l * 0.42); root.add(hb); const n = Math.max(4, Math.round(w * 9)); for (let k = 0; k < n; k++) { const d = new T.Mesh(G().sph, smat); d.scale.set(0.018, 0.012, 0.018); d.position.set(-w * 0.38 + k * (w * 0.76) / (n - 1), y, z * l * 0.42); root.add(d); } }
     root.userData.led = { mat, smat, fx: c.ledFx, color: new T.Color(c.led) };
   }
   // Lenker in verschiedenen Formen
@@ -268,7 +277,9 @@
   // ---------- Quad / ATV ----------
   function buildQuad(type, c) {
     const root = new T.Group(), wheels = [], steer = [], atv = type === 'atv';
-    const base = 0.32, ts = tireSpec(c, base), r = ts.r, lift = r - base + (atv ? 0.06 : 0);
+    // ATV: riesige Stollenreifen, viel Bodenfreiheit
+    const cT = atv && c.tires !== 'monster' ? Object.assign({}, c, { tires: 'offroad' }) : c;
+    const base = atv ? 0.46 : 0.32, ts = tireSpec(cT, base), r = ts.r, lift = r - base + (atv ? 0.24 : 0);
     const B = grp(root, 0, lift, 0);
     part(G().box, c.frame, 0.5, 0.12, 1.5, 0, 0.42, 0, B);
     for (const s of [-1, 1]) part(G().box, c.frame, 0.24, 0.04, 0.5, s * 0.42, 0.36, 0, B);
@@ -295,14 +306,35 @@
     // Muster an den Seiten
     for (const s of [-1, 1]) { decalPlane(B, c.decal, c.accent, 0.56, 0.2, s * 0.585, 0.72, -0.64, s * Math.PI / 2); decalPlane(B, c.decal, c.accent, 0.5, 0.18, s * 0.566, 0.72, 0.66, s * Math.PI / 2); }
     if (c.decal === 'streifen') part(G().box, '#f2f2f2', 0.1, 0.012, 0.56, 0, 0.805, 0.66, B, { noShadow: true });
+    decalTop(B, c.decal, c.accent, 0.9, 0.5, 0, 0.805, 0.66);
+    decalTop(B, c.decal, c.accent, 0.9, 0.56, 0, 0.825, -0.64);
+    for (const s of [-1, 1]) decalPlane(B, c.decal, c.accent, 0.3, 0.16, s * 0.315, 0.64, 1.0, s * Math.PI / 2);
     // Auspuff
     const ex = c.exhaust, chrome = '#d8dde2';
     const pipe = (x, big) => { const p = part(G().cyl, ex === 'std' ? '#555' : chrome, big ? 0.07 : 0.05, 0.45, big ? 0.07 : 0.05, x, 0.55, -0.95, B); p.rotation.x = Math.PI / 2 - 0.15; part(G().cyl, '#111', big ? 0.05 : 0.035, 0.02, big ? 0.05 : 0.035, x, 0.58, -1.18, B, { noShadow: true }).rotation.x = Math.PI / 2; };
     if (ex === 'doppel') { pipe(0.22, false); pipe(-0.22, false); } else pipe(0.28, ex === 'sport' || ex === 'turbo');
     if (ex === 'turbo') { const fl = part(G().cone, '#ff7a20', 0.08, 0.35, 0.08, 0.28, 0.6, -1.36, B, { basic: true, noShadow: true }); fl.rotation.x = -Math.PI / 2; fl.visible = false; root.userData.flame = fl; }
     // Räder
-    const wx = 0.52 + (ts.w - 1) * 0.06;
-    for (const s of [-1, 1]) { steer.push(makeWheel(root, s * wx, r, 0.68, r, 0.24 * ts.w, c, wheels)); makeWheel(root, s * wx, r, -0.68, r, 0.27 * ts.w, c, wheels); }
+    const wx = (atv ? 0.66 : 0.52) + (ts.w - 1) * 0.06, wz = atv ? 0.74 : 0.68, tw = atv ? 0.38 : 0.24;
+    for (const s of [-1, 1]) { steer.push(makeWheel(root, s * wx, r, wz, r, tw * ts.w, cT, wheels)); makeWheel(root, s * wx, r, -wz, r, (tw + 0.03) * ts.w, cT, wheels); }
+    if (atv) {
+      // dicke Kotflügel über jedem Rad
+      for (const s of [-1, 1]) for (const z of [-1, 1]) {
+        const fy = r * 2 + 0.06, top = part(G().box, c.body, tw * ts.w + 0.14, 0.07, r * 1.25, s * wx, fy, z * wz, root);
+        for (const e of [-1, 1]) { const sl = part(G().box, c.body, tw * ts.w + 0.14, 0.07, r * 0.55, s * wx, fy - r * 0.2, z * wz + e * r * 0.78, root); sl.rotation.x = e * 0.75; }
+        decalPlane(root, c.decal, c.accent, r * 1.1, 0.06, s * (wx + (tw * ts.w + 0.14) / 2 + 0.002), fy, z * wz, s * Math.PI / 2);
+      }
+      // schwarzer Kühlergrill mit zwei runden LED-Scheinwerfern
+      part(G().box, '#141414', 0.92, 0.36, 0.12, 0, 0.6, 1.2, B);
+      for (let k = 0; k < 5; k++) part(G().box, '#2a2a2a', 0.8, 0.02, 0.02, 0, 0.48 + k * 0.06, 1.265, B, { noShadow: true });
+      for (const sx of [-1, 1]) { const ring = part(G().cyl, '#3a3a3a', 0.1, 0.05, 0.1, sx * 0.28, 0.66, 1.27, B); ring.rotation.x = Math.PI / 2; const led = part(G().cyl, '#f4fbff', 0.075, 0.06, 0.075, sx * 0.28, 0.66, 1.28, B, { basic: true, noShadow: true }); led.rotation.x = Math.PI / 2; }
+      part(G().box, c.frame, 1.0, 0.08, 0.1, 0, 0.36, 1.26, B);
+      // Gepäckträger vorne (Rohrrahmen)
+      for (const sx of [-1, 1]) part(G().box, c.frame, 0.04, 0.04, 0.5, sx * 0.46, 0.96, 0.8, B);
+      for (let k = 0; k < 4; k++) part(G().box, c.frame, 0.92, 0.035, 0.035, 0, 0.96, 0.58 + k * 0.15, B);
+      // Trittbretter
+      for (const sx of [-1, 1]) part(G().box, '#1a1a1a', 0.26, 0.05, 0.7, sx * 0.42, 0.3, -0.02, B);
+    }
     underglow(root, c, 1.0, 1.8, 0.3 + lift);
     extras(B, c, { korbY: 0.85, korbZ: 0.85, flagX: -0.45, flagY: 0.7, flagZ: -0.95, rackW: 0.95, rackY: 0.88, rackZ: [0.68, -0.72], spY: 1.02, spZ: -0.85 });
     plate(B, c, 0, 0.58, -0.99, Math.PI);
@@ -314,6 +346,8 @@
       part(G().box, '#141518', 0.9, 0.03, 0.5, 0, 0.58, 0, K);
       for (const s of [-1, 1]) { part(G().box, '#8a8d92', 0.08, 0.1, 0.03, s * 0.3, 0.42, 0.29, K); part(G().box, '#141518', 0.03, 0.4, 0.5, s * 0.5, 0.25, 0, K); }
       part(G().box, '#c8c8c8', 0.22, 0.05, 0.02, 0, 0.3, -0.29, K, { basic: true });
+      for (const s of [-1, 1]) decalPlane(K, c.decal, c.accent, 0.5, 0.36, s * 0.53, 0.25, 0, s * Math.PI / 2);
+      decalPlane(K, c.decal, c.accent, 0.8, 0.36, 0, 0.25, -0.291, Math.PI);
     }
     // echte Größe: ATVs sind groß (Gelände-ATV ~3,2 m lang, Straßen-Quad etwas kleiner)
     const S = atv ? 1.35 : 1.2; root.scale.setScalar(S);

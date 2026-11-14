@@ -1280,7 +1280,7 @@
     mondrover: { name: 'Mond-Rover', vmax: 140, acc: 8, hp: 250, kind: 'car', big: true, open: true, len: 4.6, wid: 2.6, off: 1, h: 2.0, wr: 0.7, body: '#e8e8ec' },
     mondbuggy: { name: 'Mond-Buggy', vmax: 180, acc: 11, hp: 160, kind: 'car', big: true, open: true, len: 3.6, wid: 2.0, off: 1, h: 1.4, wr: 0.55, body: '#c8c8d0' },
     quad: { name: 'Straßen-Quad', vmax: 275, acc: 22, hp: 110, kind: 'bike', quad: true, wheelie: true, len: 2.9, wid: 1.5, off: 0.75 },
-    atv: { name: 'Gelände-ATV', vmax: 400, acc: 27, hp: 160, kind: 'bike', quad: true, wheelie: true, len: 3.3, wid: 1.75, off: 1 },
+    atv: { name: 'Gelände-ATV', vmax: 400, acc: 27, hp: 180, kind: 'bike', quad: true, wheelie: true, len: 3.4, wid: 2.2, off: 1 },
     // Polizei (unzerstörbar, nur KI): 500 km/h
     polizei_auto: { name: 'Polizeiauto', vmax: 500, acc: 30, hp: 99999, kind: 'car', len: 4.8, wid: 1.85, off: 0.85, h: 1.45, model: 'limousine', police: true },
     polizei_sport: { name: 'Polizei-Sportwagen', vmax: 500, acc: 34, hp: 99999, kind: 'car', len: 4.4, wid: 1.9, off: 0.8, h: 1.2, model: 'sportwagen', police: true },
