@@ -95,6 +95,12 @@
     }
     return res;
   };
+  // Dach unter (x, z), auf dem man stehen kann (höchstens knapp unter y) – sonst 0
+  L.roofAt = function (x, z, y) {
+    let top = -1e9;
+    for (const b of L.queryBoxes(x, z, 0.05)) { if (b.mtn || b.kind === 'tree' || b.h > y + 0.6 || (b.y0 !== undefined && b.y0 > y)) continue; if (x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2 && b.h > top) top = b.h; }
+    return top;
+  };
   L.blockedAt = function (x, y, z) {
     const l = L.queryBoxes(x, z, 0.05);
     for (const b of l) if (y < b.h && (b.y0 === undefined || y >= b.y0) && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2 && !(b.mtn && y >= L.mountainH(x, z))) return true;

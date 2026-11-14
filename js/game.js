@@ -701,6 +701,7 @@
     const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null;
     if (bf !== null) sf = bf;
     { const mh = L.mountainH(P.x, P.z); if (mh > sf) sf = mh; } // auf Bergen stehen statt hineinfallen
+    if (bf === null && (P.y || 0) > 1) { const rt = L.roofAt(P.x, P.z, P.y || 0); if (rt > sf) sf = rt; } // auf Dächern landen statt hineinzurutschen
     const depth = L.WATER_Y - sf;
     P.swim = depth > 1.35 && !L.inDim(P.x);
     const wt = performance.now() / 1000, wv = P.swim && !L.inDim(P.x) ? L.waveH(P.x, P.z, wt) : 0;
@@ -735,9 +736,13 @@
     // Umfallen dreht nur in der Luft weiter – am Boden (oder nach dem Fliegen) sofort beenden
     P.tumble = P.tumble > 0 && P.air ? P.tumble + dt * 9 : 0;
     // Bewegung mit Kollision
-    { const hz = L.heroSize ? L.heroSize() : 1;
-      if (hz > 5) { RES.x = P.x + P.vx * dt; RES.z = P.z + P.vz * dt; if (L.queryBoxes(RES.x, RES.z, 0.4 * hz).length && Math.random() < dt * 6) L.fx('#8a8378', RES.x + L.rand(-2, 2), L.rand(1, 3) * hz * 0.3, RES.z + L.rand(-2, 2), 3, 4, { size: 0.6, life: 1 }); }
-      else L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38 * Math.min(hz, 3), P.y, RES); }
+    // Bewegung in kleinen Schritten prüfen (sonst rutscht man bei hohem Tempo durch dünne Wände)
+    { const hz = L.heroSize ? L.heroSize() : 1, r = 0.38 * Math.min(hz, 3), stepY = hz > 2 ? (P.y || 0) + 2.8 * hz * 0.45 : P.y;
+      const n = Math.min(40, Math.max(1, Math.ceil(Math.hypot(P.vx, P.vz) * dt / 0.3)));
+      let x = P.x, z = P.z;
+      // riesig: niedrige Häuser (bis zur halben Körperhöhe) steigt er hinweg, an hohen bleibt er hängen
+      for (let i = 0; i < n; i++) { L.collide(x + P.vx * dt / n, z + P.vz * dt / n, r, stepY, RES); x = RES.x; z = RES.z; }
+      RES.x = x; RES.z = z; }
     P.x = RES.x; P.z = RES.z;
     for (const v of E.vehicles) {
       const d = L.dist(P.x, P.z, v.x, v.z);
@@ -804,6 +809,7 @@
     P.vy += (wantVy - P.vy) * Math.min(1, dt * 4);
     let gY = L.seaFloor(P.x, P.z); const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null; if (bf !== null) gY = bf;
     gY = Math.max(gY, L.mountainH(P.x, P.z));
+    if (bf === null) gY = Math.max(gY, L.roofAt(P.x, P.z, P.y || 0));
     if (!L.inDim(P.x)) gY = Math.max(gY, L.WATER_Y);
     P.y = Math.min(450, P.y + P.vy * dt);
     if (P.y <= gY) { P.y = gY; P.vy = Math.max(0, P.vy); if (P.flying === 2) { P.flying = 0; P.air = false; L.snd.land({ x: P.x, y: 0, z: P.z }); L.msg('🦸 Gelandet', 1200); } }

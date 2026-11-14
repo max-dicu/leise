@@ -255,7 +255,10 @@
       case 'erdbebensprung': {
         // gezielter Riesensprung: landet genau dort, wo der orange Kreis ist (Monster in der Nähe werden angepeilt)
         rageUp(); const T0 = leapTarget(), dist = Math.hypot(T0.x - P.x, T0.z - P.z), ft = L.clamp(0.9 + dist / 70, 0.9, 2.6);
-        H.leap = { t: 0, ft, sx: P.x, sy: y, sz: P.z, tx: T0.x, ty: T0.y, tz: T0.z, h: Math.max(6, dist * 0.35) };
+        let h = Math.max(6, dist * 0.35);
+        for (let k = 1; k < 20; k++) { const u = k / 20, x = L.lerp(P.x, T0.x, u), z = L.lerp(P.z, T0.z, u); let bh = 0; for (const b of L.queryBoxes(x, z, 1)) if (!b.mtn) bh = Math.max(bh, b.h); if (L.mountainH) bh = Math.max(bh, L.mountainH(x, z)); const need = (bh + 3 - L.lerp(y, T0.y, u)) / Math.max(0.3, Math.sin(u * Math.PI)); if (need > h) h = need; }
+        h = Math.min(h, 140);
+        H.leap = { t: 0, ft, sx: P.x, sy: y, sz: P.z, tx: T0.x, ty: T0.y, tz: T0.z, h };
         play('slamUp', 3); P.air = true; P.vx = P.vz = P.vy = 0; P.knockT = ft + 0.3;
         P.yaw = Math.atan2(T0.x - P.x, T0.z - P.z);
         H.slam = { r: 15 * kRad(), dmg: 360 * kPow(), col: 0xd8b070 };
@@ -387,11 +390,15 @@
     if (H.leap) {
       // feste Flugbahn: ein hoher Bogen genau zum Ziel
       const Lp = H.leap; Lp.t += dt; const u = Math.min(1, Lp.t / Lp.ft);
+      const ox = P.x, oz = P.z, oy = P.y;
       P.x = L.lerp(Lp.sx, Lp.tx, u); P.z = L.lerp(Lp.sz, Lp.tz, u); P.y = L.lerp(Lp.sy, Lp.ty, u) + Math.sin(u * Math.PI) * Lp.h;
+      if (u < 0.97 && L.blockedAt(P.x, P.y + 1, P.z)) { P.x = ox; P.z = oz; P.y = oy; H.leap = null; P.air = true; P.vy = -4; P.knockT = 0; }
+      else {
       P.vx = P.vz = 0; P.vy = 0; P.air = u < 1; P.knockT = Math.max(P.knockT || 0, 0.1);
       if (P.rig) { P.rig.root.position.set(P.x, P.y, P.z); P.rig.root.rotation.y = P.yaw; }
       if (Math.random() < dt * 20) L.fx('#8a7a60', P.x, P.y, P.z, 1, 1, { size: 0.3, life: 0.5 });
       if (u >= 1) { H.leap = null; P.air = false; H.wasAir = true; }
+      }
     }
     if (H.wasAir && !P.air && H.slam) {
       const S = H.slam; H.slam = null; const y = P.y || 0;
