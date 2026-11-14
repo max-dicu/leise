@@ -647,6 +647,7 @@
         for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld).project(prev.cam); if (Math.abs(v.x) > 1.01 || Math.abs(v.y) > 1.01) { big = true; return; } }
       });
     }
+    if (charApp.special === 'h_loki') big = false; // Loki: nur die Hörner ragen raus – kein Hinweis
     prev.big = big;
     if (!$('charTooBig')) {
       const note = document.createElement('div'); note.id = 'charTooBig'; note.textContent = '⚠️ Zu breit für das Menü';

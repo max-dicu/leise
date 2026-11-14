@@ -106,7 +106,7 @@
       r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, base, { skin: '#8a5a3a', hair: 'glatze', top: 'tshirt', topColor: '#8a5a3a', pants: 'kurz', pantsColor: '#8a5a3a', shoeType: 'barfuss', shoes: '#6a4428', build: 'extrem', height: 'gross' }));
       r.head.children.forEach((c) => { c.visible = false; });
       const br = '#7a4a2e', dk = '#5a3420';
-      part(L.GEO.sph, br, 0.6, 0.56, 0.52, 0, -0.04, 0.04, r.torso); r.head.position.z += 0.07; r.head.position.y += 0.04;
+      part(L.GEO.sph, br, 0.6, 0.56, 0.52, 0, -0.04, 0.04, r.torso); r.head.position.z += 0.07; r.head.position.y += 0.04; r.root.scale.setScalar(1.5);
       part(L.GEO.sph, br, 0.3, 0.14, 0.28, 0, -0.06, 0, r.head); // Nackenfalte
       part(L.GEO.sph, br, 0.26, 0.24, 0.27, 0, 0.1, 0.02, r.head); // Kopf
       part(L.GEO.sph, '#8a5838', 0.2, 0.13, 0.14, 0, 0.04, 0.16, r.head); // Schnauze
