@@ -217,7 +217,9 @@
       L.nz({ dur: 0.8, f: 600, type: 'bandpass', vol: 0.4, pos: { x: sx, y: 0, z: sz }, ref: 40 });
     }
     for (let i = sharks.length - 1; i >= 0; i--) {
-      const s = sharks[i]; s.t += dt; const u = s.t / s.dur;
+      const s = sharks[i];
+      if (s.dead) { s.deadT += dt; s.g.position.y -= dt * 10; s.g.rotation.z += dt * 3; if (s.deadT > 2) { L.scene.remove(s.g); sharks.splice(i, 1); } continue; }
+      s.t += dt; const u = s.t / s.dur;
       const x = L.lerp(s.sx, s.ex, u), z = L.lerp(s.sz, s.ez, u), y = L.WATER_Y - 4 + Math.sin(u * Math.PI) * (s.h + 4);
       s.g.position.set(x, y, z); s.g.rotation.set(-Math.cos(u * Math.PI) * 0.9, Math.atan2(s.ex - s.sx, s.ez - s.sz), 0);
       if ((u < 0.08 || u > 0.92) && Math.random() < 0.6) L.fx('#e8f4ff', x, 0, z, 6, 6, { size: 0.6, life: 1 });
@@ -236,6 +238,7 @@
     }
     for (let i = giants.length - 1; i >= 0; i--) {
       const G0 = giants[i], d = L.dist(G0.x, G0.z, P.x, P.z);
+      if (G0.dead) { G0.deadT += dt; G0.rig.root.position.y -= dt * 6; G0.rig.root.rotation.z = Math.min(1.2, G0.deadT * 0.3); if (Math.random() < dt * 8) L.fx('#e8f4ff', G0.x + L.rand(-15, 15), 0, G0.z + L.rand(-15, 15), 5, 7, { size: 1.2, life: 1.2 }); if (G0.deadT > 8) { L.scene.remove(G0.rig.root); giants.splice(i, 1); } continue; }
       // stampft auf, wenn er dich erreicht (Wellen + Schaden)
       G0.cd = (G0.cd || 0) - dt;
       if (d < 34 && G0.cd <= 0 && P.alive && (P.y || 0) < 20) { G0.cd = 3; L.hurtPlayer(28 * (L.md ? L.md.dmg : 1), 'Vom Meeresriesen unter Wasser gedrückt'); L.shake = Math.max(L.shake, 1); L.fx('#e8f4ff', P.x, 0, P.z, 30, 10, { size: 1, life: 1.2 }); if (P.vehicle) { P.vehicle.speed *= 0.3; P.vehicle.hp -= 15; } }
@@ -248,10 +251,96 @@
       if (Math.random() < dt * 0.3) L.snd.ruferStep({ x: G0.x, y: 0, z: G0.z });
       if (d > 1400 || openSea(G0.x, G0.z) < 150) { L.scene.remove(G0.rig.root); giants.splice(i, 1); }
     }
+    // Monsterwellen und Unterwasser-Strudel auf dem offenen Meer
+    L.seaEvT = (L.seaEvT === undefined ? 35 : L.seaEvT) - dt;
+    if (os > 350 && L.seaEvT <= 0 && P.alive && !L.cine && alt < 40) { L.seaEvT = L.rand(40, 80); if (Math.random() < 0.5) spawnRogue(); else spawnWhirl(); }
+    updRogue(dt); updWhirl(dt);
     // Wasserhosen auf dem Meer
     if (os > 400 && L.tornados && L.tornados.length < 1 && Math.random() < dt * 0.01 && !isClient()) { const a = Math.random() * 6.28; L.spawnTornado(P.x + Math.sin(a) * 350, P.z + Math.cos(a) * 350); }
   }
-  L.clearSea = () => { for (const s of sharks) L.scene.remove(s.g); for (const G0 of giants) L.scene.remove(G0.rig.root); sharks.length = 0; giants.length = 0; };
+  // Haie und Meeresriesen kann man treffen und besiegen
+  L.seaTargets = () => {
+    const a = [];
+    for (const s of sharks) if (!s.dead) { s.kind = 'seamon'; s.x = s.g.position.x; s.z = s.g.position.z; s.y = s.g.position.y; s.rig = s.rig || { root: s.g }; s.hitR = 20; if (s.hp === undefined) s.hp = 120; a.push(s); }
+    for (const G0 of giants) if (!G0.dead) { G0.kind = 'seamon'; G0.hitR = 90; if (G0.hp === undefined) G0.hp = 2500; a.push(G0); }
+    return a;
+  };
+  L.seaHit = function (e, dmg, src) {
+    if (e.dead || !(dmg > 0)) return;
+    e.hp -= dmg; const shark = !!e.g;
+    L.blood(e.x, shark ? e.g.position.y : 6, e.z, shark ? 10 : 16);
+    if (!shark && L.showBossHp) L.showBossHp('🌊 MEERESRIESE', e.hp, 2500);
+    if (e.hp <= 0) {
+      e.dead = true; e.deadT = 0; const coins = shark ? 40 : 300;
+      if (src === P && L.gotKillCoins) L.gotKillCoins(coins);
+      L.msg(shark ? '🦈 Riesenhai erledigt! +' + coins + ' 🪙' : '🌊 Der Meeresriese versinkt! +' + coins + ' 🪙', 3500);
+      if (!shark) { L.snd.bossRoar && L.snd.bossRoar({ x: e.x, y: 10, z: e.z }); L.shake = Math.max(L.shake, 0.8); }
+    }
+  };
+  // ---- Monsterwelle: eine Wasserwand rollt übers Meer ----
+  const rogues = [], whirls = [];
+  function spawnRogue() {
+    const a = Math.random() * 6.28, dx = Math.sin(a), dz = Math.cos(a), sx = P.x - dx * 380, sz = P.z - dz * 380;
+    const g = new T.Group(); g.rotation.y = a; L.scene.add(g);
+    const body = new T.Mesh(new T.BoxGeometry(520, 1, 26), new T.MeshPhongMaterial({ color: 0x2a6a88, transparent: true, opacity: 0.86, shininess: 90 })); g.add(body);
+    const crest = new T.Mesh(new T.BoxGeometry(520, 1, 5), new T.MeshLambertMaterial({ color: 0xf0f6ff })); g.add(crest);
+    rogues.push({ g, body, crest, dx, dz, sx, sz, t: 0, hit: false });
+    L.banner('🌊 MONSTERWELLE!', 'Eine riesige Welle rollt übers Meer auf dich zu – halt dich fest!');
+    L.nz({ dur: 3, f: 300, type: 'lowpass', vol: 0.5, ref: 60 });
+  }
+  function updRogue(dt) {
+    for (let i = rogues.length - 1; i >= 0; i--) {
+      const R0 = rogues[i]; R0.t += dt;
+      const d = R0.t * 32, cx = R0.sx + R0.dx * d, cz = R0.sz + R0.dz * d, h = 13 * Math.min(1, R0.t / 3) * Math.max(0, Math.min(1, (26 - R0.t) / 4));
+      R0.g.position.set(cx, L.WATER_Y, cz);
+      R0.body.scale.y = Math.max(0.1, h); R0.body.position.y = h / 2 - 1; R0.body.rotation.x = Math.sin(R0.t * 2) * 0.05;
+      R0.crest.position.set(0, h - 0.6, 6); R0.crest.scale.y = 1.2;
+      if (Math.random() < dt * 20) L.fx('#f0f6ff', cx + Math.cos(R0.g.rotation.y) * L.rand(-200, 200), h + L.WATER_Y, cz - Math.sin(R0.g.rotation.y) * L.rand(-200, 200), 3, 5, { size: 0.8, life: 1 });
+      // trifft sie dich?
+      const rx = P.x - cx, rz = P.z - cz, along = rx * R0.dx + rz * R0.dz, side = rx * R0.dz - rz * R0.dx, py = P.vehicle ? (P.vehicle.alt || 0) : (P.y || 0);
+      if (!R0.hit && Math.abs(along) < 10 && Math.abs(side) < 260 && py < h + 1 && P.alive) {
+        R0.hit = true; L.shake = Math.max(L.shake, 1.2);
+        const v = P.vehicle;
+        if (v) { v.x += R0.dx * 18; v.z += R0.dz * 18; v.speed *= 0.3; v.yaw += L.rand(-1, 1); L.hurtPlayer(10, 'Von der Monsterwelle erwischt'); }
+        else { P.vx = R0.dx * 20; P.vz = R0.dz * 20; P.vy = 9; P.air = true; P.knockT = 1; L.hurtPlayer(14, 'Von der Monsterwelle erwischt'); }
+        L.msg('🌊 Die Welle reißt dich mit!', 2500);
+      }
+      if (R0.t > 26) { L.scene.remove(R0.g); rogues.splice(i, 1); }
+    }
+  }
+  // ---- Unterwasser-Strudel: ein Wirbel zieht alles im Kreis und in die Tiefe ----
+  function spawnWhirl() {
+    const yaw = P.vehicle ? P.vehicle.yaw : P.yaw, x = P.x + Math.sin(yaw) * 110 + L.rand(-30, 30), z = P.z + Math.cos(yaw) * 110 + L.rand(-30, 30);
+    const g = new T.Group(); g.position.set(x, L.WATER_Y, z); L.scene.add(g);
+    const fun = new T.Mesh(new T.CylinderGeometry(42, 2, 70, 32, 6, true), new T.MeshPhongMaterial({ color: 0x1a5a7a, transparent: true, opacity: 0.75, side: T.DoubleSide, shininess: 80, depthWrite: false })); fun.position.y = -35; g.add(fun);
+    const rings = []; for (let k = 0; k < 4; k++) { const r = new T.Mesh(new T.TorusGeometry(10 + k * 9, 0.6, 6, 40), new T.MeshLambertMaterial({ color: 0xe8f4ff, transparent: true, opacity: 0.8 })); r.rotation.x = Math.PI / 2; r.position.y = 0.2 - k * 0.1; g.add(r); rings.push(r); }
+    const lines = []; for (let k = 0; k < 10; k++) { const m = new T.Mesh(L.GEO.box, new T.MeshBasicMaterial({ color: 0x9ad8ff, transparent: true, opacity: 0.6 })); m.scale.set(0.4, 30, 0.4); g.add(m); lines.push({ m, a: k / 10 * 6.28 }); }
+    whirls.push({ g, fun, rings, lines, x, z, t: 0, life: 40 });
+    L.banner('🌀 UNTERWASSER-STRUDEL', 'Ein riesiger Wirbel öffnet sich im Meer – bleib weg vom Zentrum!');
+    L.nz({ dur: 4, f: 180, type: 'lowpass', vol: 0.4, ref: 60 });
+  }
+  function updWhirl(dt) {
+    for (let i = whirls.length - 1; i >= 0; i--) {
+      const W0 = whirls[i]; W0.t += dt;
+      const grow = Math.min(1, W0.t / 3) * Math.min(1, Math.max(0, (W0.life - W0.t) / 3));
+      W0.g.scale.set(grow, grow, grow); W0.fun.rotation.y += dt * 1.6;
+      W0.rings.forEach((r, k) => { r.rotation.z += dt * (1.8 - k * 0.3); });
+      W0.lines.forEach((q) => { q.a += dt * 1.5; const rr = 26 - ((W0.t * 6 + q.a * 5) % 24); q.m.position.set(Math.sin(q.a) * rr, -15 - (26 - rr), Math.cos(q.a) * rr); q.m.rotation.set(0.6, q.a, 0); });
+      if (Math.random() < dt * 15) { const a = Math.random() * 6.28, r = 10 + Math.random() * 30; L.fx('#f0f6ff', W0.x + Math.sin(a) * r * grow, 0, W0.z + Math.cos(a) * r * grow, 2, 3, { size: 0.6, life: 1 }); }
+      // Sog: im Kreis und zur Mitte, in der Mitte nach unten
+      const v = P.vehicle, ref = v || P, dx = ref.x - W0.x, dz = ref.z - W0.z, d = Math.hypot(dx, dz) || 1, py = v ? (v.alt || 0) : (P.y || 0);
+      if (d < 70 * grow && py < 2 && P.alive) {
+        const k = (1 - d / 70) * grow, tx = -dz / d, tz = dx / d;
+        const mx = (tx * 9 - dx / d * 6) * k * dt, mz = (tz * 9 - dz / d * 6) * k * dt;
+        if (v) { v.x += mx * 1.5; v.z += mz * 1.5; v.yaw += k * dt * 1.5; } else { P.x += mx; P.z += mz; }
+        if (d < 9) { if (!v && P.swim) P.y = Math.max(P.y - dt * 4, -30); L.hurtPlayer(14 * dt * 3, 'Vom Strudel in die Tiefe gerissen'); if (!(W0.msgT > 0)) { W0.msgT = 3; L.msg('🌀 Der Strudel zieht dich nach unten – schwimm weg!', 2500); } }
+        W0.msgT = (W0.msgT || 0) - dt;
+      }
+      if (W0.t > W0.life) { L.scene.remove(W0.g); whirls.splice(i, 1); }
+    }
+  }
+  L.clearSea = () => { for (const R0 of rogues) L.scene.remove(R0.g); rogues.length = 0; for (const W0 of whirls) L.scene.remove(W0.g); whirls.length = 0; clearSea0(); };
+  const clearSea0 = () => { for (const s of sharks) L.scene.remove(s.g); for (const G0 of giants) L.scene.remove(G0.rig.root); sharks.length = 0; giants.length = 0; };
 
   // ---------- Inselgefahren: Lavabomben, Blitze ----------
   const bombs = [];

@@ -469,7 +469,10 @@
     // freie Fläche suchen (kein Haus/Baum/Fels in 70 m, Kameraplatz auch frei)
     let F = { x: kr.x, z: kr.z + 200 };
     const freeR = (x, z, r) => { for (let i = -r; i <= r; i += 10) for (let j = -r; j <= r; j += 10) if (i * i + j * j <= r * r && L.queryBoxes(x + i, z + j, 1).length) return false; return Math.abs(x) < 1350 && Math.abs(z) < 1350 && L.mountainH(x, z) === 0 && L.waterDepth(x, z) < -0.3; };
-    F = { x: -152, z: -76 }; // Kreuzung im Hochhausviertel – IVA ist größer als jedes Haus
+    // freie Wiese direkt neben der Stadt (Altheim reicht etwa 390 m weit)
+    F = null;
+    for (let k = 0; k < 240 && !F; k++) { const a = k * 0.53, d = 470 + (k % 12) * 28, x = Math.sin(a) * d, z = Math.cos(a) * d; if (freeR(x, z, 60) && freeR(x + 228, z + 168, 20)) F = { x, z }; }
+    if (!F) F = { x: -152, z: -76 };
     const rig = L.buildKoloss(); rig.root.children.forEach((c) => { if (c !== rig.hull) c.visible = false; });
     rig.root.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false; } });
     const K = 6; rig.root.scale.setScalar(K); rig.root.rotation.set(0, 0.6, 0); rig.root.position.set(F.x, -200, F.z); L.scene.add(rig.root);
@@ -479,7 +482,7 @@
     const wave = new T.Mesh(new T.TorusGeometry(1, 0.08, 8, 64), new T.MeshBasicMaterial({ color: 0xffd8a0, transparent: true, opacity: 0, depthWrite: false })); wave.frustumCulled = false; wave.visible = false; L.scene.add(wave);
     iva = { rig, K, F, E0, maw, clawUp, clawDn, wave, armS, handM, chunks: [], cam: { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0 } };
     L.banner('👹 MAMA IVA', '… sie hat Hunger.');
-    L.startCine('👹 MAMA IVA GEGEN BERNHARD', 26, () => iva && iva.cam);
+    L.startCine('👹 MAMA IVA GEGEN BERNHARD', 33, () => iva && iva.cam);
   }
   const ease = (u) => { u = L.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
   function chunk(V, pos, big) {
@@ -489,7 +492,7 @@
     L.scene.add(ch); V.chunks.push(ch);
   }
   function updateIvaEnd(dt) {
-    const V = iva, t = bern.t, b = bern.g, R = V.rig, K = V.K, S = K / 230;
+    const V = iva, tr = bern.t, mid = tr >= 10 && tr < 17, t = tr < 10 ? tr : mid ? 9.999 : tr - 7, b = bern.g, R = V.rig, K = V.K, S = K / 230;
     // ===== Teil 1: Mond – der Arm packt Bernhard und reißt ihn zur Erde (0–3,2 s) =====
     if (t < 3.2) {
       animB(dt, false);
@@ -505,7 +508,7 @@
       Object.assign(V.cam, { x: cp.x, y: cp.y, z: cp.z, lx: lk.x, ly: lk.y, lz: lk.z });
       return;
     }
-    if (!V.home) { V.home = true; for (const m of V.armS) m.visible = false; V.handM.visible = false; L.banner('🌍 DIE HAUPTINSEL', 'Bernhard kracht mitten in die Stadt Altheim …'); }
+    if (!V.home) { V.home = true; for (const m of V.armS) m.visible = false; V.handM.visible = false; L.banner('🌍 DIE HAUPTINSEL', 'Bernhard kracht auf die Wiese neben der Stadt …'); }
     const F = V.F;
     const W = (x, y, z) => R.root.localToWorld(new T.Vector3(x, y, z));
     const qIva = R.root.quaternion, qx = (a) => new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), a), qy = (a) => new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), a);
@@ -538,15 +541,18 @@
       animB(dt, true);
       if (Math.random() < dt * 4) { L.shake = Math.max(L.shake, 0.6); L.snd.stomp && L.snd.stomp({ x: P.x, y: 0, z: P.z }); }
     } else if (t < 13.5) {
-      // SUPLEX
-      const u = ease((t - 10) / 2), back = t < 12 ? u : 1 - ease((t - 12.2) / 1.3) * 0.85;
-      torsoX = -1.1 * back; armX = -2.2; armZ = 0.45; elb = -1.3;
-      const piv = new T.Vector3(0, 4.5, 0), off = new T.Vector3(0, -2.5, 9).applyAxisAngle(new T.Vector3(1, 0, 0), -Math.PI * u);
-      const loc = piv.clone().add(off); bp = W(loc.x, loc.y, loc.z); bq = qIva.clone().multiply(qx(-Math.PI * u)).multiply(facing);
+      // SUPLEX: hochstemmen – oben halten und brüllen – Brücke nach hinten – Aufschlag
+      const lift = ease((t - 10) / 0.9), arch = ease((t - 11.3) / 1.1), back = t < 12.4 ? arch : 1 - ease((t - 12.6) / 0.9) * 0.85;
+      torsoX = -1.25 * back + 0.15 * lift * (1 - arch); armX = -2.2 - 0.9 * lift * (1 - arch); armZ = 0.45; elb = -1.3 + 0.9 * lift * (1 - arch);
+      shake = t > 10.9 && t < 11.3 ? 0.5 : 0.1;
+      if (t > 10.9 && !V.liftRoar) { V.liftRoar = true; L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 10, z: P.z }); L.shake = Math.max(L.shake, 0.9); }
+      const piv = new T.Vector3(0, 4.5, 0), up = new T.Vector3(0, 2 + lift * 14, L.lerp(9, 2, lift)).sub(piv);
+      const th = Math.PI * 0.6 * arch, loc = piv.clone().add(up.applyAxisAngle(new T.Vector3(1, 0, 0), -th));
+      bp = W(loc.x, loc.y, loc.z); bq = qIva.clone().multiply(qx(-Math.PI / 2 * lift - th * 1.15)).multiply(facing);
       animB(dt, true);
-      if (t >= 12 && !V.slam) {
+      if (t >= 12.4 && !V.slam) {
         V.slam = true; L.shake = 2.5; L.snd.explosion && L.snd.explosion({ x: P.x, y: 5, z: P.z }); L.snd.crash && L.snd.crash(1, { x: P.x, y: 2, z: P.z });
-        const sp = W(0, 2, -9); for (let k = 0; k < 8; k++) chunk(V, sp, true);
+        const sp = bp.clone(); sp.y = 2; for (let k = 0; k < 12; k++) chunk(V, sp, true); L.blood && L.blood(sp.x, 6, sp.z, 60, true);
         L.fx('#6a5a40', sp.x, 2, sp.z, 50, 26, { size: 1.8, life: 1.6 }); L.decal && L.decal(sp.x, sp.z, 45, '#2a2218');
         V.wave.visible = true; V.wave.position.set(sp.x, 1.5, sp.z); V.wave.rotation.set(Math.PI / 2, 0, 0); V.waveT = 0;
       }
@@ -578,6 +584,30 @@
       b.visible = false; armX = -2.8 * (1 - u); elb = -0.5;
       if (!V.roared) { V.roared = true; L.snd.bossRoar && L.snd.bossRoar({ x: P.x, y: 10, z: P.z }); L.shake = 1.5; }
     }
+    if (mid) {
+      const m = tr - 10; animB(dt, true); bq = qIva.clone().multiply(facing); bScale = BS;
+      if (m < 2.5) {
+        // Bernhard reißt sich los und beißt IVA in den Arm
+        const u = ease(m / 0.8); bp = W(L.lerp(0, 2.2, u), L.lerp(2, 9, u), L.lerp(9, 6, u)); bq = bq.multiply(qx(-0.7 * u));
+        torsoX = 0.35 * u; armX = -1.2; armZ = 0.9 * u; elb = -0.4; shake = 0.7;
+        if (m > 0.8 && Math.random() < dt * 8) { const p = W(2.2, 10, 6); L.blood && L.blood(p.x, p.y, p.z, 6); }
+        if (m > 0.8 && !V.bit) { V.bit = true; L.snd.scream && L.snd.scream({ x: P.x, y: 5, z: P.z }); L.shake = 1.2; }
+      } else if (m < 4.5) {
+        // Kopfstoß und zwei Schläge – Bernhard fliegt weg
+        const hb = ease((m - 2.5) / 0.3) * (1 - ease((m - 2.9) / 0.3)); torsoX = -0.55 * hb + 0.1;
+        const p1 = ease((m - 3.0) / 0.25) * (1 - ease((m - 3.3) / 0.3)), p2 = ease((m - 3.4) / 0.25) * (1 - ease((m - 3.7) / 0.3));
+        armX = -1.0 - (p1 + p2) * 0.8; armZ = 0.3; elb = -1.4 + (p1 + p2) * 1.2; shake = 0.3;
+        const fly = ease((m - 3.6) / 0.8); bp = W(L.lerp(2.2, 0, fly), L.lerp(9, 2, fly) + Math.sin(fly * Math.PI) * 9, L.lerp(6, 26, fly)); bq = bq.multiply(qx(fly * 2.4));
+        if (m > 2.75 && !V.hb) { V.hb = true; L.shake = 1.6; L.snd.crash && L.snd.crash(1, { x: P.x, y: 2, z: P.z }); }
+        if (m > 3.6 && !V.pu) { V.pu = true; L.shake = 1.8; L.snd.explosion && L.snd.explosion({ x: P.x, y: 3, z: P.z }); const p = W(1, 8, 7); L.blood && L.blood(p.x, p.y, p.z, 30, true); }
+        if (m > 4.4 && !V.land2) { V.land2 = true; const p = W(0, 2, 26); for (let k = 0; k < 8; k++) chunk(V, p, true); L.fx('#6a5a40', p.x, 2, p.z, 40, 22, { size: 1.6, life: 1.4 }); L.decal && L.decal(p.x, p.z, 40, '#2a2218'); L.shake = 2.2; }
+      } else {
+        // sie stampft heran, packt ihn am Kopf und zerrt ihn zurück
+        const u = ease((m - 4.6) / 2); armX = -1.6 - 0.2 * u; armZ = 0.15; elb = -0.1 - u * 0.9; torsoX = 0.25 * (1 - u) - 0.1;
+        bp = W(0, 2 + u * 0.5, L.lerp(26, 9, u)); bq = bq.multiply(qx(0.5 * (1 - u)));
+        if (Math.floor(m * 1.6) !== Math.floor((m - dt) * 1.6)) { L.shake = Math.max(L.shake, 0.9); L.snd.stomp && L.snd.stomp({ x: P.x, y: 0, z: P.z }); }
+      }
+    }
     if (bp) { b.position.copy(bp); b.quaternion.copy(bq); b.scale.setScalar(bScale); }
     for (const [i, a] of A.entries()) { const s = i ? 1 : -1; a.arm.rotation.set(armX + Math.sin(t * 20) * shake * 0.1, 0, s * armZ); a.elbow.rotation.set(elb, 0, 0); }
     T0.rotation.x = torsoX + Math.sin(t * 23) * shake * 0.05; T0.rotation.z = Math.sin(t * 17) * shake * 0.06;
@@ -588,12 +618,13 @@
     // Kamera immer so, als stünde IVA schon (sonst landet sie beim Aufsteigen/Versinken zwischen den Häusern)
     R.root.updateMatrixWorld(true);
     const dyC = -2 * K - R.root.position.y, WC = (x, y, z) => W(x, y, z).add(new T.Vector3(0, dyC, 0));
-    const far = WC(38, 25, 28), farLook = WC(0, 13, -1), near = WC(5, 22, 17), nearLook = WC(0, 19.5, 1);
+    const orb = mid ? (tr - 10) * 0.09 : tr >= 17 && tr < 21 ? 0.63 - (tr - 17) * 0.12 : 0, ox = 38 * Math.cos(orb) - 28 * Math.sin(orb), oz = 38 * Math.sin(orb) + 28 * Math.cos(orb);
+    const far = WC(ox, mid ? 18 : 25, oz), farLook = WC(0, 13, -1), near = WC(5, 22, 17), nearLook = WC(0, 19.5, 1);
     const k = t < 13.5 ? 0 : t < 15 ? ease((t - 13.5) / 1.5) : t < 22 ? 1 : 1 - ease((t - 22) / 2);
     const cp = new T.Vector3().lerpVectors(far, near, k), lk = new T.Vector3().lerpVectors(t < 4.6 ? b.position.clone() : farLook, nearLook, k);
     if (cp.y < 3) cp.y = 3;
     Object.assign(V.cam, { x: cp.x, y: cp.y, z: cp.z, lx: lk.x, ly: lk.y, lz: lk.z });
-    if (t > 26 || (!L.cine && t > 1)) endIva();
+    if (t > 26 || (!L.cine && tr > 1)) endIva();
   }
   function endIva() {
     const V = iva; if (!V) return;
@@ -634,7 +665,7 @@
     return '🍔 Bernhard kommt in ' + L.fmt(Math.max(0, bTimer));
   };
   L.moonNav = () => (L.inMoon(P.x) && bern && ['hunt', 'aim', 'chomp', 'rise', 'final', 'approach'].includes(bern.phase) && !L.inBurger(P.x, P.z) ? BURGER : null);
-  L.moonTargets = () => [[LAND.x, LAND.z, '🚀', 'Rakete (Heimflug)'], [BURGER.x, BURGER.z, '🍔', 'Burger (sicher)']];
+  L.moonTargets = () => [[LAND.x, LAND.z, '🚀', 'Rakete (Heimflug)'], [BURGER.x, BURGER.z, '🍔', 'Burger (sicher)'], [MOON.x + 1180, MOON.z, '🪐', 'Portal zum Titanenmond']];
 
   // ---------- jedes Bild ----------
   L.updateMoon = function (dt) {

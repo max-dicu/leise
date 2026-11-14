@@ -8,7 +8,7 @@
   const S = 50, NSEG = 22, RESPAWN = 180, FIRST = 25, R0 = 7 * S;
   const maxHp = () => (L.remotes && [...L.remotes.values()].some((r) => r.inRound) ? 500 : 250);
   function part(geo, color, sx, sy, sz, x, y, z, parent, o) { const m = new T.Mesh(geo, L.mat(color, o)); m.scale.set(sx, sy, sz); m.position.set(x, y, z); if (parent) parent.add(m); return m; }
-  const inDim = () => L.inDim(P.x) && !(L.inMoon && L.inMoon(P.x)) && !(L.inBack && L.inBack(P.x));
+  const inDim = () => L.inDim(P.x) && !(L.inMoon && L.inMoon(P.x)) && !(L.inBack && L.inBack(P.x)) && !(L.inTitan && L.inTitan(P.x, P.z));
 
   // ---------- Modell (riesig, nicht vom Nebel verschluckt) ----------
   function build() {
@@ -112,7 +112,9 @@
     if (W.lookAt) segs[0].lookAt(W.lookAt.x, W.lookAt.y, W.lookAt.z);
     // Trefferzone: das Maul (nur wenn er aufgetaucht ist)
     const sph = W.ent.sph; sph.length = 0;
-    if (W.state === 'spit' || W.state === 'roar' || W.state === 'rise') { const mp = mouthPos(); sph.push([mp.x, mp.y, mp.z, R0 * 0.62, W.state === 'roar' ? 1.6 : W.state === 'spit' ? 1 : 0.5]); }
+    if (W.state === 'spit' || W.state === 'roar' || W.state === 'rise') { const mp = mouthPos(); sph.push([mp.x, mp.y, mp.z, R0 * 0.62, W.state === 'roar' ? 2.4 : W.state === 'spit' ? 1.8 : 1.2]); }
+    // der ganze Körper nimmt Schaden (weniger als das Maul)
+    for (let k = 0; k < segs.length; k += 1) { const p = segs[k].position; sph.push([p.x, p.y, p.z, R0 * (1 - k * 0.034) * 0.95, 0.6]); }
     W.ent.x = W.head.x; W.ent.z = W.head.z;
   }
   function update(dt) {

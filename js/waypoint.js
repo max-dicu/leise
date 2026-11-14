@@ -97,6 +97,7 @@
     const tgt = (x, z, icon, name) => { if (Math.hypot(x - P.x, z - P.z) < 40) return; put(x - P.x, z - P.z, icon + '<small>' + name + ' ' + km(x, z) + '</small>'); };
     if (L.inMoon && L.inMoon(P.x)) { for (const q of L.moonTargets()) tgt(q[0], q[1], q[2], q[3]); }
     else if (L.inBack && L.inBack(P.x)) { /* Backrooms: kein Kompass */ }
+    else if (L.inTitan && L.inTitan(P.x, P.z)) { for (const q of L.titanWaypoints()) tgt(q[0], q[1], q[2], q[3]); }
     else if (L.inDim(P.x)) { if (L.DIM_PORTAL) tgt(L.DIM_PORTAL.x, L.DIM_PORTAL.z, '🌀', 'Heimweg'); }
     else if (L.ROCKET && !L.curIsland) tgt(L.ROCKET.x, L.ROCKET.z, '🚀', 'Rakete');
     else {

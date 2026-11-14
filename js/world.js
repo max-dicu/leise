@@ -97,7 +97,7 @@
   };
   L.blockedAt = function (x, y, z) {
     const l = L.queryBoxes(x, z, 0.05);
-    for (const b of l) if (y < b.h && (b.y0 === undefined || y >= b.y0) && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2) return true;
+    for (const b of l) if (y < b.h && (b.y0 === undefined || y >= b.y0) && x >= b.x1 && x <= b.x2 && z >= b.z1 && z <= b.z2 && !(b.mtn && y >= L.mountainH(x, z))) return true;
     return false;
   };
   // Sichtlinie (wird durch Gebäude unterbrochen)
@@ -852,8 +852,14 @@
     // weiße Schaumkronen-Linie am Strand
     L.ocean = { mesh: wm, geo: wg, base, W };
   }
+  L.seaWild = function (x, z) {
+    const os = L.openSea ? L.openSea(x, z) : 0, st = L.env && L.env.weather && /sturm|gewitter|schauer/.test(L.env.weather) ? 1.6 : 1;
+    return (0.4 + L.clamp(os / 500, 0, 1) * 2.6) * st;
+  };
   L.waveH = function (x, z, t) {
-    return Math.sin(x * 0.035 + t * 1.3) * 0.22 + Math.sin(z * 0.03 - t * 1.1) * 0.22 + Math.sin((x + z) * 0.08 + t * 2.2) * 0.1;
+    const w = L.seaWild(x, z);
+    return (Math.sin(x * 0.035 + t * 1.3) * 0.22 + Math.sin(z * 0.03 - t * 1.1) * 0.22 + Math.sin((x + z) * 0.08 + t * 2.2) * 0.1) * Math.min(w, 1.6)
+      + (Math.sin(x * 0.011 + z * 0.004 + t * 0.85) * 0.8 + Math.sin(z * 0.013 - x * 0.003 - t * 0.7) * 0.55) * Math.max(0, w - 0.4);
   };
   const cB = new T.Color(), cS = new T.Color('#c8b888'), cD = new T.Color('#0e1a22');
   function updateSeabed(cam) {

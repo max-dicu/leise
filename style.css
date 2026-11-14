@@ -27,7 +27,7 @@ button { font: inherit; cursor: pointer; }
 #menu { background: radial-gradient(ellipse at 50% 40%, rgba(5, 6, 8, .35), rgba(5, 6, 8, .85) 75%); }
 #loading { background: #050506; z-index: 50; }
 .menuBox { text-align: center; max-width: 560px; }
-.menuBox h1 { font-size: clamp(70px, 16vw, 150px); font-weight: 700; letter-spacing: .25em; margin: 0 0 0 .25em; line-height: 1; color: #f0e8d6; text-shadow: 0 0 30px rgba(179, 52, 42, .5); }
+.menuBox h1 { font-size: clamp(26px, 7vw, 112px); font-weight: 700; letter-spacing: .12em; margin: 0 0 0 .12em; line-height: 1.05; max-width: 100%; overflow-wrap: anywhere; color: #f0e8d6; text-shadow: 0 0 30px rgba(179, 52, 42, .5); }
 .eyebrow { color: var(--dim); letter-spacing: .3em; text-transform: uppercase; margin: 0 0 8px; }
 .tag { font-family: var(--type); color: var(--red); font-size: 22px; margin: 6px 0 14px; }
 .lead { font-family: var(--type); font-size: 17px; line-height: 1.5; color: var(--text); margin: 0 auto 22px; max-width: 34ch; }

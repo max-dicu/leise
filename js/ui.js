@@ -631,6 +631,7 @@
     if (charApp.special === 'waechter' && L.waechterToken()) charApp.wk = L.waechterToken();
     if (charApp.special === 'titan' && L.titanToken()) charApp.tk = L.titanToken();
     if (charApp.special === 'baer' && L.baerToken()) charApp.bk = L.baerToken();
+    if (charApp.special && charApp.special.startsWith('h_') && L.heroToken && L.heroToken(charApp.special.slice(2))) charApp.hk = L.heroToken(charApp.special.slice(2));
     prev.rig = L.buildHuman(charApp); prev.s.add(prev.rig.root);
   }
   function renderCharOpts() {
@@ -642,13 +643,13 @@
     nameD.appendChild(inp); box.appendChild(nameD);
     { const d = document.createElement('div'); d.className = 'opt'; d.innerHTML = '<label>⭐ Exklusive Skins</label>';
       const ch = document.createElement('div'); ch.className = 'choices';
-      for (const [k, nm] of L.SKINS) { if (k === 'waechter' && !L.waechterToken()) continue; if (k === 'titan' && !L.titanToken()) continue; if (k === 'baer' && !L.baerToken()) continue; const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
+      for (const [k, nm] of L.SKINS) { if (k === 'waechter' && !L.waechterToken()) continue; if (k === 'titan' && !L.titanToken()) continue; if (k === 'baer' && !L.baerToken()) continue; if (k.startsWith('h_') && !(L.heroToken && L.heroToken(k.slice(2)))) continue; const b = document.createElement('button'); b.textContent = nm; if ((charApp.special || '') === k) b.classList.add('sel'); b.onclick = () => { charApp.special = k; renderCharOpts(); rebuildPreview(); }; ch.appendChild(b); }
       d.appendChild(ch); box.appendChild(d);
       // Geheimcode für exklusive Skins
       const cd = document.createElement('div'); cd.className = 'opt'; cd.innerHTML = '<label>🔑 Geheimcode</label>';
       const ci = document.createElement('input'); ci.type = 'text'; ci.maxLength = 20; ci.placeholder = 'Code eingeben';
       const cb = document.createElement('button'); cb.textContent = 'Freischalten';
-      cb.onclick = () => { const k = ci.value.trim().toUpperCase(); if (L.baerCheck && L.baerCheck(k)) { L.save.baerKey = k; charApp.special = 'baer'; charApp.bk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); return; } if (L.titanCheck && L.titanCheck(k)) { L.save.titanKey = k; charApp.special = 'titan'; charApp.tk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); return; } if (L.hash53(L.hash53(k)) === 'ofaw0xb94x') { L.save.skinKey = k; charApp.special = 'waechter'; charApp.wk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); } else { ci.value = ''; ci.placeholder = '❌ falscher Code'; } };
+      cb.onclick = () => { const k = ci.value.trim().toUpperCase(); { const hid = L.heroCheck && L.heroCheck(k); if (hid) { L.heroUnlock(hid, k); charApp.special = 'h_' + hid; charApp.hk = L.heroToken(hid); L.persist(); renderCharOpts(); rebuildPreview(); return; } } if (L.baerCheck && L.baerCheck(k)) { L.save.baerKey = k; charApp.special = 'baer'; charApp.bk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); return; } if (L.titanCheck && L.titanCheck(k)) { L.save.titanKey = k; charApp.special = 'titan'; charApp.tk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); return; } if (L.hash53(L.hash53(k)) === 'ofaw0xb94x') { L.save.skinKey = k; charApp.special = 'waechter'; charApp.wk = L.hash53(k); L.persist(); renderCharOpts(); rebuildPreview(); } else { ci.value = ''; ci.placeholder = '❌ falscher Code'; } };
       cd.appendChild(ci); cd.appendChild(cb); box.appendChild(cd); }
     for (const key in L.CHAR_OPTS) {
       const d = document.createElement('div'); d.className = 'opt';

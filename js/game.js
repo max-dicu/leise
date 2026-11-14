@@ -83,18 +83,26 @@
   // Bosse gelten nur dort, wo sie sind: auf einer Insel zählt nur der Insel-Boss, daheim nur MAMA IVA & Co.
   const homeBossOn = () => !!((L.boss && !L.boss.dead) || L.wboss || L.frenzy);
   const onIsl = (x, z) => !!((L.islandAt && L.islandAt(x, z)) || L.inDim(x));
+  // in welcher Welt liegt (x, z)? Monster jagen nur Spieler in derselben Welt
+  const worldOf = (x, z) => { if (L.inBack && L.inBack(x)) return 'back'; if (L.inTitan && L.inTitan(x, z)) return 'titan'; if (L.inMoon && L.inMoon(x)) return 'moon'; if (L.inDim(x)) return 'dim'; const I = L.islandAt && L.islandAt(x, z); return I ? I.id : 'home'; };
+  L.worldOf = worldOf;
+  const atHome = (p) => worldOf(p.x, p.z) === 'home';
+  L.atHome = () => atHome(P);
+  // Ort für Heimat-Bosse: neben einem Spieler, der gerade in der Heimat ist – sonst irgendwo in der Heimat
+  function homeAnchor() { for (const p of players()) if (atHome(p)) return p; return { x: L.rand(-900, 900), z: L.rand(-900, 900) }; }
   const bossAt = (x, z) => (onIsl(x, z) ? !!(L.islandBoss && L.islandBoss.active && !L.inDim(x)) : homeBossOn());
   const bossOn = () => bossAt(P.x, P.z);
   L.bossOn = bossOn; L.onIsl = onIsl;
   const isSneak = (p) => (p === P ? (P.stance !== 'stand' && !P.vehicle) : (p.stance !== 'stand' && !p.inVeh));
   function hiddenFrom(p, d, near) {
+    if (p === P && L.heroInvis && L.heroInvis()) return true;
     if (!bossAt(p.x, p.z) || !isSneak(p)) return false;
     const st = p === P ? (P.sneakT || 0) : (p.sneakT === undefined ? 9 : p.sneakT);
     return !(d < (near || 2.5) && st < 0.9);
   }
   L.hiddenFrom = (p, d, near) => hiddenFrom(p, d, near);
-  function nearestSeen(x, z, near) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (hiddenFrom(p, d, near)) continue; if (d < bd) { bd = d; best = p; } } return [best, bd]; }
-  function nearestPlayer(x, z) { let best = null, bd = 1e9; for (const p of players()) { const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
+  function nearestSeen(x, z, near) { let best = null, bd = 1e9; const w = worldOf(x, z); for (const p of players()) { if (worldOf(p.x, p.z) !== w) continue; const d = L.dist(x, z, p.x, p.z); if (hiddenFrom(p, d, near)) continue; if (d < bd) { bd = d; best = p; } } return [best, bd]; }
+  function nearestPlayer(x, z) { let best = null, bd = 1e9; const w = worldOf(x, z); for (const p of players()) { if (worldOf(p.x, p.z) !== w) continue; const d = L.dist(x, z, p.x, p.z); if (d < bd) { bd = d; best = p; } } return [best, bd]; }
   function hurtRemote(r, dmg, cause, kx, kz, ky, sneak) { L.mp.sendTo(r.pid, { t: 'hurt', dmg, cause, kx, kz, ky, sneak }); }
   function hurtAny(t, dmg, cause) { if (t === P) L.hurtPlayer(dmg, cause); else if (isRemote(t)) hurtRemote(t, dmg, cause); }
   function dps(t, dmg, cause) {
@@ -247,6 +255,8 @@
     if (L.islandTargets) for (const e of L.islandTargets()) a.push(e);
     if (L.bernTarget) { const b = L.bernTarget(); if (b) a.push(b); }
     if (L.extraTargets) for (const e of L.extraTargets()) a.push(e);
+    if (L.seaTargets) for (const e of L.seaTargets()) a.push(e);
+    if (L.titanTargets) for (const e of L.titanTargets()) a.push(e);
     for (const r of remotesList()) if (r.inRound && r.alive && !r.gone && !r.inVeh) a.push(r);
     return a;
   }
@@ -254,6 +264,7 @@
   const visChain = (o) => { while (o) { if (!o.visible) return false; o = o.parent; } return true; };
   function meshHit(e, o, d, minT, far) {
     const root = e.rig && e.rig.root; if (!root || !root.visible) return null;
+    root.updateMatrixWorld(true);
     RC.set(o, d); RC.near = minT; RC.far = far; RC.camera = L.camera;
     let hits; try { hits = RC.intersectObject(root, true); } catch (er) { return null; }
     for (const h of hits) {
@@ -285,6 +296,8 @@
     }
     // Gebäude oder Boden davor?
     let groundT = d.y < 0 ? -o.y / d.y : 1e9;
+    // in der Dimension / auf dem Mond gibt es nur dort Boden, wo Land ist (sonst Leere)
+    if (groundT < 1e9 && L.inDim(o.x) && !(L.dimLand && L.dimLand(o.x + d.x * groundT, o.z + d.z * groundT))) groundT = 1e9;
     for (let t = minT; t < Math.min(bt, groundT); t += 1.2) {
       const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
       if (L.blockedAt(x, y, z)) return { ent: null, t, wall: true };
@@ -297,6 +310,7 @@
   L.hurtPlayer = function (dmg, cause, fx, fz) {
     if (L.suitOn && L.suitOn()) return;
     if (L.titanOn && L.titanOn()) dmg *= 0.3;
+    if (L.heroDmgMul) dmg *= L.heroDmgMul();
     if (!P.alive || dmg <= 0 || L.cine) return;
     P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
     L.snd.hurt(); L.shake = Math.min(1.2, L.shake + dmg / 60);
@@ -319,6 +333,8 @@
     if (e.kind === 'iboss' || e.kind === 'nmin') { if (L.islandHit) L.islandHit(e, dmg, src); return; }
     if (e.kind === 'bern') { if (L.bernHit) L.bernHit(dmg, src); return; }
     if (e.kind === 'carolina') { if (L.carolinaHit) L.carolinaHit(dmg, src); return; }
+    if (e.kind === 'seamon') { if (L.seaHit) L.seaHit(e, dmg, src); return; }
+    if (e.kind === 'thanatos') { if (L.thanatosHit) L.thanatosHit(dmg, src); return; }
     if (e.kind === 'remote') { if (src === P) { L.mp.sendTo(e.pid, { t: 'pvp', dmg, by: (L.save.char || {}).name || 'Mitspieler' }); L.blood(e.x, e.y + 1.2, e.z, 10); } return; }
     if (isClient()) { if (src === P) L.mp.send({ t: 'dmg', id: e.key, dmg }); L.blood(e.x, e.kind === 'walker' ? e.hy : 1.5, e.z, 6); return; }
     e.hp -= dmg;
@@ -356,7 +372,7 @@
   function queueRespawn(e) {
     if (e.noRespawn || !MK[e.kind]) return;
     const g = grp(e);
-    L.respawnQueue.push({ kind: e.kind, variant: e.variant, isl: g, t: L.rand(40, 80) });
+    L.respawnQueue.push({ kind: e.kind, variant: e.variant, isl: g, t: L.rand(20, 40) });
     const anyAlive = E.monsters.some((m) => !m.dead && MK[m.kind] && grp(m) === g);
     if (!anyAlive) {
       for (const q of L.respawnQueue) if (q.isl === g) q.t = Math.min(q.t, 6);
@@ -371,6 +387,7 @@
       if (I) { const a = Math.random() * 6.28, d = 60 + Math.sqrt(Math.random()) * Math.max(10, I.r - 90); x = I.x + Math.sin(a) * d; z = I.z + Math.cos(a) * d; }
       else { x = L.rand(-1400, 1400); z = L.rand(-1400, 1400); if (L.inTower(x, z, 6)) continue; }
       if (L.queryBoxes(x, z, 1.5).length) continue;
+      if (!I && (L.mountainH(x, z) > 0.2 || L.waterDepth(x, z) > 0.3)) continue;
       if (!I && L.inMil && L.inMil(x, z, 15)) continue;
       if (pl.some((p) => p && L.dist(x, z, p.x, p.z) < 110)) continue;
       return [x, z];
@@ -519,6 +536,8 @@
     P.rig = L.buildHuman(L.save.char || L.DEFAULT_CHAR);
     L.scene.add(P.rig.root);
     if (L.suitOn()) { P.hot[1] = { type: 'donneraxt', count: 1, mag: 1 }; P.bag = new Array(75).fill(null); }
+    if (L.heroStart) L.heroStart();
+    if (L.gauntletStart) L.gauntletStart();
     if (L.titanOn()) { P.hot[1] = { type: 'repulsor', count: 1, mag: 1 }; P.hot[2] = { type: 'schulterkanone', count: 1, mag: 1 }; P.hot[3] = { type: 'minirakete', count: 1, mag: 1 }; P.hot[4] = { type: 'brustlaser', count: 1, mag: 1 }; }
   }
   function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
@@ -621,7 +640,7 @@
       for (let i = 0; i < 5; i++) if (L.hit('Digit' + (i + 1))) L.selectSlot(i);
     }
     // 🛡️ Fliegen – nur mit dem freigeschalteten Wächter-Skin. V = abheben / landen
-    const canFly = !!(L.suitOn() || L.titanOn());
+    const canFly = !!(L.suitOn() || L.titanOn() || (L.heroFly && L.heroFly()));
     if (!canFly) P.flying = false;
     if (!block && canFly && L.hit('KeyV')) {
       if (!P.flying) { P.flying = 1; P.vy = 6; P.air = false; P.stance = 'stand'; L.msg('🦸 Du fliegst! Leertaste = hoch · C = runter · Shift = schnell · V = landen', 4000); L.snd.teleport && L.snd.teleport({ x: P.x, y: P.y + 1, z: P.z }); }
@@ -645,7 +664,8 @@
     if (P.aiming && P.mode === 'walk') spd = 2.6;
     const weed = weeds.length && L.inWeed(P.x, P.z);
     if (weed) spd *= 0.6;
-    if (P.swim) { spd = Math.min(spd, 2.3); P.stance = 'stand'; }
+    if (L.heroSpeed) spd *= L.heroSpeed();
+    if (P.swim) { spd = Math.min(spd, 2.3) * (L.heroSwim ? L.heroSwim() : 1); P.stance = 'stand'; }
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw);
     let mx = sy * fIn - cy * rIn, mz = cy * fIn + sy * rIn;
     const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
@@ -671,7 +691,7 @@
       if (!(P.curT > 0)) { P.curT = 6; L.msg('🌊 Die Strömung ist zu stark – sie drückt dich zurück zur Küste.', 3000); }
     }
     P.curT = (P.curT || 0) - dt;
-    if (!block && !P.swim && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2; P.air = true; P.stam -= 8; P.stance = 'stand'; }
+    if (!block && !P.swim && L.hit('Space') && !P.air && P.stance !== 'crawl' && P.stam > 8) { P.vy = 6.2 * (L.heroJump ? L.heroJump() : 1); P.air = true; P.stam -= 8; P.stance = 'stand'; }
     // Schwerkraft – Boden: an Land 0, am Strand der Sand, im tiefen Wasser schwimmt man oben
     let sf = L.seaFloor(P.x, P.z);
     const bf = L.floorAt ? L.floorAt(P.x, P.z, P.y || 0) : null;
@@ -679,7 +699,12 @@
     { const mh = L.mountainH(P.x, P.z); if (mh > sf) sf = mh; } // auf Bergen stehen statt hineinfallen
     const depth = L.WATER_Y - sf;
     P.swim = depth > 1.35 && !L.inDim(P.x);
-    const gY = P.swim ? L.WATER_Y - 1.25 : sf;
+    const wt = performance.now() / 1000, wv = P.swim && !L.inDim(P.x) ? L.waveH(P.x, P.z, wt) : 0;
+    const gY = P.swim ? L.WATER_Y - 1.25 + wv : sf;
+    if (P.swim && !L.inDim(P.x) && !(L.underwaterDive)) {
+      const gx = L.waveH(P.x + 1.5, P.z, wt) - L.waveH(P.x - 1.5, P.z, wt), gz = L.waveH(P.x, P.z + 1.5, wt) - L.waveH(P.x, P.z - 1.5, wt);
+      P.x -= gx * 2.2 * dt; P.z -= gz * 2.2 * dt; // die Welle schiebt dich ihren Hang hinunter – hin und her
+    }
     // 🤿 mit Taucheranzug: frei tauchen (C runter, Leertaste hoch), kein Ertrinken
     if (P.swim && L.hasDiveSuit && L.hasDiveSuit()) {
       const upK = !block && L.keys.Space, dnK = !block && (L.keys.KeyC || L.keys.ControlLeft);
@@ -700,7 +725,7 @@
           const dmg = Math.max(0, (hs - 5) * 1.6) + Math.max(0, (impact - 8) * 2);
           if (dmg > 0) L.hurtPlayer(dmg, P.ejected ? 'Durch die Windschutzscheibe geflogen' : 'Hart aufgeschlagen');
           P.knockT = 0.9; P.tumble = 0; P.ejected = false;
-        } else if (impact > 13) L.hurtPlayer((impact - 13) * 4, 'Gestürzt');
+        } else if (impact > 13 * (L.heroJump ? Math.max(1, L.heroJump()) : 1) && !(L.heroNoFall && L.heroNoFall())) L.hurtPlayer((impact - 13) * 4, 'Gestürzt');
       }
     }
     // Umfallen dreht nur in der Luft weiter – am Boden (oder nach dem Fliegen) sofort beenden
@@ -891,7 +916,8 @@
       if (e.kind === 'walker' || e.kind === 'boss') continue;
       const dx = e.x - P.x, dz = e.z - P.z, d = Math.hypot(dx, dz);
       if (e.kind === 'bern') continue;
-      if (d > 2.6 + (e.bigR || 0) || (dx * fx + dz * fz) / (d || 1) < 0.3) continue;
+      const bigR = e.bigR || (e.kind === 'walker' ? 7 : e.kind === 'rufer' ? 1.5 : e.kind === 'wboss' ? (e.S || 9) * 0.8 : e.kind === 'boss' ? 8 : e.kind === 'seamon' ? (e.g ? 3 : 14) : 0);
+      if (d > 2.6 + bigR || (dx * fx + dz * fz) / (d || 1) < 0.3) continue;
       const sneak = (P.stance !== 'stand') && (e.state === 'wander' || e.state === 'search' || e.state === 'idle');
       const dmg = sneak ? 90 : 34;
       if (sneak) L.msg('🔨 Schleich-Angriff! (x2,6 Schaden)');
@@ -1670,8 +1696,10 @@
     if (m.dead) {
       m.deadT += dt;
       D.anim(rig, { mode: 'dead' });
-      rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
-      return m.deadT < 45;
+      // Leiche versinkt nach 8 s im Boden und verschwindet – das Monster kommt woanders neu
+      rig.root.position.set(m.x, -Math.max(0, m.deadT - 8) * 0.8, m.z); rig.root.rotation.set(0, m.yaw, 0);
+      if (m.deadT > 8 && m.deadT - dt <= 8 && dP < 60) L.fx('#5a4630', m.x, 0.3, m.z, 8, 2, { size: 0.4, life: 1.2 });
+      return m.deadT < 12;
     }
     // weit weg: grob und selten rechnen
     if (dN > 450 && !L.frenzy) {
@@ -2136,26 +2164,27 @@
     const rig = L.buildKoloss(); L.scene.add(rig.root);
     // bleibt bis zum Ende ihres Zeitfensters (Fusion und Aufsteigen abgezogen)
     const stay = Math.max(30, (left || L.BOSS_STAY) - L.FUSION_T - 9);
-    const fromMountain = !L.curIsland && L.mountains && L.mountains.length && Math.random() < 0.5;
+    const A = homeAnchor();
+    const fromMountain = L.mountains && L.mountains.length && Math.random() < 0.5;
     let x, z;
     if (fromMountain) {
       // hinter dem Berg, der dem Spieler am nächsten ist (vom Spieler aus gesehen dahinter)
-      const m = L.mountains.slice().sort((p, q) => L.dist(p.x, p.z, P.x, P.z) - L.dist(q.x, q.z, P.x, P.z))[0];
-      const a = Math.atan2(m.x - P.x, m.z - P.z);
+      const m = L.mountains.slice().sort((p, q) => L.dist(p.x, p.z, A.x, A.z) - L.dist(q.x, q.z, A.x, A.z))[0];
+      const a = Math.atan2(m.x - A.x, m.z - A.z);
       // auf dem hinteren Hang: so ragen Kopf und Schultern beim Aufsteigen über den Gipfel
       x = L.clamp(m.x + Math.sin(a) * m.r * 0.4, -1485, 1485); z = L.clamp(m.z + Math.cos(a) * m.r * 0.4, -1485, 1485);
     } else {
       // aus dem Boden, 220–350 m vom Spieler entfernt
-      x = P.x + 260; z = P.z;
+      x = L.clamp(A.x + 260, -1400, 1400); z = L.clamp(A.z, -1400, 1400);
       for (let k = 0; k < 40; k++) {
-        const a = Math.random() * 6.28, d = L.rand(220, 350), tx = P.x + Math.sin(a) * d, tz = P.z + Math.cos(a) * d;
+        const a = Math.random() * 6.28, d = L.rand(220, 350), tx = A.x + Math.sin(a) * d, tz = A.z + Math.cos(a) * d;
         if (Math.abs(tx) < 1450 && Math.abs(tz) < 1450 && L.mountainH(tx, tz) === 0) { x = tx; z = tz; break; }
       }
     }
     const how = fromMountain ? "berg" : "boden";
-    const b = { kind: "boss", rig, x, z, yaw: 0, hy: 30, hp: 8000, t: 0, life: stay, tx: P.x + L.rand(-150, 150), tz: P.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: true, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3,
+    const b = { kind: "boss", rig, x, z, yaw: 0, hy: 30, hp: 8000, t: 0, life: stay, tx: A.x + L.rand(-150, 150), tz: A.z + L.rand(-150, 150), stompT: 0, stompCd: 0, beamT: 0, beamCd: 4, leaving: true, dead: false, deadT: 0, aimX: 0, aimZ: 0, roarT: 3,
       how, emerge: -L.FUSION_T, emergeDur: fromMountain ? 9 : 8, rootY: fromMountain ? -50 : -62, startY: fromMountain ? -50 : -62, sinking: 0 };
-    b.yaw = Math.atan2(P.x - b.x, P.z - b.z);
+    b.yaw = Math.atan2(A.x - b.x, A.z - b.z);
     // jedes Mal schneller und stärker – bis man stirbt
     const lvl = Math.min(10, L.save.ivaLvl || 0);
     L.save.ivaLvl = lvl + 1; L.persist();
@@ -2439,6 +2468,7 @@
   // Effekte beim Erscheinen (auch auf den Geräten der Mitspieler)
   L.bossAppear = function (b) {
     L.towerRestore();
+    if (!atHome(P)) { L.fusionStart(b.x, b.z); L.msg('📡 In der Heimat ist MAMA IVA aufgetaucht – hier bei dir ist es sicher.', 5000); return; }
     if (b.instant) { L.banner("MAMA IVA IST DA", "Nur noch 30 Sekunden – bleib leise im Turm!"); L.snd.bossRoar({ x: b.x, y: 40, z: b.z }); return; }
     // erst verschmelzen alle Monster zu MAMA IVA, dann steigt sie auf
     L.fusionStart(b.x, b.z);
@@ -2627,14 +2657,15 @@
   }
   function spawnGiantBoss(type, left) {
     const G0 = GBT[type], rig = G0.build(); rig.root.scale.setScalar(G0.S); L.scene.add(rig.root);
-    let x = P.x + 260, z = P.z;
+    const A = homeAnchor();
+    let x = L.clamp(A.x + 260, -1400, 1400), z = L.clamp(A.z, -1400, 1400);
     for (let k = 0; k < 40; k++) {
-      const a = Math.random() * 6.28, d = L.rand(220, 330), tx = P.x + Math.sin(a) * d, tz = P.z + Math.cos(a) * d;
+      const a = Math.random() * 6.28, d = L.rand(220, 330), tx = A.x + Math.sin(a) * d, tz = A.z + Math.cos(a) * d;
       if (Math.abs(tx) < 1400 && Math.abs(tz) < 1400 && L.mountainH(tx, tz) === 0 && !L.inTower(tx, tz, 60)) { x = tx; z = tz; break; }
     }
     const lvl = Math.min(10, L.save[G0.lvl] || 0);
     L.save[G0.lvl] = lvl + 1; L.persist();
-    const w = { kind: 'wboss', key: 'wboss', type, rig, S: G0.S, x, z, yaw: Math.atan2(P.x - x, P.z - z), hp: G0.hp * (1 + lvl * 0.3), life: Math.max(30, (left || 600) - 8), lvl,
+    const w = { kind: 'wboss', key: 'wboss', type, rig, S: G0.S, x, z, yaw: Math.atan2(A.x - x, A.z - z), hp: G0.hp * (1 + lvl * 0.3), life: Math.max(30, (left || 600) - 8), lvl,
       spdMul: 1 + lvl * 0.15, dmgMul: 1 + lvl * 0.25, emerge: 0, rootY: -G0.S * 3.2, tx: x, tz: z, slamT: 0, slamCd: 3, roarT: 4, ph: 0, leaving: true, towerAtk: false, dead: false, hy: G0.S * 1.2 };
     L.byId.set('wboss', w);
     L.wboss = w; L.frenzy = true;
@@ -2646,6 +2677,7 @@
     const G0 = GBT[w.type || 'walross'];
     L.towerRestore();
     const lv = (w.lvl || 0) + 1;
+    if (!atHome(P)) { L.msg('📡 In der Heimat ist ' + G0.name + ' aufgetaucht – hier bei dir ist es sicher.', 5000); return; }
     L.banner(G0.name + ' – STUFE ' + lv, (lv > 1 ? 'Schneller und stärker als letztes Mal! ' : '') + 'Alle Monster drehen durch! Schaff es zum 🗼 TURM in der Stadtmitte!');
     G0.voice({ x: w.x, y: 10, z: w.z });
     const a0 = Math.atan2(P.x - w.x, P.z - w.z);
@@ -2881,7 +2913,7 @@
   // ---------- Runde ----------
   L.respawnQueue = [];
   function clearAll() {
-    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); if (L.clearWeapons) L.clearWeapons(); if (L.clearLegend) L.clearLegend(); if (L.clearFireworks) L.clearFireworks(); if (L.clearEvents) L.clearEvents(); if (L.clearCarolina) L.clearCarolina(); if (L.clearBackrooms) L.clearBackrooms(); if (L.clearAsgard) L.clearAsgard(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
+    clearCyls(); if (L.clearExtras) L.clearExtras(); if (L.clearWorkshop) L.clearWorkshop(); if (L.clearRevive) L.clearRevive(); if (L.clearInteriors) L.clearInteriors(); if (L.clearIslands) L.clearIslands(); if (L.clearIslandBosses) L.clearIslandBosses(); if (L.clearDimBoss) L.clearDimBoss(); if (L.clearPolice) L.clearPolice(); if (L.clearCrates) L.clearCrates(); if (L.clearMoon) L.clearMoon(); if (L.clearTentacles) L.clearTentacles(); if (L.clearSuitPortals) L.clearSuitPortals(); if (L.clearWeapons) L.clearWeapons(); if (L.clearLegend) L.clearLegend(); if (L.clearFireworks) L.clearFireworks(); if (L.clearEvents) L.clearEvents(); if (L.clearCarolina) L.clearCarolina(); if (L.clearBackrooms) L.clearBackrooms(); if (L.clearHeroes) L.clearHeroes(); if (L.clearTitan) L.clearTitan(); if (L.clearAsgard) L.clearAsgard(); L.voyageOn = false; if (L.clearOcean) L.clearOcean(); if (L.clearNature) L.clearNature(); if (L.endRichard) L.endRichard(); if (L.endDuel) L.endDuel();
     if (L.wboss) { L.scene.remove(L.wboss.rig.root); L.wboss = null; }
     for (const m of E.monsters) L.scene.remove(m.rig.root);
     for (const w of E.walkers) L.scene.remove(w.rig.root);
@@ -3110,7 +3142,7 @@
       R.nextBoss = R.nextBossType === 'iva' ? 'MAMA IVA' : GBT[R.nextBossType].name;
       if (K.pause) {
         R.bossT = K.left;
-        if (R.bossT < 30 && !R.warned) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt ' + R.nextBoss + '.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
+        if (R.bossT < 30 && !R.warned && atHome(P)) { R.warned = true; L.banner('DER BODEN BEBT ...', 'In 30 Sekunden kommt ' + R.nextBoss + '.'); L.snd.horn({ x: P.x + 400, y: 50, z: P.z }); }
       } else if (L.ivaDone !== K.idx && K.left > 25) {
         R.warned = false;
         const bt = ['iva', 'viktor', 'walross', 'daniel'][K.idx % 4];
@@ -3161,6 +3193,8 @@
     L.updateInteriors(dt);
     if (L.updateAsgard) L.updateAsgard(dt);
     if (L.updateBackrooms) L.updateBackrooms(dt);
+    if (L.updateHeroes) L.updateHeroes(dt);
+    if (L.updateTitan) L.updateTitan(dt);
     L.updateExtras(dt);
     if (L.updateWorkshop) L.updateWorkshop(dt);
     if (L.updateRevive) L.updateRevive(dt);

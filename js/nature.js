@@ -124,8 +124,9 @@
     g.rotation.y = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : Math.PI;
     tsu = { side, t: -TSU_WARN, g, wall, front, foam, hitT: 0 };
     const name = ['Westen', 'Osten', 'Süden'][side];
-    L.banner('🌊 TSUNAMI-WARNUNG', `Eine Riesenwelle rollt aus dem ${name} über die ganze Karte! Rette dich in den 🗼 Turm, flieg mit dem T10 hoch oder setz dich ins Auto!`);
-    for (let k = 0; k < 6; k++) setTimeout(() => L.snd.alarm({ x: P.x, y: 5, z: P.z }), k * 1300);
+    tsu.warned = !(L.atHome && !L.atHome() && !L.curIsland);
+    if (tsu.warned) L.banner('🌊 TSUNAMI-WARNUNG', `Eine Riesenwelle rollt aus dem ${name} über die ganze Karte! Rette dich in den 🗼 Turm, flieg mit dem T10 hoch oder setz dich ins Auto!`);
+    if (tsu.warned) for (let k = 0; k < 6; k++) setTimeout(() => L.snd.alarm({ x: P.x, y: 5, z: P.z }), k * 1300);
     if (send && isHost()) L.mp.send({ t: 'tsu', side });
   };
   // Abstand der Wellenfront von der Kartenmitte (vom Meer aus nach innen)
@@ -152,7 +153,8 @@
     // Mesh: Welle steht quer zur Seite, Wasser dahinter bis zum Meer
     const depthBehind = Math.min(L.FAR + 300 - front, front > 1500 ? 1e9 : 90);
     const g = S.g;
-    g.visible = S.t > -2;
+    g.visible = S.t > -2 && !L.inDim(L.camera.position.x);
+    if (!S.warned && L.atHome && L.atHome() && S.t < 10) { S.warned = true; L.banner('🌊 TSUNAMI!', 'Eine Riesenwelle rollt gerade über die Heimat – rette dich in den 🗼 Turm oder nach oben!'); }
     const cx = S.side === 0 ? -front : S.side === 1 ? front : 0, cz = S.side === 2 ? front : 0;
     g.position.set(cx, 0, cz);
     S.wall.scale.set(1, Math.max(0.1, h), depthBehind / 40); S.wall.position.set(0, h / 2 + L.WATER_Y, -depthBehind / 2);
@@ -164,11 +166,11 @@
     // Rauschen
     S.hitT -= dt;
     const pc = coordOf(S.side, P.x, P.z), dist = pc - front;
-    if (S.hitT <= 0) { S.hitT = 0.4; if (Math.abs(dist) < 500) { L.nz({ dur: 0.9, f: 400, type: 'lowpass', vol: 0.6 * (1 - Math.abs(dist) / 500), ref: 30 }); L.shake = Math.max(L.shake, (1 - Math.abs(dist) / 500) * 0.8); } }
+    if (S.hitT <= 0 && !L.inDim(P.x)) { S.hitT = 0.4; if (Math.abs(dist) < 500) { L.nz({ dur: 0.9, f: 400, type: 'lowpass', vol: 0.6 * (1 - Math.abs(dist) / 500), ref: 30 }); L.shake = Math.max(L.shake, (1 - Math.abs(dist) / 500) * 0.8); } }
     // Wirkung: alles, was die Welle erwischt (hinter der Front, unter der Wellenhöhe)
     const hit = (x, z, y) => { const c = coordOf(S.side, x, z); return c > front - 4 && c < front + 60 && (y || 0) < h + L.WATER_Y && !(L.towerSafe && L.towerSafe() && L.inTower(x, z)); };
     const dir = S.side === 0 ? [1, 0] : S.side === 1 ? [-1, 0] : [0, -1];
-    if (P.alive && !P.gone && hit(P.x, P.z, P.y)) {
+    if (P.alive && !P.gone && !L.inDim(P.x) && hit(P.x, P.z, P.y)) {
       const v = P.vehicle;
       if (v && !(P.seat > 0)) { v.x += dir[0] * 14 * dt; v.z += dir[1] * 14 * dt; v.speed *= 0.9; }
       else if (!v) { P.vx = dir[0] * 14; P.vz = dir[1] * 14; P.knockT = 0.5; }

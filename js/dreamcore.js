@@ -4,7 +4,7 @@
 (function () {
   const L = window.L, T = THREE, P = L.player;
   let done = false, sky = null, eyes = [], clouds = null, props = null;
-  const inDream = (x) => L.inDim(x) && !(L.inMoon && L.inMoon(x)) && !(L.inBack && L.inBack(x));
+  const inDream = (x) => L.inDim(x) && !(L.inMoon && L.inMoon(x)) && !(L.inBack && L.inBack(x)) && !(L.inTitan && L.inTitan(x, L.camera ? L.camera.position.z : 0));
   function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); return t; }
   const checker = (a, b) => { const t = canvasTex(64, 64, (g) => { g.fillStyle = a; g.fillRect(0, 0, 64, 64); g.fillStyle = b; g.fillRect(0, 0, 32, 32); g.fillRect(32, 32, 32, 32); }); t.wrapS = t.wrapT = T.RepeatWrapping; t.magFilter = T.NearestFilter; return t; };
   const PASTEL = ['#ffb8d8', '#b8d8ff', '#d8b8ff', '#b8ffe0', '#fff0a8', '#ffd0b0'];

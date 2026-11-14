@@ -90,9 +90,9 @@
   L.hasDiveSuit = () => [P.hot, P.bag].some((a) => a && a.some((it) => it && it.type === 'taucheranzug'));
   // beim Rundenstart (nur der Host): Anzüge oben auf den Turm legen – einer pro Spieler
   L.spawnDiveSuits = function () {
-    const n = Math.min(4, 1 + (L.remotes ? [...L.remotes.values()].filter((r) => r.inRound || r.got !== undefined).length : 0));
+    // immer alle 4 in einer Reihe ganz oben auf dem Turm, direkt neben dem Wächter
     const T0 = L.TOWER;
-    for (let k = 0; k < n; k++) L.spawnItem('taucheranzug', T0.x - 3 + k * 2, T0.z + 2, 1, undefined, undefined, undefined, T0.h);
+    for (let k = 0; k < 4; k++) L.spawnItem('taucheranzug', T0.x + 2.5 + k * 1.6, T0.z + 9.5, 1, undefined, undefined, undefined, T0.h);
   };
   // jede Runde neu: alte Anzüge aus dem Inventar und dem Versteck entfernen
   L.stripDiveSuits = function () {

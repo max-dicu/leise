@@ -62,6 +62,9 @@
     add(belly, L.GEO.sph, skin, 0.42, 0.36, 0.34, 0, -0.08, 0.1); add(belly, L.GEO.sph, skin, 0.36, 0.26, 0.3, 0, -0.3, 0.12);
     add(belly, L.GEO.sph, L.mat('#c8a898'), 0.03, 0.03, 0.02, 0, -0.1, 0.43);
     r.belly = belly;
+    // Maul (für die Fress-Szene)
+    r.maw = add(r.head, L.GEO.sph, L.mat('#3a0408'), 0.001, 0.001, 0.001, 0, 0.03, 0.15);
+    for (let k = 0; k < 6; k++) { const tt = add(r.maw, L.GEO.cone, L.mat('#f0ece0'), 0.12, 0.35, 0.12, (k - 2.5) * 0.32, 0.75, 0.5); tt.rotation.x = Math.PI; }
     // breite Hüften, Nietengürtel
     add(r.hips, L.GEO.sph, blk, 0.44, 0.22, 0.32, 0, -0.02, 0);
     for (let k = 0; k < 10; k++) { const a = k / 10 * 6.283; add(r.hips, L.GEO.sph, L.mat('#c8c8d0'), 0.025, 0.025, 0.025, Math.sin(a) * 0.43, 0.08, Math.cos(a) * 0.31); }
@@ -109,6 +112,7 @@
     if (!C) return;
     const M = L.MIL, rig = C.rig;
     if (C.dead) { C.deadT += dt; L.animHuman(rig, { mode: 'dead' }); rig.root.position.set(C.x, 0, C.z); if (C.deadT > 240) { L.scene.remove(rig.root); spawnC(); } return; }
+    if (C.eat) { updateEat(dt); return; }
     C.t += dt; C.cd -= dt; C.growlT -= dt; C.rage = Math.max(0, (C.rage || 0) - dt);
     // nur in der Nähe aktiv rechnen
     const dP = Math.hypot(P.x - C.x, P.z - C.z);
@@ -133,8 +137,8 @@
       C.cd = 1.2; C.yaw = Math.atan2(P.x - C.x, P.z - C.z); L.shake = Math.max(L.shake, 1);
       L.snd.stomp && L.snd.stomp({ x: C.x, y: 1, z: C.z });
       if (P.vehicle && L._leaveVehicle && !(L.suitOn && L.suitOn())) L._leaveVehicle(true);
-      L.hurtPlayer(99999, 'Die wahre Carolina hat dich gefunden');
-      if (P.alive && L.suitOn && L.suitOn()) L.msg('🛡️ Carolina schlägt zu – aber der Anzug hält.', 2000);
+      if (L.suitOn && L.suitOn()) L.msg('🛡️ Carolina schlägt zu – aber der Anzug hält.', 2000);
+      else startEat();
     }
     // Aussehen
     C.ph += dt * (C.state === 'chase' ? 4.2 : 2.2);
@@ -144,6 +148,49 @@
     // schwere Schritte
     C.stepT -= dt * (C.state === 'chase' ? 1.4 : 0.7);
     if (C.stepT <= 0 && C.state !== 'search') { C.stepT = 0.9; if (dP < 90) { L.tn && L.tn({ f: 55, fTo: 30, dur: 0.35, vol: Math.max(0.03, 0.3 * (1 - dP / 60)), pos: { x: C.x, y: 0, z: C.z } }); if (dP < 30) L.shake = Math.max(L.shake, 0.08 * (1 - dP / 30)); } }
+  }
+  // ---------- Fress-Szene ----------
+  const ease = (u) => { u = L.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+  function startEat() {
+    C.eat = { t: 0, cam: { x: 0, y: 0, z: 0, lx: 0, ly: 0, lz: 0 }, from: { x: P.x, y: P.y || 0, z: P.z } };
+    P.vx = P.vz = 0;
+    L.startCine('🖤 DIE WAHRE CAROLINA HAT DICH', 4.2, () => (C && C.eat ? C.eat.cam : null));
+    if (!L.cine) { C.eat = null; L.hurtPlayer(99999, 'Die wahre Carolina hat dich gefunden'); return; }
+    L.snd.scream && L.snd.scream({ x: P.x, y: 2, z: P.z });
+  }
+  function updateEat(dt) {
+    const E0 = C.eat, rig = C.rig; E0.t += dt; const t = E0.t;
+    C.yaw += L.angDiff(C.yaw, Math.atan2(E0.from.x - C.x, E0.from.z - C.z)) * Math.min(1, dt * 6);
+    rig.root.position.set(C.x, 0, C.z); rig.root.rotation.set(0, C.yaw, 0);
+    L.animHuman(rig, { mode: 'walk', phase: 0, speed: 0 });
+    const reach = ease(t / 0.7), lift = ease((t - 0.7) / 1.2);
+    for (const a of rig.arms) { a.arm.rotation.x = -1.3 * reach - 1.0 * lift; a.elbow.rotation.x = -0.4 - lift * 0.9; }
+    rig.head.rotation.x = -0.25 * ease((t - 1.6) / 0.6);
+    rig.root.updateMatrixWorld(true);
+    const hp = new T.Vector3(); rig.head.getWorldPosition(hp);
+    const fx = Math.sin(C.yaw), fz = Math.cos(C.yaw);
+    const mouth = new T.Vector3(hp.x + fx * 1.4, hp.y - 0.3, hp.z + fz * 1.4);
+    // Maul geht auf, schnappt zu, kaut
+    const open = t < 1.6 ? 0 : t < 2.4 ? ease((t - 1.6) / 0.8) : t < 2.55 ? 1 - (t - 2.4) / 0.15 : 0.25 + Math.abs(Math.sin(t * 9)) * 0.25;
+    rig.maw.scale.set(0.12 * Math.max(0.01, open), 0.15 * Math.max(0.01, open), 0.06 * Math.max(0.01, open));
+    // du wirst gepackt und hochgehoben
+    if (P.rig) {
+      const pr = P.rig.root;
+      if (t < 2.5) { pr.visible = true; pr.position.set(L.lerp(E0.from.x, mouth.x, lift), L.lerp(E0.from.y, mouth.y - 1.2, lift), L.lerp(E0.from.z, mouth.z, lift)); pr.rotation.set(-0.3 * lift, C.yaw + Math.PI, Math.sin(t * 14) * 0.25 * lift); L.animHuman(P.rig, { mode: 'tumble', tumble: 1, phase: t * 8 }); }
+      else pr.visible = false;
+    }
+    if (t > 2.5 && !E0.chomp) { E0.chomp = true; L.shake = Math.max(L.shake, 1.4); L.blood && L.blood(mouth.x, mouth.y, mouth.z, 40, true); L.snd.splat && L.snd.splat({ x: mouth.x, y: mouth.y, z: mouth.z }); L.snd.stomp && L.snd.stomp({ x: C.x, y: 5, z: C.z }); }
+    if (t > 2.5 && Math.random() < dt * 10) L.blood && L.blood(mouth.x, mouth.y - 0.5, mouth.z, 3);
+    if (rig.belly) { const j = t > 2.6 ? Math.sin(t * 6) * 0.05 : 0; rig.belly.scale.set(1 + j, 1 - j, 1 + j); }
+    // Kamera: von der Seite, langsam näher
+    const side = C.yaw + Math.PI / 2, d = 26 - ease(t / 3) * 9;
+    Object.assign(E0.cam, { x: C.x + Math.sin(side) * d + fx * 6, y: hp.y * 0.75, z: C.z + Math.cos(side) * d + fz * 6, lx: L.lerp(E0.from.x, mouth.x, 0.6), ly: L.lerp(2, mouth.y, 0.7), lz: L.lerp(E0.from.z, mouth.z, 0.6) });
+    if (t > 3.9 || (!L.cine && t > 0.1)) {
+      C.eat = null; rig.maw.scale.setScalar(0.001);
+      if (L.cine && L.endCine) L.endCine();
+      L.hurtPlayer(99999, 'Die wahre Carolina hat dich gefressen');
+      if (P.rig) P.rig.root.visible = false;
+    }
   }
   L.extraTargets = () => (C && !C.dead && L.MIL ? [C] : []);
   L.carolinaHit = function (dmg, src) {

@@ -19,7 +19,7 @@
   const nameOf = (pid) => (RM.get(pid) ? RM.get(pid).name : 'Mitspieler');
   const V1 = new T.Vector3(), V2 = new T.Vector3(), V3 = new T.Vector3(), DOWN = new T.Vector3(0, -1, 0);
   // Nachrichten, die der Host von einem Mitspieler an alle anderen weiterreicht
-  const FWD = new Set(['ps', 'chat', 'venter', 'vleave', 'done', 'ready', 'shot', 'boom', 'fw', 'glass']);
+  const FWD = new Set(['ps', 'chat', 'venter', 'vleave', 'done', 'ready', 'shot', 'boom', 'fw', 'glass', 'portal', 'von', 'voff']);
 
   // ---------- Senden ----------
   function rawSend(c, o) { if (c && c.open) { try { c.send(o); } catch (e) { /* Verbindung weg */ } } }
@@ -79,7 +79,7 @@
     N.conns.delete(pid);
     const r = RM.get(pid);
     if (r) { freeRemoteVehicle(r); L.msg('⚠️ ' + r.name + ' hat das Spiel verlassen'); addChat('System', r.name + ' hat das Spiel verlassen', true); }
-    removeRemote(pid);
+    removeRemote(pid); if (L.voiceLeft) L.voiceLeft(pid);
     mp.send({ t: 'leave', pid });
     N.connected = N.conns.size > 0 || N.role === 'host';
     renderLobby();
@@ -235,11 +235,12 @@
         L.msg('✅ Verbunden – du bist Spieler ' + (m.pid + 1)); renderLobby(); break;
       case 'join':
         makeRemote(m.pid, m.app, m.name);
+        if (L.voice && L.voice.on) mp.send({ t: 'von', id: N.peer && N.peer.id });
         L.msg('👋 ' + m.name + ' ist beigetreten'); addChat('System', m.name + ' ist beigetreten', true); renderLobby(); break;
       case 'leave': {
         const r = RM.get(m.pid);
         if (r) { freeRemoteVehicle(r); L.msg('⚠️ ' + r.name + ' hat das Spiel verlassen'); addChat('System', r.name + ' hat das Spiel verlassen', true); }
-        removeRemote(m.pid); renderLobby(); break;
+        removeRemote(m.pid); if (L.voiceLeft) L.voiceLeft(m.pid); renderLobby(); break;
       }
       case 'full': status('❌ Der Raum ist voll (höchstens ' + MAXP + ' Spieler).'); break;
       case 'chat': addChat(nameOf(from), String(m.text || '').slice(0, 160), false, from); break;
@@ -351,6 +352,8 @@
       case 'msg': L.msg(String(m.text)); break;
       case 'kc': if (!host && L.gotKillCoins) L.gotKillCoins(m.n); break;
       case 'fw': if (L.fwRemote) L.fwRemote(m); break;
+      case 'portal': if (L.portalRemote) L.portalRemote(m); break;
+      case 'von': case 'voff': if (L.voiceMsg) L.voiceMsg(m, from); break;
       case 'glass': if (L.glassRemote) L.glassRemote(m.i | 0); break;
       case 'done':
         if (R) { freeRemoteVehicle(R); R.inRound = false; R.rig.root.visible = false; }
@@ -598,8 +601,10 @@
       const D = L.MK[m.kind] || L.MK.viktor;
       rig.root.visible = dP < (m.variant === 'lange' ? 300 : D.view) && now - (m.seen || 0) < 2000;
       if (m.dead) {
+        m.deadC = (m.deadC || 0) + dt;
         D.anim(rig, { mode: 'dead' });
-        rig.root.position.set(m.x, 0, m.z); rig.root.rotation.set(0, m.yaw, 0);
+        rig.root.position.set(m.x, -Math.max(0, m.deadC - 8) * 0.8, m.z); rig.root.rotation.set(0, m.yaw, 0);
+        if (m.deadC > 12) rig.root.visible = false;
         continue;
       }
       const k = Math.min(1, dt * 8);

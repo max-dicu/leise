@@ -17,9 +17,11 @@
     geist: { ring: 0x6a7a70, inner: 0xb0ffd0, deco: 'wisps', dc: '#d0ffe8', fx: '#c0ffe0', name: 'Geisterinsel' },
     oma: { ring: 0xff8fc0, inner: 0xffd0e8, deco: 'dots', dc: '#ff4f9a', fx: '#ffb7d5', name: 'Omas Garteninsel' },
     dim: { ring: 0x2a0050, inner: 0xff40d0, deco: 'crystals', dc: '#9a50ff', fx: '#ff40d0', name: 'Dimension' },
+    titan: { ring: 0xff7a20, inner: 0xffc060, deco: 'flames', dc: '#ff9a40', fx: '#ffb060', name: 'Titanenmond' },
     moon: { ring: 0xc8c8d0, inner: 0x101030, deco: 'stars', dc: '#ffffff', fx: '#ffffff', name: 'Mond' }
   };
   function worldAt(x, z) {
+    if (L.inTitan && L.inTitan(x, z)) return 'titan';
     if (L.inMoon && L.inMoon(x)) return 'moon';
     if (L.inDim(x)) return 'dim';
     const I = L.islandAt ? L.islandAt(x, z) : null;
@@ -44,15 +46,24 @@
     L.scene.add(g); return g;
   }
   let entry = null, exits = [];
+  // offene Portale (vom Anzug-Träger): alle Spieler sehen sie und können hindurchgehen
+  const open = [], LIFE = 30;
+  function openPortal(o) {
+    if (open.some((q) => q.id === o.id)) return;
+    const g = build(o.th); g.position.set(o.x, o.y, o.z); g.rotation.y = o.yaw; g.scale.setScalar(0.01);
+    open.push({ g, id: o.id, x: o.x, y: o.y, z: o.z, tx: o.tx, tz: o.tz, th: o.th, t: 0, mine: !!o.mine });
+    while (open.length > 4) { L.scene.remove(open[0].g); open.shift(); }
+  }
+  L.portalRemote = function (m) { if (THEMES[m.th]) { openPortal(m); if (Math.hypot(P.x - m.x, P.z - m.z) < 300) L.msg('🌀 Ein Portal nach ' + THEMES[m.th].name + ' hat sich geöffnet – du kannst hindurchgehen!', 3500); } };
   // Ziel festlegen und Portal vor dir öffnen
   L.suitPortalTo = function (x, z, label) {
     if (!(L.suitOn && L.suitOn()) || !P.alive) return;
     if (P.vehicle && L._leaveVehicle) L._leaveVehicle(true);
-    if (entry) L.scene.remove(entry.g);
-    const th = worldAt(x, z), g = build(th), yaw = P.camYaw, d = 4;
+    const th = worldAt(x, z), yaw = P.camYaw, d = 4;
     const px = P.x + Math.sin(yaw) * d, pz = P.z + Math.cos(yaw) * d, py = (P.y || 0) + 1.9;
-    g.position.set(px, py, pz); g.rotation.y = yaw; g.scale.setScalar(0.01);
-    entry = { g, x: px, y: py, z: pz, tx: x, tz: z, th, t: 0 };
+    const o = { t: 'portal', id: Math.floor(Math.random() * 1e9), x: px, y: py, z: pz, yaw, tx: x, tz: z, th };
+    openPortal(Object.assign({ mine: true }, o));
+    if (L.mp && L.mp.send && L.net && L.net.connected) L.mp.send(o);
     L.snd.teleport && L.snd.teleport({ x: px, y: py, z: pz });
     L.msg('🌀 Portal nach ' + (label || THEMES[th].name) + ' geöffnet – geh hindurch!', 4000);
   };
@@ -79,13 +90,16 @@
     if (Math.random() < dt * 30) { const a = Math.random() * 6.28, w = new T.Vector3(Math.cos(a) * 2.2, Math.sin(a) * 2.2, 0); g.localToWorld(w); L.fx(THEMES[u.th].fx, w.x, w.y, w.z, 2, 1.2, { basic: true, size: 0.12, life: 0.8 }); }
   }
   L.updateSuitPortals = function (dt) {
-    if (entry) {
-      const e = entry; e.t += dt;
-      e.g.scale.setScalar(Math.min(1, e.t / 0.7) * (1 + Math.sin(Math.min(1, e.t / 0.7) * Math.PI) * 0.15));
-      anim(e.g, e.t, dt);
+    for (let i = open.length - 1; i >= 0; i--) {
+      const e = open[i]; e.t += dt;
+      const grow = Math.min(1, e.t / 0.7), shrink = e.t > LIFE - 0.8 ? Math.max(0, (LIFE - e.t) / 0.8) : 1;
+      e.g.scale.setScalar(grow * shrink * (1 + Math.sin(grow * Math.PI) * 0.15));
+      e.g.visible = Math.hypot(P.x - e.x, P.z - e.z) < 2500;
+      if (e.g.visible) anim(e.g, e.t, dt);
+      e.cd = (e.cd || 0) - dt;
       const dh = Math.hypot(P.x - e.x, P.z - e.z);
-      if (e.t > 0.5 && dh < 1.7 && Math.abs((P.y || 0) + 1 - e.y) < 3.5 && P.alive) { L.scene.remove(e.g); entry = null; arrive(e); }
-      else if (e.t > 25 || !(L.suitOn && L.suitOn())) { L.scene.remove(e.g); entry = null; }
+      if (e.t > 0.5 && e.cd <= 0 && dh < 1.7 && Math.abs((P.y || 0) + 1 - e.y) < 3.5 && P.alive && !P.vehicle && !L.cine) { e.cd = 3; arrive(e); }
+      if (e.t > LIFE) { L.scene.remove(e.g); open.splice(i, 1); }
     }
     for (let i = exits.length - 1; i >= 0; i--) {
       const x = exits[i]; x.t += dt; anim(x.g, x.t, dt);
@@ -94,10 +108,11 @@
       if (s <= 0) { L.scene.remove(x.g); exits.splice(i, 1); }
     }
   };
-  L.clearSuitPortals = function () { if (entry) L.scene.remove(entry.g); entry = null; for (const x of exits) L.scene.remove(x.g); exits = []; };
+  L.clearSuitPortals = function () { for (const e of open) L.scene.remove(e.g); open.length = 0; if (entry) L.scene.remove(entry.g); entry = null; for (const x of exits) L.scene.remove(x.g); exits = []; };
   // Ziel-Knöpfe für andere Welten (nur mit Anzug, auf der Karte)
   L.suitWorldTargets = function () {
     const out = [['🏠 Heimat (Altheim)', 30, 30]];
+    if (L.TITAN) out.push(['🪐 Titanenmond', L.TITAN.x - 936, L.TITAN.z]);
     for (const I of L.ISL || []) { if (I.moon) out.push(['🌕 Mond', L.moonCheckpoint().x, L.moonCheckpoint().z]); else if (I.dim) out.push(['🌌 Dimension', L.dimCheckpoint().x, L.dimCheckpoint().z]); else out.push([I.icon + ' ' + I.name, I.x + 25, I.z + 25]); }
     return out;
   };

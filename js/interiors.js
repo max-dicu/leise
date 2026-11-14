@@ -179,8 +179,14 @@
         }
         const len = Math.hypot(S.z2 - S.z1, top - y), ang = Math.atan2(top - y, S.z2 - S.z1);
         for (const sx of [S.x1 - 0.04, S.x2 + 0.04]) { const st2 = new T.Mesh(L.GEO.box, matStringer); st2.scale.set(0.08, 0.3, len); st2.position.set(sx, y + (top - y) / 2 - 0.05, (S.z1 + S.z2) / 2); st2.rotation.x = -ang; g.add(st2); }
-        const rail = new T.Mesh(L.GEO.box, matRail); rail.scale.set(0.06, 0.06, len); rail.position.set(S.x2 + 0.06, y + (top - y) / 2 + 0.95, (S.z1 + S.z2) / 2); rail.rotation.x = -ang; g.add(rail);
-        for (let p = 0; p <= 4; p++) { const u = p / 4, post = new T.Mesh(L.GEO.boxB, matRail); post.scale.set(0.05, 0.95, 0.05); post.position.set(S.x2 + 0.06, y + u * (top - y), S.z1 + u * (S.z2 - S.z1)); g.add(post); }
+        // Geländer: bei der Treppe aufs Dach nur so weit, dass nichts aus dem Dach ragt
+        const toRoof = !(k + 1 < Ly.nf), uMax = toRoof ? Math.max(0, 1 - 1.1 / (top - y)) : 1;
+        if (uMax > 0.2) {
+          const rl = len * uMax, rail = new T.Mesh(L.GEO.box, matRail); rail.scale.set(0.06, 0.06, rl); rail.position.set(S.x2 + 0.06, y + (top - y) * uMax / 2 + 0.95, S.z1 + (S.z2 - S.z1) * uMax / 2); rail.rotation.x = -ang; g.add(rail);
+          for (let p = 0; p <= 4; p++) { const u = p / 4 * uMax, post = new T.Mesh(L.GEO.boxB, matRail); post.scale.set(0.05, 0.95, 0.05); post.position.set(S.x2 + 0.06, y + u * (top - y), S.z1 + u * (S.z2 - S.z1)); g.add(post); }
+        }
+        // Dachluke: Rahmen um die Öffnung (flach, ragt nicht hoch)
+        if (toRoof) for (const [a1, b1, a2, b2] of [[S.x1 - 0.15, S.z1 - 0.15, S.x2 + 0.15, S.z1], [S.x1 - 0.15, S.z1, S.x1, S.z2], [S.x2, S.z1, S.x2 + 0.15, S.z2]]) wallMesh(a1, b1, a2, b2, top - 0.02, top + 0.12, matRail);
       }
       // Zimmer: Wände mit Durchgängen
       const [cols, rows] = L.roomGrid(B), ch = k + 1 < Ly.nf ? Ly.fh - 0.15 : (B.h - y);

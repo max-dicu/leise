@@ -7,7 +7,7 @@
   const L = window.L, T = THREE, P = L.player;
   const X0 = 81000, SPAN = 2000, CELL = 5, CN = 8, CH = CELL * CN, PER = SPAN / CELL, CPER = SPAN / CH, NLEV = 100;
   const zc = (n) => (n - 49.5) * 2400;
-  L.inBack = (x) => x > 62000 && x < 100000;
+  L.inBack = (x) => x > 78000 && x < 84000;
   L.BACK_N = NLEV;
   setTimeout(() => { const od = L.dimLand; L.dimLand = (x, z) => (L.inBack(x) ? true : od ? od(x, z) : false); }, 0);
   const mod = (a, m) => ((a % m) + m) % m;

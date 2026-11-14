@@ -209,7 +209,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     }
     camera.lookAt(look);
     // hoch oben: weiter sehen und genauere Tiefe (sonst flimmert der Boden)
-    { const alt = Math.max(0, camera.position.y - 25), far = L.inDim(camera.position.x); camera.far = far ? 60000 : L.S().view + 1200 + alt * 3; camera.near = fp ? 0.1 : L.clamp((far ? 0.3 : 0.1) + alt * 0.004, 0.1, 1.5); }
+    { const alt = Math.max(0, camera.position.y - 25), far = L.inDim(camera.position.x); camera.far = far ? 60000 : L.S().view + 1200 + alt * 3; camera.near = fp ? 0.1 : L.clamp(Math.min((far ? 0.3 : 0.1) + alt * 0.004, (P.camDist || 4) * 0.25), 0.1, 1.5); }
     { const zf = L.weaponZoom ? L.weaponZoom() : 1, fov = 70 / zf; camera.fov += (fov - camera.fov) * Math.min(1, dt * 10); }
     camera.updateProjectionMatrix();
   }
