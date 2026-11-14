@@ -14,6 +14,41 @@
   const ease = (u) => { u = L.clamp(u, 0, 1); return u * u * (3 - 2 * u); };
   const isClientNet = () => L.net && L.net.role === 'client';
 
+  // ---------- Block-Portale (eigener Entwurf im Block-Stil) ----------
+  // 'nether': dunkle Obsidian-Blöcke, lila Wirbel · 'meer': Meeres- und Pastell-Blöcke, schimmerndes Pastell-Wasser
+  function pix(w, h, fn) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); fn(g, w, h); const t = new T.CanvasTexture(c); t.magFilter = T.NearestFilter; t.minFilter = T.NearestFilter; t.wrapS = t.wrapT = T.RepeatWrapping; return t; }
+  const rnd = (a) => a[Math.floor(Math.random() * a.length)];
+  function blockTex(cols) { return pix(16, 16, (g) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { g.fillStyle = rnd(cols); g.fillRect(x, y, 1, 1); } }); }
+  function swirlTex(cols, bubbles) { return pix(32, 64, (g, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = Math.sin(x * 0.45 + Math.sin(y * 0.2) * 2.2) + Math.sin(y * 0.3 + x * 0.12); g.fillStyle = cols[Math.max(0, Math.min(cols.length - 1, Math.floor((v + 2) / 4 * cols.length)))]; g.fillRect(x, y, 1, 1); } if (bubbles) { g.fillStyle = 'rgba(255,255,255,0.8)'; for (let k = 0; k < 14; k++) { const x = Math.random() * w | 0, y = Math.random() * h | 0; g.fillRect(x, y, 2, 2); } } }); }
+  L.blockPortal = function (style) {
+    const g = new T.Group(), BS = 2.4, nether = style === 'nether';
+    const frameMats = nether ? [new T.MeshLambertMaterial({ map: blockTex(['#120a1c', '#1a1028', '#22143a', '#140c20', '#2e1c4a']) })]
+      : [new T.MeshLambertMaterial({ map: blockTex(['#1e7a76', '#2a948a', '#4ab8a8', '#186462', '#38a898']), emissive: new T.Color('#0c4a46') }), new T.MeshLambertMaterial({ map: blockTex(['#e070a8', '#d860a0', '#f088c0', '#e878b0']), emissive: new T.Color('#4a1838') }), new T.MeshLambertMaterial({ map: blockTex(['#6aa8e8', '#5898e0', '#80b8f0', '#70b0ec']), emissive: new T.Color('#183a5a') })];
+    // Blöcke leuchten leicht in ihrer eigenen Farbe (sonst in der dunklen Tiefsee unsichtbar)
+    if (!nether) for (const m of frameMats) { m.emissiveMap = m.map; m.emissive = new T.Color(0xffffff); m.emissiveIntensity = 0.3; m.fog = false; }
+    const frame = new T.Group(); g.add(frame); let k = 0;
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 5; j++) {
+      if (i > 0 && i < 3 && j > 0 && j < 4) continue;
+      const b = new T.Mesh(L.GEO.box, frameMats[(k++) % frameMats.length]); b.scale.setScalar(BS); b.position.set((i - 1.5) * BS, (j + 0.5) * BS, 0); frame.add(b);
+    }
+    const tex = swirlTex(nether ? ['#3a0a6a', '#5a12a0', '#7a1ad0', '#9a40ff', '#c070ff'] : ['#8ad8ff', '#b8e8ff', '#ffc8e8', '#ffb0d8', '#d8c8ff'], !nether);
+    tex.repeat.set(1, 1.5);
+    const disc = new T.Mesh(new T.PlaneGeometry(BS * 2, BS * 3), new T.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85, side: T.DoubleSide, depthWrite: false, fog: false }));
+    disc.position.set(0, BS * 2.5, 0); g.add(disc);
+    const tex2 = swirlTex(nether ? ['#000000', '#2a0050', '#6a20c0'] : ['#000000', '#304060', '#ffffff'], false);
+    const glow = new T.Mesh(new T.PlaneGeometry(BS * 2, BS * 3), new T.MeshBasicMaterial({ map: tex2, transparent: true, opacity: 0.5, side: T.DoubleSide, blending: T.AdditiveBlending, depthWrite: false, fog: false })); glow.position.copy(disc.position); glow.position.z = 0.02; g.add(glow);
+    const parts = [];
+    for (let i = 0; i < 18; i++) { const m = new T.Mesh(L.GEO.box, new T.MeshBasicMaterial({ color: nether ? (i % 2 ? 0x9a40ff : 0xc070ff) : (i % 3 ? 0xffffff : 0xffb8e0), transparent: true, opacity: 0.85, fog: false })); m.scale.setScalar(nether ? 0.18 : 0.22); g.add(m); parts.push({ m, ph: Math.random() * 6, x: (Math.random() - 0.5) * BS * 2.4, z: (Math.random() - 0.5) * 1.8 }); }
+    const light = new T.PointLight(nether ? 0xa040ff : 0x9adcff, 1.6, 40, 2); light.position.set(0, BS * 2.5, 1); g.add(light);
+    g.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
+    const P0 = { g, ring: frame, disc, swirl: [], tex, h: BS * 5 };
+    P0.update = function (dt) {
+      tex.offset.y -= dt * (nether ? 0.35 : 0.2); tex.offset.x = Math.sin(performance.now() / 900) * 0.08; tex2.offset.y += dt * 0.5;
+      disc.material.opacity = 0.8 + Math.sin(performance.now() / 300) * 0.08; glow.material.opacity = 0.35 + Math.sin(performance.now() / 200) * 0.15;
+      for (const p of parts) { p.ph += dt * (nether ? 0.6 : 0.4); const u = p.ph % 1; p.m.position.set(p.x, BS + u * BS * 3.2, p.z); p.m.material.opacity = 0.9 * Math.sin(u * Math.PI); p.m.rotation.y += dt * 2; }
+    };
+    return P0;
+  };
   // ---------- Portale ----------
   function portal(col1, col2) {
     const g = new T.Group();
@@ -28,9 +63,9 @@
   let pMoon = null, pBack = null, travel = null;
   function updatePortals(dt) {
     const t = performance.now() / 1000, mp = MOONP();
-    if (!pMoon && L.inMoon && L.inMoon(P.x)) { pMoon = portal(0xff7a20, 0xffc060); pMoon.g.position.set(mp.x, 10.5, mp.z); pMoon.g.rotation.y = Math.PI / 2; }
-    if (!pBack && L.inTitan(P.x, P.z)) { pBack = portal(0x9a9aff, 0xd0d0ff); pBack.g.position.set(BACKP.x, 10.5, BACKP.z); pBack.g.rotation.y = Math.PI / 2; }
-    for (const p of [pMoon, pBack]) if (p) { p.sw.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.6 : -1.2); }); p.disc.material.opacity = 0.5 + Math.sin(t * 3) * 0.15; }
+    if (!pMoon && L.inMoon && L.inMoon(P.x)) { pMoon = L.blockPortal('nether'); L.scene.add(pMoon.g); pMoon.g.position.set(mp.x, 0, mp.z); pMoon.g.rotation.y = Math.PI / 2; }
+    if (!pBack && L.inTitan(P.x, P.z)) { pBack = L.blockPortal('nether'); L.scene.add(pBack.g); pBack.g.position.set(BACKP.x, 0, BACKP.z); pBack.g.rotation.y = Math.PI / 2; }
+    for (const p of [pMoon, pBack]) if (p) p.update(dt);
     if (travel) { travel.t += dt; L.backFade && (L.backFade.style.background = travel.toT ? '#ffb060' : '#c0c0ff', L.backFade.style.opacity = String(travel.t < 1.6 ? Math.max(0, (travel.t - 1.2) / 0.4) : Math.max(0, 1 - (travel.t - 1.6) / 0.6))); if (travel.t > 1.6 && !travel.done) doTravel(); if (travel.t > 2.3) { travel = null; if (L.backFade) L.backFade.style.opacity = '0'; } return; }
     if (!P.alive || L.cine) return;
     const ref = P.vehicle || P, reach = P.vehicle ? 7 + P.vehicle.t.len * 0.4 : 6;

@@ -150,6 +150,8 @@
   // ---------- Portal in der Tiefsee ----------
   let portal = null;
   function buildPortal(x, y, z, color) {
+    // Block-Portal: Meeres- und Pastell-Blöcke (Unterseite dort, wo früher der Ring unten war)
+    if (L.blockPortal) { const p = L.blockPortal('meer'); p.g.position.set(x, y - 14, z); L.scene.add(p.g); p.g.scale.setScalar(1.15); return p; }
     const g = new T.Group(); g.position.set(x, y, z); L.scene.add(g);
     const ring = new T.Mesh(new T.TorusGeometry(14, 1.6, 12, 48), new T.MeshBasicMaterial({ color, fog: false })); g.add(ring);
     const disc = new T.Mesh(new T.CircleGeometry(13, 48), new T.MeshBasicMaterial({ color: 0x9a40ff, transparent: true, opacity: 0.55, side: T.DoubleSide, blending: T.AdditiveBlending, depthWrite: false, fog: false })); g.add(disc);
@@ -188,6 +190,7 @@
     const t = performance.now() / 1000;
     portal.swirl.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.5 : -1.2); });
     portal.disc.material.opacity = 0.45 + Math.sin(t * 3) * 0.15;
+    if (portal.update) portal.update(dt);
     portal.g.visible = L.dist(P.x, P.z, L.PORTAL.x, L.PORTAL.z) < 1500 && !L.inDim(P.x);
     const v = P.vehicle, py = v ? (v.alt || 0) : P.y;
     if (!L.cine && P.alive && L.dist(P.x, P.z, L.PORTAL.x, L.PORTAL.z) < 16 && Math.abs(py - L.PORTAL.y) < 18) travel(true);
@@ -270,7 +273,7 @@
     const t = performance.now() / 1000;
     for (const q of I.jelly) { q.ph += dt; q.j.position.y += Math.sin(q.ph) * dt * 2; q.j.children[0].scale.y = 2 + Math.sin(q.ph * 3) * 0.3; }
     for (const h of I.holes) h.rotation.z += dt * 0.1;
-    if (L.dimPortal) L.dimPortal.swirl.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.5 : -1.2); });
+    if (L.dimPortal) { L.dimPortal.swirl.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.5 : -1.2); }); if (L.dimPortal.update) L.dimPortal.update(dt); }
     // in die Leere gefallen
     if (L.inDim(P.x) && !(L.inMoon && L.inMoon(P.x)) && !(L.inBack && L.inBack(P.x)) && !(L.inTitan && L.inTitan(P.x, P.z)) && P.y < -90 && P.alive && !P.vehicle) {
       const c = L.dimCheckpoint(); P.x = c.x; P.z = c.z; P.y = 2; P.vy = 0; P.air = true;
