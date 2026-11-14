@@ -41,6 +41,11 @@
   // ---------- Verbindung und Lobby ----------
   function status(t) { const s = $('mpStatus'); if (s) s.innerHTML = t; }
   function codeGen() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let s = ''; for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)]; return s + '-' + L.randi(10, 99); }
+  // Verbindungshilfen: STUN (eigene Adresse finden) + TURN (Weiterleitung, wenn direkte Verbindung nicht geht – z. B. Handy-Daten, Schul-WLAN)
+  const PEER_OPTS = { debug: 0, config: { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }, { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }
+  ] } };
   const peerId = (code) => 'leise-spiel-' + String(code).toUpperCase().replace(/[^A-Z0-9]/g, '');
   function cleanup() {
     try { if (N.conn) N.conn.close(); } catch (e) { /* egal */ }
@@ -55,7 +60,7 @@
     cleanup(); L.initAudio();
     N.code = codeGen(); N.role = 'host'; N.pid = 0;
     status('⏳ Raum wird erstellt …');
-    N.peer = new Peer(peerId(N.code));
+    N.peer = new Peer(peerId(N.code), PEER_OPTS);
     N.peer.on('open', () => renderLobby());
     N.peer.on('connection', (c) => setupHostConn(c));
     N.peer.on('error', (e) => { status(e.type === 'unavailable-id' ? 'Der Code ist gerade belegt. Bitte nochmal „Raum erstellen“.' : '❌ Fehler: ' + e.type); });
@@ -91,10 +96,12 @@
     cleanup(); L.initAudio();
     N.role = 'client'; N.code = code;
     status('⏳ Verbinde mit Raum ' + code + ' …');
-    N.peer = new Peer();
+    N.peer = new Peer(undefined, PEER_OPTS);
     N.peer.on('open', () => {
       const c = N.peer.connect(peerId(code), { reliable: true });
       N.conn = c;
+      // hängt die Verbindung? Dann Tipps zeigen
+      setTimeout(() => { if (N.conn === c && !N.connected && N.role === 'client') status('⚠️ Die Verbindung klappt noch nicht. Tipps: 1) Code genau so eingeben, wie er beim Host steht (z. B. WOLF-42). 2) Der Host muss im Mehrspieler-Menü bleiben. 3) Beide die Seite einmal neu laden (gleiche Version). 4) Klappt es gar nicht: beide ins gleiche WLAN oder einen anderen Browser (Chrome) nehmen.'); }, 15000);
       c.on('open', () => { N.connected = true; rawSend(c, { t: 'hello', app: L.save.char || L.DEFAULT_CHAR, name: myName() }); renderLobby(); });
       c.on('data', (m) => { try { handle(m, m.from === undefined ? 0 : m.from); } catch (e) { console.error(e); } });
       c.on('close', clientLost); c.on('error', clientLost);
