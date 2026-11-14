@@ -163,6 +163,39 @@
     return Math.max(0, Math.hypot(e.x - x, e.z - z, (ey - y) * 0.5) - (e.bigR || 0.6));
   }
   L.heroDistTo = distTo;
+  // Ziel für den Riesensprung: wohin du schaust, höchstens so weit wie die Sprungkraft reicht
+  function leapTarget() {
+    const kk = Math.pow(RG.show, 0.3), maxR = 75 * kk, o = L.camera.position, dir = aim();
+    const h = L.rayHit(o, dir, maxR + P.camDist, P.camDist + 0.3);
+    let p = o.clone().addScaledVector(dir, Math.min(h.t, maxR + P.camDist));
+    if (h.ent) p.set(h.ent.x, 0, h.ent.z);
+    let dx = p.x - P.x, dz = p.z - P.z, d = Math.hypot(dx, dz);
+    if (d > maxR) { p.x = P.x + dx / d * maxR; p.z = P.z + dz / d * maxR; }
+    if (d < 6) { const f = fwd(); p.x = P.x + f.x * 12; p.z = P.z + f.z * 12; }
+    // Monster anpeilen: ungefähr in Blickrichtung (bis ~8°) oder nahe am Zielpunkt
+    let best = null, ba = 0.14;
+    for (const e of targets()) {
+      if (e.dead) continue; const ex = e.x - o.x, ez = e.z - o.z, ed = Math.hypot(ex, ez); if (ed > maxR + P.camDist + 10 || ed < 3) continue;
+      const ey = (e.y !== undefined ? e.y : (e.hy || 2) * 0.5) - o.y, ang = Math.acos(L.clamp((ex * dir.x + ey * dir.y + ez * dir.z) / Math.hypot(ex, ey, ez), -1, 1));
+      if (ang < ba) { ba = ang; best = e; }
+    }
+    if (!best) { let bd = 9 * kRad(); for (const e of targets()) { const q = Math.hypot(e.x - p.x, e.z - p.z); if (q < bd && !e.dead) { bd = q; best = e; } } }
+    if (best && Math.hypot(best.x - P.x, best.z - P.z) > maxR + 5) best = null;
+    if (best) { p.x = best.x; p.z = best.z; }
+    const fl = L.floorAt ? L.floorAt(p.x, p.z, 999) : null;
+    p.y = typeof fl === 'number' ? fl : Math.max(0, L.mountainH ? L.mountainH(p.x, p.z) : 0);
+    return { x: p.x, y: p.y, z: p.z, lock: best };
+  }
+  L._leapTarget = () => leapTarget();
+  let marker = null;
+  function updMarker(dt) {
+    const on = isK() && L.selType && L.selType() === 'erdbebensprung' && P.alive && !P.air && !L.cine && L.state === 'game';
+    if (!on) { if (marker) marker.visible = false; return; }
+    if (!marker) { marker = new T.Mesh(new T.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffa030, transparent: true, opacity: 0.85, depthWrite: false, side: T.DoubleSide })); marker.renderOrder = 5; L.scene.add(marker); }
+    const T0 = leapTarget(), r = 15 * kRad(), ready = !(P.fireCd > 0);
+    marker.visible = true; marker.position.set(T0.x, T0.y + 0.15, T0.z); marker.scale.setScalar(r * (1 + Math.sin(performance.now() / 150) * 0.04));
+    marker.material.color.set(T0.lock ? 0xff3020 : ready ? 0xffa030 : 0x707070);
+  }
   function hitArea(x, y, z, r, dmg, knock, stun, skip) {
     let n = 0;
     for (const e of targets()) {
@@ -220,9 +253,12 @@
         break;
       }
       case 'erdbebensprung': {
-        // gewaltiger Sprung weit nach vorn (je größer, desto weiter)
-        rageUp(); const kk = Math.pow(RG.show, 0.3);
-        play('slamUp', 3); P.vy = 26 * kk; P.air = true; P.vx = f.x * 42 * kk; P.vz = f.z * 42 * kk; P.knockT = 3; H.slam = { r: 13 * kRad(), dmg: 320 * kPow(), col: 0xd8b070 };
+        // gezielter Riesensprung: landet genau dort, wo der orange Kreis ist (Monster in der Nähe werden angepeilt)
+        rageUp(); const T0 = leapTarget(), dist = Math.hypot(T0.x - P.x, T0.z - P.z), ft = L.clamp(0.9 + dist / 70, 0.9, 2.6);
+        H.leap = { t: 0, ft, sx: P.x, sy: y, sz: P.z, tx: T0.x, ty: T0.y, tz: T0.z, h: Math.max(6, dist * 0.35) };
+        play('slamUp', 3); P.air = true; P.vx = P.vz = P.vy = 0; P.knockT = ft + 0.3;
+        P.yaw = Math.atan2(T0.x - P.x, T0.z - P.z);
+        H.slam = { r: 15 * kRad(), dmg: 360 * kPow(), col: 0xd8b070 };
         L.snd.land && L.snd.land({ x: P.x, y, z: P.z }); break;
       }
       case 'netzschuss': {
@@ -347,6 +383,16 @@
     }
     if (H.anchor) { H.anchor.t += dt; if (!H.anchor.m) H.anchor.m = line(handPos(), H.anchor.p, 0xf0f8ff, 0.9, 0.02); else { L.scene.remove(H.anchor.m); H.fxs = H.fxs.filter((q) => q.m !== H.anchor.m); H.anchor.m = line(handPos(), H.anchor.p, 0xf0f8ff, 0.05, 0.02); } if (H.anchor.t > 0.8) H.anchor = null; }
     // Landung nach Sprung-Angriffen
+    updMarker(dt);
+    if (H.leap) {
+      // feste Flugbahn: ein hoher Bogen genau zum Ziel
+      const Lp = H.leap; Lp.t += dt; const u = Math.min(1, Lp.t / Lp.ft);
+      P.x = L.lerp(Lp.sx, Lp.tx, u); P.z = L.lerp(Lp.sz, Lp.tz, u); P.y = L.lerp(Lp.sy, Lp.ty, u) + Math.sin(u * Math.PI) * Lp.h;
+      P.vx = P.vz = 0; P.vy = 0; P.air = u < 1; P.knockT = Math.max(P.knockT || 0, 0.1);
+      if (P.rig) { P.rig.root.position.set(P.x, P.y, P.z); P.rig.root.rotation.y = P.yaw; }
+      if (Math.random() < dt * 20) L.fx('#8a7a60', P.x, P.y, P.z, 1, 1, { size: 0.3, life: 0.5 });
+      if (u >= 1) { H.leap = null; P.air = false; H.wasAir = true; }
+    }
     if (H.wasAir && !P.air && H.slam) {
       const S = H.slam; H.slam = null; const y = P.y || 0;
       hitArea(P.x, y + 1, P.z, S.r + (isK() ? 3 * RG.show : 0), S.dmg, 8, 1.5);
@@ -416,6 +462,7 @@
   L.clearHeroes = function () {
     for (const f of H.fxs) L.scene.remove(f.m); H.fxs.length = 0;
     for (const c of H.clones) L.scene.remove(c.rig.root); H.clones.length = 0;
+    if (marker) marker.visible = false; H.leap = null;
     H.invisT = 0; H.dashT = 0; H.slam = null; H.anchor = null; H.anim = null; RG.f = 1; RG.show = 1; RG.calm = 0;
   };
 })();
