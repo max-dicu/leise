@@ -310,6 +310,7 @@
   L.hurtPlayer = function (dmg, cause, fx, fz) {
     if (L.suitOn && L.suitOn()) return;
     if (L.titanOn && L.titanOn()) dmg *= 0.3;
+    if (L.heroHurt && dmg > 0 && P.alive) L.heroHurt(dmg);
     if (L.heroDmgMul) dmg *= L.heroDmgMul();
     if (!P.alive || dmg <= 0 || L.cine) return;
     P.hp -= dmg; P.hurtFlash = Math.min(1, P.hurtFlash + dmg / 40);
@@ -734,7 +735,9 @@
     // Umfallen dreht nur in der Luft weiter – am Boden (oder nach dem Fliegen) sofort beenden
     P.tumble = P.tumble > 0 && P.air ? P.tumble + dt * 9 : 0;
     // Bewegung mit Kollision
-    L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38, P.y, RES);
+    { const hz = L.heroSize ? L.heroSize() : 1;
+      if (hz > 5) { RES.x = P.x + P.vx * dt; RES.z = P.z + P.vz * dt; if (L.queryBoxes(RES.x, RES.z, 0.4 * hz).length && Math.random() < dt * 6) L.fx('#8a8378', RES.x + L.rand(-2, 2), L.rand(1, 3) * hz * 0.3, RES.z + L.rand(-2, 2), 3, 4, { size: 0.6, life: 1 }); }
+      else L.collide(P.x + P.vx * dt, P.z + P.vz * dt, 0.38 * Math.min(hz, 3), P.y, RES); }
     P.x = RES.x; P.z = RES.z;
     for (const v of E.vehicles) {
       const d = L.dist(P.x, P.z, v.x, v.z);
@@ -1127,6 +1130,7 @@
     rig.root.position.set(sp.x, 0, sp.z); rig.root.rotation.y = sp.yaw;
   }
   function enterVehicle(v) {
+    if (L.heroSize && L.heroSize() > 2) { L.msg('💢 Viel zu groß für ein Fahrzeug!', 2000); return; }
     P.flying = 0;
     if (!v.t.police) L.myVeh = v;
     const seat = seatFor(v);

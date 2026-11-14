@@ -178,7 +178,7 @@
     R.nx = m.x; R.ny = m.y; R.nz = m.z; R.nyaw = m.yaw;
     if (!R.got) { R.x = m.x; R.y = m.y; R.z = m.z; R.yaw = m.yaw; R.got = true; }
     R.st = m.st || R.st; R.stance = m.stance; R.moving = m.moving; R.alive = m.alive; R.gone = m.gone;
-    R.held = m.held; R.flash = m.flash; R.hp = m.hp;
+    R.held = m.held; R.flash = m.flash; R.hp = m.hp; R.hs = m.hs || 1;
     if (m.veh && m.veh.length === 2) { R.inVeh = true; R.vehId = m.veh[0]; R.seat = m.veh[1]; }
     else if (m.veh) {
       const v = L.byId.get('v' + m.veh[0]);
@@ -199,7 +199,7 @@
       R.x = R.nx = v.x; R.z = R.nz = v.z;
       rig.root.position.set(v.x + s.x * cy + s.z * sy, s.y + (v.alt || 0), v.z - s.x * sy + s.z * cy);
       rig.root.rotation.set(0, v.yaw, 0); rig.root.rotateZ(-v.lean);
-    } else { rig.root.position.set(R.x, R.y, R.z); rig.root.rotation.set(0, R.yaw, 0); }
+    } else { rig.root.position.set(R.x, R.y, R.z); rig.root.rotation.set(0, R.yaw, 0); if (rig.heroId === 'koloss') rig.root.scale.setScalar(1.55 * (R.hs || 1)); }
     L.setHeld(rig, v ? null : R.held);
     L.animHuman(rig, R.st || { mode: 'walk' });
   }
@@ -418,7 +418,7 @@
   function sendPs() {
     const v = P.vehicle;
     mp.send({
-      t: 'ps', x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), st: P.animSt, stance: P.stance,
+      t: 'ps', hs: L.heroSize ? r2(L.heroSize()) : 1, x: r2(P.x), y: r2(P.y), z: r2(P.z), yaw: r2(P.yaw), st: P.animSt, stance: P.stance,
       moving: Math.hypot(P.vx || 0, P.vz || 0) > 0.4 || !!(v && Math.abs(v.speed) > 0.5),
       alive: !!P.alive, gone: !!P.gone, held: P.rig ? P.rig.heldType : null, flash: !!P.flash, hp: Math.round(P.hp || 0),
       veh: v ? (P.seat > 0 ? [v.id, P.seat] : [v.id, r2(v.x), r2(v.z), r2(v.yaw), r2(v.speed), r2(v.steer), Math.round(v.hp), r1(v.alt || 0)]) : 0

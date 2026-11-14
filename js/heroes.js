@@ -18,17 +18,25 @@
 
   // ---------- Werte ----------
   const STATS = {
-    koloss: { dmg: 0.3, spd: 1.45, jump: 2.4, noFall: true, regen: 3, items: ['kolossfaust', 'donnerklatscher', 'erdbebensprung'] },
+    koloss: { dmg: 0.3, spd: 2.1, jump: 3.4, noFall: true, regen: 3, items: ['kolossfaust', 'donnerklatscher', 'erdbebensprung'] },
     netz: { dmg: 0.75, spd: 1.35, jump: 2.1, noFall: true, regen: 0.5, items: ['netzschuss', 'netzschwinger', 'netzbombe'] },
     thor: { dmg: 0.45, spd: 1.15, jump: 1.5, noFall: true, regen: 1, fly: true, items: ['thorhammer', 'gewitter'] },
     loki: { dmg: 0.8, spd: 1.2, jump: 1.3, noFall: false, regen: 0.5, items: ['lokidolch', 'lokizepter', 'illusion', 'tarnung'] },
     walross: { dmg: 0.55, spd: 0.85, jump: 0.9, noFall: false, regen: 1, swim: 3.5, items: ['stosszahn', 'bauchplatscher', 'walrossbruell'] }
   };
   const st = () => { const id = L.heroId(); return id ? STATS[id] : null; };
-  L.heroDmgMul = () => { const s = st(); return s ? s.dmg : 1; };
-  L.heroSpeed = () => { const s = st(); return s ? s.spd : 1; };
+  // Koloss: je wütender, desto größer und stärker (bis Turmhöhe), nach 1 Minute Ruhe schrumpft er wieder
+  const RG = { f: 1, show: 1, calm: 0, msgT: 0, ph: 0 }, FMAX = 62 / 2.8;
+  const isK = () => L.heroId() === 'koloss';
+  L.heroSize = () => (isK() ? RG.show : 1);
+  L.heroHurt = function (raw) { if (!isK() || !(raw > 0)) return; RG.f = Math.min(FMAX, RG.f * (1 + Math.min(0.25, raw / 250)) + 0.06); RG.calm = 0; rageMsg(); };
+  function rageUp() { if (!isK()) return; RG.f = Math.min(FMAX, RG.f * 1.035 + 0.01); RG.calm = 0; }
+  function rageMsg() { if (RG.msgT > 0) return; RG.msgT = 6; L.msg(RG.f >= FMAX - 0.01 ? '💢 MAXIMALE WUT – so groß wie der Turm!' : '💢 Der Koloss wird wütender – er wächst! (' + Math.round(2.8 * RG.f) + ' m)', 2500); }
+  const kPow = () => Math.pow(RG.show, 0.8), kRad = () => Math.pow(RG.show, 0.6);
+  L.heroDmgMul = () => { const s = st(); return s ? s.dmg / (isK() ? Math.sqrt(RG.show) : 1) : 1; };
+  L.heroSpeed = () => { const s = st(); return s ? s.spd * (isK() ? Math.pow(RG.show, 0.4) : 1) : 1; };
   L.heroSwim = () => { const s = st(); return s && s.swim ? s.swim : 1; };
-  L.heroJump = () => { const s = st(); return s ? s.jump : 1; };
+  L.heroJump = () => { const s = st(); return s ? s.jump * (isK() ? Math.pow(RG.show, 0.3) : 1) : 1; };
   L.heroNoFall = () => { const s = st(); return !!(s && s.noFall); };
   L.heroFly = () => { const s = st(); return !!(s && s.fly); };
   L.heroInvis = () => H.invisT > 0;
@@ -183,21 +191,24 @@
     switch (t) {
       case 'kolossfaust': {
         play('punch', 0.4);
-        setTimeout(() => { const n = hitArea(P.x + f.x * 2.6, y + 1, P.z + f.z * 2.6, 3.2, 380, 6); if (n) { L.shake = Math.max(L.shake, 0.6); boom(0.6); L.fx('#c8b090', P.x + f.x * 2.6, y + 1.2, P.z + f.z * 2.6, 14, 6, { size: 0.3, life: 0.6 }); } else L.snd.swing && L.snd.swing(); }, 140);
+        rageUp(); const kp = kPow(), kr = kRad();
+        setTimeout(() => { const n = hitArea(P.x + f.x * 2.6 * kr, y + 1, P.z + f.z * 2.6 * kr, 3.2 * kr, 380 * kp, 6 * kr); if (n) { L.shake = Math.max(L.shake, 0.6); boom(0.6); L.fx('#c8b090', P.x + f.x * 2.6, y + 1.2, P.z + f.z * 2.6, 14, 6, { size: 0.3, life: 0.6 }); } else L.snd.swing && L.snd.swing(); }, 140);
         break;
       }
       case 'donnerklatscher': {
-        play('clap', 0.7);
+        play('clap', 0.7); rageUp(); const kp = kPow(), kr = kRad();
         setTimeout(() => {
           boom(1); L.shake = Math.max(L.shake, 1); L.env.bolt = 0.3;
           const m = ring(P.x + f.x * 2, y + 1.5, P.z + f.z * 2, 0xffffff, 30, 0.7, false); m.lookAt(P.x + f.x * 10, y + 1.5, P.z + f.z * 10);
-          for (const e of targets()) { const dx = e.x - P.x, dz = e.z - P.z, dd = Math.hypot(dx, dz); if (dd > 32 + (e.bigR || 0) || (dx * f.x + dz * f.z) / (dd || 1) < 0.75) continue; L.damageEnt(e, 170 * (1 - dd / 40), P.x, P.z, P); if (L.MK && L.MK[e.kind] && !e.dead) { e.x += dx / (dd || 1) * 10; e.z += dz / (dd || 1) * 10; e.stunT = Math.max(e.stunT || 0, 2); } }
+          for (const e of targets()) { const dx = e.x - P.x, dz = e.z - P.z, dd = Math.hypot(dx, dz); if (dd > 32 * kr + (e.bigR || 0) || (dx * f.x + dz * f.z) / (dd || 1) < 0.75) continue; L.damageEnt(e, 170 * kp * (1 - dd / (40 * kr)), P.x, P.z, P); if (L.MK && L.MK[e.kind] && !e.dead) { e.x += dx / (dd || 1) * 10; e.z += dz / (dd || 1) * 10; e.stunT = Math.max(e.stunT || 0, 2); } }
           for (let k = 0; k < 20; k++) L.fx('#d8c8a8', P.x + f.x * (3 + k * 1.4), y + 0.5, P.z + f.z * (3 + k * 1.4), 2, 5, { size: 0.5, life: 0.8 });
         }, 320);
         break;
       }
       case 'erdbebensprung': {
-        play('slamUp', 3); P.vy = 17; P.air = true; P.vx = f.x * 16; P.vz = f.z * 16; P.knockT = 1.2; H.slam = { r: 13, dmg: 320, col: 0xd8b070 };
+        // gewaltiger Sprung weit nach vorn (je größer, desto weiter)
+        rageUp(); const kk = Math.pow(RG.show, 0.3);
+        play('slamUp', 3); P.vy = 26 * kk; P.air = true; P.vx = f.x * 42 * kk; P.vz = f.z * 42 * kk; P.knockT = 3; H.slam = { r: 13 * kRad(), dmg: 320 * kPow(), col: 0xd8b070 };
         L.snd.land && L.snd.land({ x: P.x, y, z: P.z }); break;
       }
       case 'netzschuss': {
@@ -282,7 +293,21 @@
   }
 
   // ---------- jedes Bild ----------
+  function updateRage(dt) {
+    RG.msgT -= dt;
+    if (!isK()) { RG.f = 1; RG.show = 1; RG.calm = 0; return; }
+    RG.calm += dt;
+    if (RG.calm > 60 && RG.f > 1) { const was = RG.f; RG.f = Math.max(1, RG.f - Math.max(0.6, RG.f * 0.35) * dt); if (was > 1.5 && RG.f <= 1.5 && RG.f > 1) L.msg('😮‍💨 Der Koloss beruhigt sich und schrumpft wieder.', 3000); }
+    if (!P.alive) { RG.f = 1; }
+    const prev = RG.show; RG.show += (RG.f - RG.show) * Math.min(1, dt * 2.5);
+    if (P.rig && P.rig.heroId === 'koloss') P.rig.root.scale.setScalar(1.55 * RG.show);
+    if (RG.show - prev > 0.02 && Math.random() < dt * 20) { L.fx('#5a9a3a', P.x + L.rand(-1, 1) * RG.show, (P.y || 0) + RG.show * 1.5, P.z + L.rand(-1, 1) * RG.show, 2, 3, { size: 0.2 * RG.show, life: 0.6 }); L.shake = Math.max(L.shake, 0.3); }
+    // groß: kein Auto mehr
+    if (RG.show > 2 && P.vehicle && L._leaveVehicle) L._leaveVehicle(true);
+  }
+  L.heroRageReset = () => { RG.f = 1; RG.show = 1; RG.calm = 0; };
   L.updateHeroes = function (dt) {
+    updateRage(dt);
     for (let i = H.fxs.length - 1; i >= 0; i--) {
       const f = H.fxs[i]; f.t += dt; const u = f.t / f.dur;
       if (f.kind === 'ring') { f.m.scale.setScalar(1 + u * f.maxR); f.m.material.opacity = 0.9 * (1 - u); }
@@ -330,7 +355,7 @@
       const hsp = Math.hypot(P.vx, P.vz), run = P.mode === 'run' && hsp > 3 && !P.air && !P.swim && !P.vehicle;
       if (run) {
         // schwerer Koloss-Sprint: weit nach vorn gebeugt, riesige Schritte, Arme schwingen wie Hämmer, jeder Schritt bebt
-        const ph = P.phase * 0.82, s1 = Math.sin(ph), c1 = Math.cos(ph);
+        RG.ph += dt * 9 / Math.sqrt(RG.show); const ph = RG.ph, s1 = Math.sin(ph), c1 = Math.cos(ph);
         r.body.rotation.x = 0.32; r.body.position.y = -0.06 + Math.abs(c1) * 0.12; r.body.rotation.z = s1 * 0.07;
         r.torso.rotation.x = 0.22; r.torso.rotation.y = s1 * 0.28;
         r.head.rotation.x = -0.35;
@@ -344,8 +369,8 @@
         const step = Math.sign(s1);
         if (H.lastStep !== undefined && step !== H.lastStep) {
           const f = r.legs[step > 0 ? 1 : 0].leg, fp = new T.Vector3(); f.getWorldPosition(fp);
-          L.fx('#8a7a60', fp.x, (P.y || 0) + 0.1, fp.z, 6, 3, { size: 0.35, life: 0.6 });
-          L.shake = Math.max(L.shake, 0.18);
+          L.fx('#8a7a60', fp.x, (P.y || 0) + 0.1, fp.z, 6, 3 * Math.sqrt(RG.show), { size: 0.35 * Math.sqrt(RG.show), life: 0.6 });
+          L.shake = Math.max(L.shake, Math.min(1.2, 0.18 * Math.sqrt(RG.show)));
           L.tn && L.tn({ f: 52, fTo: 28, dur: 0.22, vol: 0.28 });
           if (Math.random() < 0.3) L.decal && L.decal(fp.x, fp.z, 0.6, '#3a3024');
         }
@@ -377,6 +402,6 @@
   L.clearHeroes = function () {
     for (const f of H.fxs) L.scene.remove(f.m); H.fxs.length = 0;
     for (const c of H.clones) L.scene.remove(c.rig.root); H.clones.length = 0;
-    H.invisT = 0; H.dashT = 0; H.slam = null; H.anchor = null; H.anim = null;
+    H.invisT = 0; H.dashT = 0; H.slam = null; H.anchor = null; H.anim = null; RG.f = 1; RG.show = 1; RG.calm = 0;
   };
 })();

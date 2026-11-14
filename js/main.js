@@ -168,10 +168,12 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       dist = (v.t.plane ? 16 : v.t.sub ? 14 : v.t.kind === 'car' ? 7.5 : 5) * L.clamp(P.zoom / 4, 0.45, 3);
       piv.set(v.x, 1.6 + (v.alt || 0), v.z);
     } else {
-      const ph = !P.alive ? 0.4 : P.stance === 'crawl' ? 0.6 : P.stance === 'crouch' ? 1.1 : 1.6;
+      const hz = L.heroSize ? L.heroSize() : 1;
+      const ph = (!P.alive ? 0.4 : P.stance === 'crawl' ? 0.6 : P.stance === 'crouch' ? 1.1 : 1.6) * (hz > 1 ? hz * 1.55 : 1);
       piv.set(P.x, P.y + ph, P.z);
       fp = P.alive && P.zoom < 0.5;
       dist = fp ? 0 : P.aiming ? Math.min(2.1, P.zoom) : P.zoom;
+      if (hz > 1) dist *= hz * 1.2;
       if (fp) piv.y += 0.12;
       if (!P.alive) {
         const S2 = L.spectate;
@@ -180,7 +182,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
       }
     }
     // drinnen: Kamera näher dran und unter der Decke
-    if (L.indoor && !v) dist = Math.min(dist, 2.4);
+    if (L.indoor && !v && !(L.heroSize && L.heroSize() > 2)) dist = Math.min(dist, 2.4);
     P.camDist = dist;
     const sy = Math.sin(P.camYaw), cy = Math.cos(P.camYaw), cp = Math.cos(py), sp = Math.sin(py);
     const side = v || fp ? 0 : (P.aiming ? 0.7 : 0.55) * Math.min(1, dist / 2);
@@ -200,7 +202,7 @@ body.cinema #hud,body.cinema #touch,body.cinema #banner{visibility:hidden}`;
     camera.position.lerpVectors(piv, want, ok);
     if (P.rig && L.state === 'game' && !v && cd * ok < 0.55) P.rig.root.visible = false;
     { const gy = L.seaFloor(camera.position.x, camera.position.z); if (camera.position.y < gy + 0.3) camera.position.y = gy + 0.3; }
-    if (L.indoor && !v) camera.position.y = Math.min(camera.position.y, L.indoor.ceil - 0.35);
+    if (L.indoor && !v && !(L.heroSize && L.heroSize() > 2)) camera.position.y = Math.min(camera.position.y, L.indoor.ceil - 0.35);
     look.set(piv.x + sy * cp * 20, piv.y - sp * 20, piv.z + cy * cp * 20);
     if (L.shake > 0) {
       const s = L.shake * 0.25;
