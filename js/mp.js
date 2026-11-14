@@ -353,6 +353,7 @@
       case 'kc': if (!host && L.gotKillCoins) L.gotKillCoins(m.n); break;
       case 'fw': if (L.fwRemote) L.fwRemote(m); break;
       case 'portal': if (L.portalRemote) L.portalRemote(m); break;
+      case 'gnt': if (L.gauntletRemote) L.gauntletRemote(m); break;
       case 'von': case 'voff': if (L.voiceMsg) L.voiceMsg(m, from); break;
       case 'glass': if (L.glassRemote) L.glassRemote(m.i | 0); break;
       case 'done':

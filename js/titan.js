@@ -102,7 +102,7 @@
   };
 
   // ---------- THANATOS ----------
-  const MAXHP = 30000;
+  const MAXHP = 10000;
   let B = null, respawnT = 0, deadInfo = null;
   function buildBoss() {
     const rig = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, { name: 'Thanatos', skin: '#6c7686', hair: 'glatze', eyes: '#e8e0ff', brows: 'boese', mouth: 'ernst', beard: 'kein', top: 'anzug', topColor: '#28305a', pants: 'anzughose', pantsColor: '#28305a', shoeType: 'stiefel', shoes: '#c8a030', build: 'extrem', height: 'sehr_gross' }), true);
@@ -130,7 +130,9 @@
   const phase = () => (B.hp > MAXHP * 0.66 ? 1 : B.hp > MAXHP * 0.33 ? 2 : 3);
   L.thanatosHit = function (dmg, src) {
     if (!B || B.dead || !(dmg > 0)) return;
-    if (L._gauntletFiring) dmg *= 0.25; // der Handschuh wirkt kaum gegen seinen eigenen Meister
+    dmg *= 0.35; // dicke Titanen-Panzerung
+    if (L._gauntletFiring) dmg *= 0.2; // der Handschuh wirkt kaum gegen seinen eigenen Meister
+    B.lastHit = performance.now();
     if (!B.awake) wake();
     B.hp -= dmg; L.blood && L.blood(B.x, 6, B.z, 6);
     if (L.showBossHp) L.showBossHp('🟣 THANATOS – PHASE ' + phase(), Math.max(0, B.hp), MAXHP);
@@ -158,7 +160,7 @@
     for (let i = B.fx.length - 1; i >= 0; i--) {
       const f = B.fx[i]; f.t += dt; const u = f.t / f.dur;
       if (f.kind === 'tele') { f.m.material.opacity = 0.4 + Math.sin(f.t * 20) * 0.4; if (u >= 1) { L.scene.remove(f.m); B.fx.splice(i, 1); if (f.onHit) f.onHit(f); } continue; }
-      if (f.kind === 'wave') { f.r += dt * 20; f.m.scale.setScalar(f.r); f.m.material.opacity = Math.max(0, 0.9 - f.r / 30); const dP = Math.hypot(P.x - f.x, P.z - f.z); if (!f.hit && Math.abs(dP - f.r) < 1.5 && (P.y || 0) < 0.8) { f.hit = true; const a = Math.atan2(P.x - f.x, P.z - f.z); hurtIf(true, 30, 'Von der Schockwelle des Titanen getroffen', Math.sin(a) * 14, Math.cos(a) * 14); } if (f.r > 30) { L.scene.remove(f.m); B.fx.splice(i, 1); } continue; }
+      if (f.kind === 'wave') { f.r += dt * 20; f.m.scale.setScalar(f.r); f.m.material.opacity = Math.max(0, 0.9 - f.r / 30); const dP = Math.hypot(P.x - f.x, P.z - f.z); if (!f.hit && Math.abs(dP - f.r) < 1.5 && (P.y || 0) < 0.8) { f.hit = true; const a = Math.atan2(P.x - f.x, P.z - f.z); hurtIf(true, 45, 'Von der Schockwelle des Titanen getroffen', Math.sin(a) * 14, Math.cos(a) * 14); } if (f.r > 30) { L.scene.remove(f.m); B.fx.splice(i, 1); } continue; }
       if (f.kind === 'spike' || f.kind === 'beam' || f.kind === 'met') { if (f.upd) f.upd(f, dt); if (u >= 1) { L.scene.remove(f.m); B.fx.splice(i, 1); } }
     }
     if (B.dead) {
@@ -175,7 +177,9 @@
     B.idleT = 0;
     const dx = P.x - B.x, dz = P.z - B.z, d = Math.hypot(dx, dz);
     if (!B.awake) { L.animHuman(rig, { mode: 'walk', phase: 0, speed: 0 }); rig.root.position.set(B.x, 0, B.z); rig.root.rotation.set(0, B.yaw, 0); if (d < 110) wake(); return; }
-    const ph = phase(), fast = ph === 3 ? 1.35 : ph === 2 ? 1.15 : 1;
+    const ph = phase(), fast = ph === 3 ? 2.0 : ph === 2 ? 1.6 : 1.3;
+    // heilt sich, wenn er 4 s nicht getroffen wird
+    if (B.awake && performance.now() - (B.lastHit || 0) > 4000 && B.hp < MAXHP) { B.hp = Math.min(MAXHP, B.hp + MAXHP * 0.015 * dt); if (Math.random() < dt * 6) L.fx('#40ff80', B.x + L.rand(-3, 3), L.rand(1, 9), B.z + L.rand(-3, 3), 1, 1.5, { basic: true, size: 0.25, life: 0.7, g: -2 }); if (L.showBossHp && Math.random() < dt * 4) L.showBossHp('🟣 THANATOS – heilt sich!', B.hp, MAXHP); }
     B.cd -= dt; B.slamCd -= dt; B.beamCd -= dt; B.telCd -= dt; B.pilCd -= dt; B.metCd -= dt;
     // Zeit-Stein: einmal heilen in Phase 3
     if (ph === 3 && !B.healed && !B.act) { B.healed = true; B.act = 'heal'; B.actT = 0; L.banner('🟢 ZEIT-STEIN', 'Thanatos dreht die Zeit zurück und heilt sich!'); }
@@ -200,7 +204,7 @@
     switch (B.act) {
       case 'punch':
         aR.arm.rotation.x = t < 0.55 ? -0.4 - t * 2 : -1.6; aR.elbow.rotation.x = t < 0.55 ? -1.8 : -0.1;
-        if (t > 0.55 && !B.hitDone) { B.hitDone = true; const dd = Math.hypot(P.x - B.x, P.z - B.z); const a = Math.atan2(P.x - B.x, P.z - B.z); hurtIf(dd < 10, 40, 'Vom Titanen zerschmettert', Math.sin(a) * 16, Math.cos(a) * 16); L.snd.stomp && L.snd.stomp({ x: B.x, y: 4, z: B.z }); }
+        if (t > 0.55 && !B.hitDone) { B.hitDone = true; const dd = Math.hypot(P.x - B.x, P.z - B.z); const a = Math.atan2(P.x - B.x, P.z - B.z); hurtIf(dd < 11, 60, 'Vom Titanen zerschmettert', Math.sin(a) * 16, Math.cos(a) * 16); L.snd.stomp && L.snd.stomp({ x: B.x, y: 4, z: B.z }); }
         if (t > 0.9) { B.act = null; B.hitDone = false; }
         break;
       case 'slam':
@@ -219,7 +223,7 @@
           B.beam = { a: gp, b: end, tick: 0 }; B.fx.push({ kind: 'beam', m, t: 0, dur: 1.2 }); L.env.bolt = 0.4; L.tn && L.tn({ f: 120, fTo: 80, dur: 1.2, type: 'sawtooth', vol: 0.3 });
         } else {
           B.beam.tick -= dt;
-          if (B.beam.tick <= 0) { B.beam.tick = 0.2; const a = B.beam.a, b = B.beam.b, ab = b.clone().sub(a), pp = new T.Vector3(P.x, (P.y || 0) + 1, P.z), u = L.clamp(pp.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1), cl = a.clone().addScaledVector(ab, u); hurtIf(cl.distanceTo(pp) < 2.4, 9, 'Vom Kraft-Stein verbrannt'); }
+          if (B.beam.tick <= 0) { B.beam.tick = 0.2; const a = B.beam.a, b = B.beam.b, ab = b.clone().sub(a), pp = new T.Vector3(P.x, (P.y || 0) + 1, P.z), u = L.clamp(pp.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1), cl = a.clone().addScaledVector(ab, u); hurtIf(cl.distanceTo(pp) < 2.6, 14, 'Vom Kraft-Stein verbrannt'); }
         }
         if (t > 2.4) { B.act = null; B.beam = null; }
         break;
@@ -255,11 +259,11 @@
     const m = new T.Mesh(L.GEO.cone, L.mat('#8a4a3a')); m.scale.set(2.6, 0.1, 2.6); m.position.set(x, 0, z); L.scene.add(m);
     B.fx.push({ kind: 'spike', m, t: 0, dur: 2.5, upd: (f) => { const k = Math.min(1, f.t / 0.15) * (f.t > 2 ? Math.max(0, 1 - (f.t - 2) * 2) : 1); f.m.scale.y = 9 * k; f.m.position.y = 4.5 * k; } });
     L.fx('#8a5a40', x, 0.5, z, 14, 6, { size: 0.5, life: 0.8 });
-    hurtIf(Math.hypot(P.x - x, P.z - z) < 3.4 && (P.y || 0) < 6, 35, 'Von einer Felssäule aufgespießt', 0, 0);
+    hurtIf(Math.hypot(P.x - x, P.z - z) < 3.4 && (P.y || 0) < 6, 50, 'Von einer Felssäule aufgespießt', 0, 0);
   }
   function meteor(x, z) {
     const m = new T.Mesh(new T.DodecahedronGeometry(2.2), new T.MeshBasicMaterial({ color: 0xff6a20 })); m.position.set(x + 40, 120, z - 30); L.scene.add(m);
-    B.fx.push({ kind: 'met', m, t: 0, dur: 0.6, upd: (f) => { const u = f.t / 0.6; f.m.position.set(x + 40 * (1 - u), 120 * (1 - u), z - 30 * (1 - u)); if (u > 0.95 && !f.boom) { f.boom = true; L.fx('#ff8a30', x, 1, z, 26, 10, { basic: true, size: 0.5, life: 0.8 }); L.snd.explosion && L.snd.explosion({ x, y: 1, z }); L.decal && L.decal(x, z, 4, '#1a0e08'); L.shake = Math.max(L.shake, 0.5); hurtIf(Math.hypot(P.x - x, P.z - z) < 6.5, 30, 'Von einem Meteor getroffen'); } } });
+    B.fx.push({ kind: 'met', m, t: 0, dur: 0.6, upd: (f) => { const u = f.t / 0.6; f.m.position.set(x + 40 * (1 - u), 120 * (1 - u), z - 30 * (1 - u)); if (u > 0.95 && !f.boom) { f.boom = true; L.fx('#ff8a30', x, 1, z, 26, 10, { basic: true, size: 0.5, life: 0.8 }); L.snd.explosion && L.snd.explosion({ x, y: 1, z }); L.decal && L.decal(x, z, 4, '#1a0e08'); L.shake = Math.max(L.shake, 0.5); hurtIf(Math.hypot(P.x - x, P.z - z) < 7, 45, 'Von einem Meteor getroffen'); } } });
   }
   function dropGauntlet(x, z) {
     const g = gauntletModel(); g.scale.setScalar(6); g.position.set(x, 3, z); L.scene.add(g);
@@ -304,6 +308,7 @@
     const d = document.createElement('div'); d.id = 'gauntHud';
     d.style.cssText = 'position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:14;display:none;gap:6px;align-items:center;background:rgba(0,0,0,.55);padding:5px 10px;border-radius:14px;font:bold 12px Arial,sans-serif;color:#fff';
     STONES.forEach((s, k) => { const b = document.createElement('button'); b.style.cssText = `width:30px;height:30px;border-radius:50%;border:3px solid #444;background:${s.css};cursor:pointer;font-size:12px;padding:0`; if (s.id === 'snap') b.textContent = '✨'; b.title = s.name; b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); G.stone = k; }; d.appendChild(b); });
+    const gear = document.createElement('button'); gear.textContent = '⚙️'; gear.title = 'Einstellen (J)'; gear.style.cssText = 'width:30px;height:30px;border-radius:50%;border:2px solid #e0b040;background:#2a2030;cursor:pointer;padding:0'; gear.onclick = (e) => { e.preventDefault(); e.stopPropagation(); openPanel(); }; d.appendChild(gear);
     const lab = document.createElement('span'); lab.style.marginLeft = '6px'; d.appendChild(lab);
     const cs = document.createElement('style'); cs.textContent = 'body.cinema #gauntHud{visibility:hidden}'; document.head.appendChild(cs);
     document.body.appendChild(d); G.hud = d; return d;
@@ -312,11 +317,85 @@
   const aim = () => { const d = new T.Vector3(); L.camera.getWorldDirection(d); return d; };
   const handPos = () => { const h = new T.Vector3(); if (P.rig && P.rig.hand) P.rig.hand.getWorldPosition(h); else h.set(P.x, (P.y || 0) + 1.4, P.z); return h; };
   const MK = () => L.MK || {};
-  const tgts = () => (L._targets ? L._targets() : []).filter((e) => e.kind !== 'remote');
+  // Einstellungen (Taste J / ⚙️): Wen trifft es, wie lange, welche Art
+  const CFG = L.gauntletCfg = { who: 'alle', zeit: 8, geistArt: 'kaempfen', geistDauer: 20, realArt: 'blasen', realDauer: 15, raumArt: 'selbst', kraft: 2 };
+  try { Object.assign(CFG, JSON.parse(localStorage.getItem('gauntletCfg') || '{}')); } catch (e) { /* egal */ }
+  const saveCfg = () => { try { localStorage.setItem('gauntletCfg', JSON.stringify(CFG)); } catch (e) { /* egal */ } };
+  const isRemote = (e) => e.kind === 'remote';
+  const allowed = (e) => (isRemote(e) ? CFG.who !== 'monster' : CFG.who !== 'spieler');
+  const tgts = () => (L._targets ? L._targets() : []).filter(allowed);
+  // Effekt an einen Mitspieler schicken
+  const toPlayer = (e, m) => { if (isRemote(e) && L.mp && L.mp.sendTo) L.mp.sendTo(e.pid, Object.assign({ t: 'gnt', by: (L.save.char || {}).name || 'Mitspieler' }, m)); };
   const fxs = [];
   function beamFx(a, b, col, w, dur) { const len = a.distanceTo(b), m = new T.Mesh(new T.CylinderGeometry(w, w, len, 10, 1, true), basic(col, { transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false })); m.position.copy(a).lerp(b, 0.5); m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), b.clone().sub(a).normalize()); L.scene.add(m); fxs.push({ m, t: 0, dur }); }
   function ringFx(x, y, z, col, r, dur) { const m = new T.Mesh(new T.TorusGeometry(1, 0.1, 6, 48), basic(col, { transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false })); m.rotation.x = Math.PI / 2; m.position.set(x, y, z); L.scene.add(m); fxs.push({ m, t: 0, dur, grow: r }); }
-  const dmg = (e, n) => { L._gauntletFiring = true; try { L.damageEnt(e, n, P.x, P.z, P); } finally { L._gauntletFiring = false; } };
+  const dmg = (e, n) => { if (isRemote(e)) { toPlayer(e, { e: 'dmg', d: Math.min(95, n / 6) }); return; } L._gauntletFiring = true; try { L.damageEnt(e, n, P.x, P.z, P); } finally { L._gauntletFiring = false; } };
+  const mind = new Set(), warped = new Set(), frozen = new Set();
+  function warp(e, art, dur) {
+    e.warpT = dur; e.warpArt = art; warped.add(e); e.prey = null; e.calmT = dur; e.state = 'idle';
+    const root = e.rig && e.rig.root; if (!root) return;
+    if (e.baseScale === undefined) e.baseScale = root.scale.x;
+    if (art === 'schaf') { if (!e.wool) { e.wool = new T.Mesh(L.GEO.sph, L.mat('#f4f2ea')); e.wool.scale.set(0.8, 0.6, 1); e.wool.position.y = 1.2; root.add(e.wool); } e.wool.visible = true; root.scale.setScalar(e.baseScale * 0.6); }
+    else root.scale.setScalar(e.baseScale * 0.3);
+    L.fx('#ff4060', e.x, 1, e.z, 14, 4, { basic: true, size: 0.3, life: 0.8 });
+  }
+  function updMind(dt) {
+    for (const e of [...frozen]) { e.frozenT -= dt; if (e.frozenT <= 0 || e.dead) { frozen.delete(e); continue; } e.x = e.frzPos.x; e.z = e.frzPos.z; e.stunT = Math.max(e.stunT || 0, 0.2); if (e.rig && e.rig.root) e.rig.root.position.set(e.x, e.rig.root.position.y, e.z); }
+    for (const e of [...warped]) { e.warpT -= dt; if (e.rig && e.rig.root && e.baseScale !== undefined) e.rig.root.scale.setScalar(e.baseScale * (e.warpArt === 'schaf' ? 0.6 : 0.3)); e.prey = null; if (e.warpT <= 0 || e.dead) { warped.delete(e); if (e.rig && e.baseScale !== undefined) e.rig.root.scale.setScalar(e.baseScale); if (e.wool) e.wool.visible = false; } }
+    for (const e of [...mind]) {
+      e.allyT -= dt; if (e.allyT <= 0 || e.dead) { mind.delete(e); continue; }
+      e.prey = null; e.calmT = 1;
+      // Verbündete greifen das nächste andere Monster an
+      let best = null, bd = 60; for (const o of L.ents.monsters) { if (o === e || o.dead || mind.has(o)) continue; const d = Math.hypot(o.x - e.x, o.z - e.z); if (d < bd) { bd = d; best = o; } }
+      if (best) { const a = Math.atan2(best.x - e.x, best.z - e.z); if (bd > 2.2) { e.x += Math.sin(a) * 6 * dt; e.z += Math.cos(a) * 6 * dt; e.yaw = a; } else { e.atkT = (e.atkT || 0) - dt; if (e.atkT <= 0) { e.atkT = 0.8; L.damageEnt(best, 35, e.x, e.z, P); } } }
+      if (Math.random() < dt * 3) L.fx('#ffe030', e.x, 3, e.z, 1, 1, { basic: true, size: 0.15, life: 0.5 });
+    }
+  }
+  // Wirkung auf MICH (von einem anderen Spieler mit Handschuh)
+  const ME = { freezeT: 0, ctrlT: 0, ctrl: null, shrinkT: 0, fx: null, pos: null };
+  L.gauntletRemote = function (m) {
+    if (!P.alive || L.state !== 'game' || (L.suitOn && L.suitOn())) return;
+    const by = String(m.by || 'Jemand').slice(0, 18);
+    if (m.e === 'dmg') L.hurtPlayer(m.d || 20, 'Vom Ewigkeitshandschuh von ' + by + ' getroffen');
+    else if (m.e === 'freeze') { ME.freezeT = Math.min(60, m.d || 8); ME.pos = { x: P.x, y: P.y || 0, z: P.z }; L.msg('🟢 ' + by + ' hat die Zeit für dich angehalten (' + Math.round(ME.freezeT) + ' s)!', 3000); }
+    else if (m.e === 'ctrl') { ME.ctrlT = Math.min(60, m.d || 15); ME.ctrl = { x: m.x, z: m.z }; L.msg('🟡 ' + by + ' kontrolliert deinen Geist – du läufst, wohin er will!', 3000); }
+    else if (m.e === 'shrink') { ME.shrinkT = Math.min(60, m.d || 15); L.msg('🔴 ' + by + ' hat deine Realität verändert – du bist winzig!', 3000); }
+    else if (m.e === 'tele') { P.x = m.x; P.z = m.z; P.y = 2; P.vx = P.vz = 0; P.air = true; L.msg('🔵 ' + by + ' hat dich weggeschleudert!', 2500); }
+  };
+  function updMe(dt) {
+    if (!ME.fx) { ME.fx = document.createElement('div'); ME.fx.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:12;display:none'; document.body.appendChild(ME.fx); }
+    let tint = null;
+    if (ME.freezeT > 0) { ME.freezeT -= dt; P.x = ME.pos.x; P.z = ME.pos.z; P.y = ME.pos.y; P.vx = P.vz = P.vy = 0; tint = 'rgba(40,255,120,.18)'; if (ME.freezeT <= 0) L.msg('⏱️ Die Zeit läuft wieder.', 1500); }
+    if (ME.ctrlT > 0) { ME.ctrlT -= dt; const dx = ME.ctrl.x - P.x, dz = ME.ctrl.z - P.z, d = Math.hypot(dx, dz); if (d > 1.5) { P.x += dx / d * 3.5 * dt; P.z += dz / d * 3.5 * dt; P.yaw = Math.atan2(dx, dz); } P.vx = P.vz = 0; tint = 'rgba(255,224,48,.15)'; }
+    if (ME.shrinkT > 0) { ME.shrinkT -= dt; if (P.rig) P.rig.root.scale.setScalar(0.3); P.vx *= 0.5; P.vz *= 0.5; tint = tint || 'rgba(255,60,90,.1)'; if (ME.shrinkT <= 0 && P.rig) { P.rig.root.scale.setScalar(1); L.msg('Du bist wieder normal groß.', 1500); } }
+    ME.fx.style.display = tint ? 'block' : 'none'; if (tint) ME.fx.style.background = tint;
+  }
+  // ---------- Einstellungsfenster ----------
+  let panel = null;
+  function openPanel() {
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:70;background:rgba(20,16,28,.96);border:2px solid #e0b040;border-radius:14px;padding:16px 20px;color:#fff;font:14px Arial,sans-serif;width:min(420px,92vw);max-height:86vh;overflow:auto';
+      document.body.appendChild(panel);
+    }
+    const sel = (key, opts) => '<select data-k="' + key + '" style="width:100%;padding:4px;margin:3px 0 9px">' + opts.map(([v, t]) => '<option value="' + v + '"' + (String(CFG[key]) === String(v) ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>';
+    const rng = (key, a, b, unit) => '<input type="range" data-k="' + key + '" min="' + a + '" max="' + b + '" value="' + CFG[key] + '" style="width:75%"> <b data-v="' + key + '">' + CFG[key] + unit + '</b><br>';
+    panel.innerHTML = '<h3 style="margin:0 0 10px;color:#ffd060">🧤 Ewigkeitshandschuh – einstellen</h3>'
+      + '<b>Wirkt auf</b>' + sel('who', [['alle', 'Alle (Monster und Spieler)'], ['monster', 'Nur Monster'], ['spieler', 'Nur Spieler']])
+      + '<b style="color:#b040ff">🟣 Kraft – Stärke</b><br>' + rng('kraft', 1, 3, '') + '<br>'
+      + '<b style="color:#3080ff">🔵 Raum</b>' + sel('raumArt', [['selbst', 'Mich selbst hinteleportieren'], ['gegner', 'Gegner in Blickrichtung wegschleudern']])
+      + '<b style="color:#ff2030">🔴 Realität</b>' + sel('realArt', [['blasen', 'In Seifenblasen auflösen'], ['schaf', 'In harmlose Schafe verwandeln'], ['schrumpf', 'Winzig schrumpfen']]) + 'Dauer: ' + rng('realDauer', 5, 60, ' s')
+      + '<br><b style="color:#30ff70">🟢 Zeit anhalten – wie lange</b><br>' + rng('zeit', 2, 60, ' s')
+      + '<br><b style="color:#ffe030">🟡 Geist</b>' + sel('geistArt', [['kaempfen', 'Monster kämpfen für mich'], ['ruhig', 'Monster vergessen mich']]) + 'Dauer: ' + rng('geistDauer', 5, 60, ' s')
+      + '<small style="opacity:.8">Spieler im Umkreis laufen per Geist dorthin, wo du hinschaust.</small><br><br>'
+      + '<button data-close style="width:100%;padding:8px;font-weight:700;background:#e0b040;border:0;border-radius:8px;cursor:pointer">Fertig</button>';
+    panel.querySelectorAll('[data-k]').forEach((el) => { el.oninput = () => { const k = el.dataset.k; CFG[k] = el.type === 'range' ? +el.value : el.value; const v = panel.querySelector('[data-v="' + k + '"]'); if (v) v.textContent = el.value + (k === 'kraft' ? '' : ' s'); saveCfg(); }; });
+    panel.querySelector('[data-close]').onclick = closePanel;
+    panel.style.display = 'block'; L.uiBlock = true; if (L.unlock) L.unlock();
+  }
+  function closePanel() { if (!panel || panel.style.display === 'none') return; panel.style.display = 'none'; L.uiBlock = false; if (L.state === 'game' && !L.paused && L.lock) L.lock(); }
+  addEventListener('keydown', (e) => { if (e.code === 'KeyJ' && !L.chatOpen && L.state === 'game' && L.selType && L.selType() === 'ewigkeitshandschuh') { if (panel && panel.style.display !== 'none') closePanel(); else openPanel(); } else if (e.code === 'Escape' && panel && panel.style.display !== 'none') closePanel(); });
+  L.gauntletPanel = openPanel;
   const owf = L.weaponFire;
   L.weaponFire = function (w, d) {
     if (!d || !d.gauntlet) return owf(w, d);
@@ -328,12 +407,22 @@
       case 'kraft': {
         const h = L.rayHit(o, dir, 250, P.camDist + 0.3), end = o.clone().addScaledVector(dir, h.t);
         beamFx(hp, end, S.col, 0.7, 0.5); L.env.bolt = 0.6; L.shake = Math.max(L.shake, 0.6);
-        if (h.ent) dmg(h.ent, 900);
-        for (const e of tgts()) if (e !== h.ent && Math.hypot(e.x - end.x, e.z - end.z) < 10 + (e.bigR || 0)) dmg(e, 400);
+        const kp = [0.5, 1, 1.8][CFG.kraft - 1] || 1;
+        if (h.ent && allowed(h.ent)) dmg(h.ent, 900 * kp);
+        for (const e of tgts()) if (e !== h.ent && Math.hypot(e.x - end.x, e.z - end.z) < 10 * kp + (e.bigR || 0)) dmg(e, 400 * kp);
         L.fx('#d080ff', end.x, end.y, end.z, 40, 12, { basic: true, size: 0.6, life: 0.8 }); L.snd.explosion && L.snd.explosion({ x: end.x, y: end.y, z: end.z });
         break;
       }
       case 'raum': {
+        if (CFG.raumArt === 'gegner') {
+          // alle in der Blickrichtung (bis 80 m) weit weg teleportieren
+          let n = 0;
+          for (const e of tgts()) { if (e.kind === 'thanatos' || e.dead) continue; const ex = e.x - P.x, ez = e.z - P.z, ed = Math.hypot(ex, ez); if (ed > 80 || (ex * dir.x + ez * dir.z) / (ed || 1) < 0.85) continue;
+            ringFx(e.x, 1, e.z, S.col, 3, 0.6); const a = Math.random() * 6.28, d = L.rand(250, 400);
+            if (isRemote(e)) toPlayer(e, { e: 'tele', x: e.x + Math.sin(a) * d, z: e.z + Math.cos(a) * d }); else if (MK()[e.kind]) { e.x += Math.sin(a) * d; e.z += Math.cos(a) * d; e.prey = null; if (e.frzPos) { e.frzPos.x = e.x; e.frzPos.z = e.z; } }
+            n++; }
+          L.msg('🔵 Raum-Stein: ' + n + ' weggeschleudert.', 2000); break;
+        }
         const h = L.rayHit(o, dir, 300, P.camDist + 0.3), end = o.clone().addScaledVector(dir, Math.max(2, h.t - 1.5));
         ringFx(P.x, y + 1, P.z, S.col, 3, 0.6); P.x = end.x; P.z = end.z; P.y = Math.max(0, end.y - 1); P.vx = P.vz = P.vy = 0; P.air = true; ringFx(P.x, P.y + 1, P.z, S.col, 3, 0.6);
         L.snd.teleport && L.snd.teleport({ x: P.x, y: P.y, z: P.z }); break;
@@ -341,7 +430,15 @@
       case 'real': {
         const h = L.rayHit(o, dir, 120, P.camDist + 0.3), end = o.clone().addScaledVector(dir, h.t);
         ringFx(end.x, Math.max(0.3, end.y), end.z, S.col, 15, 0.9);
-        for (const e of tgts()) { if (Math.hypot(e.x - end.x, e.z - end.z) > 15 + (e.bigR || 0)) continue; if (MK()[e.kind]) { dmg(e, 1e9); for (let k = 0; k < 6; k++) L.fx(k % 2 ? '#ff4060' : '#ffd0e0', e.x, 1 + k * 0.4, e.z, 3, 3, { basic: true, size: 0.35, life: 1.4, g: -2 }); } else dmg(e, 600); }
+        let n = 0;
+        for (const e of tgts()) {
+          if (e.dead || Math.hypot(e.x - end.x, e.z - end.z) > 15 + (e.bigR || 0)) continue; n++;
+          if (isRemote(e)) { toPlayer(e, { e: CFG.realArt === 'blasen' ? 'dmg' : 'shrink', d: CFG.realArt === 'blasen' ? 60 : CFG.realDauer }); continue; }
+          if (!MK()[e.kind]) { dmg(e, 600); continue; }
+          if (CFG.realArt === 'blasen') { dmg(e, 1e9); for (let k = 0; k < 6; k++) L.fx(k % 2 ? '#ff4060' : '#ffd0e0', e.x, 1 + k * 0.4, e.z, 3, 3, { basic: true, size: 0.35, life: 1.4, g: -2 }); }
+          else warp(e, CFG.realArt, CFG.realDauer);
+        }
+        L.msg('🔴 Realität: ' + n + ' ' + ({ blasen: 'zu Seifenblasen', schaf: 'in harmlose Schafe verwandelt', schrumpf: 'geschrumpft' })[CFG.realArt] + '.', 2200);
         break;
       }
       case 'seele': {
@@ -349,13 +446,22 @@
         P.hp = Math.min(100, P.hp + 30 + n * 10); ringFx(P.x, y + 1, P.z, S.col, 25, 0.8); L.msg('🟠 Seelen-Stein: ' + n + ' Seelen entzogen – du bist geheilt.', 2000); break;
       }
       case 'zeit': {
-        let n = 0; for (const e of tgts()) { if (Math.hypot(e.x - P.x, e.z - P.z) > 60) continue; if (MK()[e.kind] && !e.dead) { e.stunT = Math.max(e.stunT || 0, 8); n++; } }
+        const dur = CFG.zeit; let n = 0;
+        for (const e of tgts()) { if (e.dead || Math.hypot(e.x - P.x, e.z - P.z) > 60) continue; if (isRemote(e)) { toPlayer(e, { e: 'freeze', d: dur }); n++; } else if (MK()[e.kind]) { e.stunT = Math.max(e.stunT || 0, dur); e.frozenT = dur; e.frzPos = { x: e.x, z: e.z }; frozen.add(e); n++; } }
         for (let k = 0; k < 3; k++) setTimeout(() => ringFx(P.x, y + 1 + k, P.z, S.col, 60, 1.2), k * 200);
-        L.msg('🟢 Zeit-Stein: ' + n + ' Monster sind 8 Sekunden lang eingefroren.', 2500); break;
+        L.msg('🟢 Zeit-Stein: ' + n + ' für ' + dur + ' Sekunden eingefroren.', 2500); break;
       }
       case 'geist': {
-        let n = 0; for (const e of tgts()) { if (Math.hypot(e.x - P.x, e.z - P.z) > 50 || !MK()[e.kind] || e.dead) continue; e.prey = null; e.state = 'idle'; e.calmT = 30; n++; }
-        ringFx(P.x, y + 2, P.z, S.col, 50, 1); L.msg('🟡 Geist-Stein: ' + n + ' Monster vergessen dich für 30 Sekunden.', 2500); break;
+        let n = 0; const dur = CFG.geistDauer, h = L.rayHit(o, dir, 200, P.camDist + 0.3), goal = o.clone().addScaledVector(dir, h.t);
+        for (const e of tgts()) {
+          if (e.dead || Math.hypot(e.x - P.x, e.z - P.z) > 50) continue;
+          if (isRemote(e)) { toPlayer(e, { e: 'ctrl', x: goal.x, z: goal.z, d: dur }); n++; continue; }
+          if (!MK()[e.kind]) continue; n++;
+          if (CFG.geistArt === 'ruhig') { e.prey = null; e.state = 'idle'; e.calmT = dur; }
+          else { e.allyT = dur; e.prey = null; e.calmT = dur; mind.add(e); }
+        }
+        ringFx(P.x, y + 2, P.z, S.col, 50, 1);
+        L.msg('🟡 Geist-Stein: ' + n + (CFG.geistArt === 'ruhig' ? ' vergessen dich' : ' kämpfen jetzt für dich') + ' (' + dur + ' s). Spieler laufen dorthin, wo du hinschaust.', 3000); break;
       }
       case 'snap': {
         const all = (L.ents.monsters || []).filter((m) => !m.dead && L.worldOf && L.worldOf(m.x, m.z) === L.worldOf(P.x, P.z));
@@ -376,7 +482,7 @@
     if (r !== P.rig) return;
     const held = L.selType && L.selType() === 'ewigkeitshandschuh';
     const h = hud(); h.style.display = held && L.state === 'game' ? 'flex' : 'none';
-    if (held) { [...h.children].forEach((b, k) => { if (b.tagName === 'BUTTON') { const rdy = (G.cd[STONES[k].id] || 0) <= performance.now() / 1000; b.style.borderColor = k === G.stone ? '#fff' : '#333'; b.style.opacity = rdy ? '1' : '0.35'; b.style.transform = k === G.stone ? 'scale(1.2)' : ''; } }); h.lastChild.textContent = STONES[G.stone].name + ' · N = wechseln'; }
+    if (held) { [...h.children].forEach((b, k) => { if (b.tagName === 'BUTTON' && k < STONES.length) { const rdy = (G.cd[STONES[k].id] || 0) <= performance.now() / 1000; b.style.borderColor = k === G.stone ? '#fff' : '#333'; b.style.opacity = rdy ? '1' : '0.35'; b.style.transform = k === G.stone ? 'scale(1.2)' : ''; } }); h.lastChild.textContent = STONES[G.stone].name + ' · N = wechseln · J = einstellen'; }
     if (G.anim > 0) {
       G.anim -= dt; const s = Math.sin((0.8 - G.anim) / 0.8 * Math.PI);
       const a = r.arms[0]; a.arm.rotation.x = -1.4 - s * 1.3; a.elbow.rotation.x = 0;
@@ -387,6 +493,7 @@
 
   // ---------- jedes Bild ----------
   L.updateTitan = function (dt) {
+    updMind(dt); updMe(dt);
     updatePortals(dt);
     const here = L.inTitan(P.x, P.z);
     if (!world && (here || (L.inMoon && L.inMoon(P.x) && Math.hypot(P.x - MOONP().x, P.z) < 200))) build();
