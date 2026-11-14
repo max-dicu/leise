@@ -162,7 +162,7 @@
     $('tChat').hidden = !(L.net && L.net.connected);
     const it = L.selType ? L.selType() : null;
     $('tFire').textContent = it ? L.ITEMS[it].icon : '✋';
-    $('tAim').hidden = !(it && L.ITEMS[it].slot === 'waffe');
+    $('tAim').hidden = !(it && L.isGun && L.isGun(it));
     if ($('tAim').hidden && L.mouse.right) { L.mouse.right = false; $('tAim').classList.remove('on'); }
   }, 150);
 })();

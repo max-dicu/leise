@@ -540,6 +540,9 @@
     if (L.gauntletStart) L.gauntletStart();
     if (L.titanOn()) { P.hot[1] = { type: 'repulsor', count: 1, mag: 1 }; P.hot[2] = { type: 'schulterkanone', count: 1, mag: 1 }; P.hot[3] = { type: 'minirakete', count: 1, mag: 1 }; P.hot[4] = { type: 'brustlaser', count: 1, mag: 1 }; }
   }
+  // Schusswaffen (nur mit denen zoomt die rechte Maustaste): keine Fäuste, Nahkampf, Handschuh oder Feuerwerk
+  function isGun(t) { const d = t && ITEMS[t]; return !!(d && d.slot === 'waffe' && !d.hero && !d.gauntlet && !d.admin && t !== 'donneraxt' && (d.range || 0) >= 30); }
+  L.isGun = isGun;
   function selItem() { return P.sel >= 0 && P.hot[P.sel] ? P.hot[P.sel] : null; }
   function selType() { const it = selItem(); return it ? it.type : null; }
   L.selType = selType;
@@ -653,7 +656,7 @@
     const fIn = block ? 0 : (L.keys.KeyW ? 1 : 0) - (L.keys.KeyS ? 1 : 0);
     const rIn = block ? 0 : (L.keys.KeyD ? 1 : 0) - (L.keys.KeyA ? 1 : 0);
     const moving = (fIn || rIn) && P.knockT <= 0 && P.eatT < 0;
-    P.aiming = !block && L.mouse.right && (selType() && ITEMS[selType()].slot === 'waffe');
+    P.aiming = !block && L.mouse.right && isGun(selType());
     let sprint = !block && (L.keys.ShiftLeft || L.keys.ShiftRight);
     if (sprint && moving && P.stance !== 'stand') P.stance = 'stand';
     if (P.stam <= 1) P.exhausted = true;
