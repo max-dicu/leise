@@ -293,8 +293,8 @@
   L.gauntletStart = function () {
     if (!L.hasGauntlet()) return;
     if ([P.hot, P.bag].some((a) => a.some((x) => x && x.type === 'ewigkeitshandschuh'))) return;
-    let i = P.hot.findIndex((x) => !x); if (i < 0) i = 0;
-    P.hot[i] = { type: 'ewigkeitshandschuh', count: 1, mag: 1 };
+    const i = P.hot.findIndex((x) => !x), it = { type: 'ewigkeitshandschuh', count: 1, mag: 1 };
+    if (i >= 0) P.hot[i] = it; else { const b = P.bag.findIndex((x) => !x); if (b >= 0) P.bag[b] = it; else P.hot[0] = it; }
   };
 
   // ---------- Handschuh benutzen ----------
