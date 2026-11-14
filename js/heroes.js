@@ -19,8 +19,8 @@
   // ---------- Werte ----------
   const STATS = {
     koloss: { dmg: 0.3, spd: 2.1, jump: 3.4, noFall: true, regen: 3, items: ['kolossfaust', 'donnerklatscher', 'erdbebensprung'] },
-    netz: { dmg: 0.75, spd: 1.35, jump: 2.1, noFall: true, regen: 0.5, items: ['netzschuss', 'netzschwinger', 'netzbombe'] },
-    thor: { dmg: 0.45, spd: 1.15, jump: 1.5, noFall: true, regen: 1, fly: true, items: ['thorhammer', 'gewitter'] },
+    netz: { dmg: 0.75, spd: 1.35, jump: 2.1, noFall: true, regen: 0.5, slot0: 'spinnenschlag', items: ['netzschuss', 'netzschwinger', 'netzzug', 'netzbombe'] },
+    thor: { dmg: 0.45, spd: 1.15, jump: 1.5, noFall: true, regen: 1, fly: true, items: ['thorhammer', 'sturmaxt', 'gewitter'] },
     loki: { dmg: 0.8, spd: 1.2, jump: 1.3, noFall: false, regen: 0.5, items: ['lokidolch', 'lokizepter', 'illusion', 'tarnung'] },
     walross: { dmg: 0.55, spd: 0.85, jump: 0.9, noFall: false, regen: 1, swim: 3.5, items: ['stosszahn', 'bauchplatscher', 'walrossbruell'] }
   };
@@ -40,6 +40,8 @@
   L.heroNoFall = () => { const s = st(); return !!(s && s.noFall); };
   L.heroFly = () => { const s = st(); return !!(s && s.fly); };
   L.heroInvis = () => H.invisT > 0;
+  // Thor fliegt immer mit Hammer oder Axt in der Hand
+  L.heldOverride = (st) => (P.flying && L.heroId() === 'thor' && st !== 'thorhammer' && st !== 'sturmaxt' ? 'thorhammer' : st);
 
   // ---------- Fähigkeiten als Gegenstände ----------
   const A = (name, icon, rate, extra) => Object.assign({ name, slot: 'waffe', icon, dmg: 0, rate, noise: 30, range: 120, ammo: null, mag: 1, spread: 0, energy: true, hero: true }, extra || {});
@@ -55,6 +57,9 @@
     illusion: A('Illusionen', '👥', 12),
     tarnung: A('Tarnung', '🫥', 25, { noise: 0 }),
     stosszahn: A('Stoßzahn-Angriff', '🦷', 1.5, { noise: 60 }),
+    sturmaxt: A('Sturmaxt', '🪓', 1.1, { noise: 90, range: 120 }),
+    spinnenschlag: A('Spinnen-Kombo', '🥋', 0.32, { noise: 25 }),
+    netzzug: A('Netz-Zug', '🪢', 1.3, { noise: 30, range: 60 }),
     bauchplatscher: A('Bauchplatscher', '🌊', 4, { noise: 100 }),
     walrossbruell: A('Walross-Gebrüll', '📢', 15, { noise: 150 })
   });
@@ -63,6 +68,13 @@
   const obi = L.buildItem;
   L.buildItem = function (type) {
     if (type === 'lokizepter') { const g = new T.Group(); const s = new T.Mesh(L.GEO.cyl, L.mat('#c8a030')); s.scale.set(0.025, 1.1, 0.025); s.position.y = 0.2; g.add(s); const gem = new T.Mesh(L.GEO.sph, L.mat('#40ffa0', { basic: true })); gem.scale.setScalar(0.07); gem.position.y = 0.78; g.add(gem); for (const sd of [-1, 1]) { const b = new T.Mesh(L.GEO.cone, L.mat('#c8a030')); b.scale.set(0.02, 0.2, 0.02); b.position.set(sd * 0.06, 0.82, 0); b.rotation.z = -sd * 0.5; g.add(b); } return g; }
+    if (type === 'sturmaxt') {
+      const g = new T.Group(); const h = new T.Mesh(L.GEO.cyl, L.mat('#5a3a1e')); h.scale.set(0.03, 0.85, 0.03); h.position.y = 0.2; g.add(h);
+      const bl = new T.Mesh(L.GEO.box, L.mat('#c8ccd6', { metal: 0.9, rough: 0.25 })); bl.scale.set(0.035, 0.32, 0.26); bl.position.set(0, 0.52, 0.14); g.add(bl);
+      const ed = new T.Mesh(L.GEO.box, L.mat('#60c8ff', { basic: true })); ed.scale.set(0.04, 0.3, 0.02); ed.position.set(0, 0.52, 0.28); g.add(ed);
+      const bk = new T.Mesh(L.GEO.box, L.mat('#8a8e98', { metal: 0.8, rough: 0.3 })); bk.scale.set(0.08, 0.12, 0.1); bk.position.set(0, 0.52, -0.06); g.add(bk);
+      return g;
+    }
     if (HERO_ITEMS.has(type)) return new T.Group(); // Fäuste, Netze, Zähne: nichts in der Hand
     return obi(type);
   };
@@ -71,8 +83,9 @@
     for (let k = 0; k < P.hot.length; k++) if (P.hot[k] && HERO_ITEMS.has(P.hot[k].type)) P.hot[k] = null;
     const s = st(); if (!s) return;
     s.items.forEach((t, k) => { P.hot[k + 1] = { type: t, count: 1, mag: 1 }; });
+    if (s.slot0) P.hot[0] = { type: s.slot0, count: 1, mag: 1 };
     P.sel = 1;
-    L.msg(NAMES[L.heroId()] + ': Fähigkeiten liegen auf den Tasten 2–' + (s.items.length + 1) + '.', 6000);
+    L.msg(NAMES[L.heroId()] + ': Fähigkeiten auf den Tasten ' + (s.slot0 ? '1' : '2') + '–' + (s.items.length + 1) + '.' + (s.fly ? ' V = fliegen (mit Hammer oder Axt).' : ''), 7000);
   };
 
   // ---------- Aussehen ----------
@@ -297,6 +310,33 @@
         for (let k = 0; k < 6; k++) setTimeout(() => { const x = end.x + L.rand(-9, 9), z = end.z + L.rand(-9, 9); bolt(x, z, gy); hitArea(x, gy + 1, z, 6, 210, 3, 1); if (k % 2 === 0) L.snd.thunder && L.snd.thunder(0); }, 250 + k * 190);
         break;
       }
+      case 'sturmaxt': {
+        // Axt werfen: fliegt mit Blitzspur ins Ziel und kommt zurück
+        play('throw', 0.5);
+        const o = L.camera.position, dir = aim(), h = L.rayHit(o, dir, 120 + P.camDist, P.camDist + 0.3), end = o.clone().addScaledVector(dir, h.t);
+        if (L.axeThrow) L.axeThrow(hp.clone(), end.clone());
+        line(hp, end, 0x80d8ff, 0.3, 0.06);
+        setTimeout(() => { if (h.ent) L.damageEnt(h.ent, 320 * h.mult, P.x, P.z, P); bolt(end.x, end.z, Math.max(0, end.y - 1)); hitArea(end.x, end.y, end.z, 6, 160, 4, 1, h.ent ? new Set([h.ent]) : null); L.snd.thunder && L.snd.thunder(0); }, 250);
+        break;
+      }
+      case 'spinnenschlag': {
+        // schnelle Kombo: Schlag – Schlag – Salto-Tritt
+        H.combo = ((H.combo || 0) + 1) % 3; const big = H.combo === 0;
+        play(big ? 'flipkick' : H.combo === 1 ? 'jab' : 'jab2', big ? 0.45 : 0.25);
+        if (big) { P.vy = Math.max(P.vy || 0, 5); P.air = true; }
+        setTimeout(() => { const n = hitArea(P.x + f.x * 1.8, (P.y || 0) + 1.1, P.z + f.z * 1.8, big ? 2.6 : 2.0, big ? 150 : 70, big ? 9 : 2, big ? 1.5 : 0.4); if (n) { L.shake = Math.max(L.shake, big ? 0.5 : 0.2); L.nz && L.nz({ dur: 0.12, f: 500, vol: big ? 0.6 : 0.35 }); } else L.snd.swing && L.snd.swing(); }, big ? 220 : 90);
+        break;
+      }
+      case 'netzzug': {
+        // Netz an ein Monster schießen, heranziehen und wegtreten (große Monster: du ziehst dich zu ihnen)
+        const o = L.camera.position, dir = aim(), h = L.rayHit(o, dir, 60 + P.camDist, P.camDist + 0.3), end = o.clone().addScaledVector(dir, h.t);
+        line(hp, end, 0xf0f8ff, 0.5, 0.025); play('shoot', 0.3);
+        if (!h.ent) break;
+        const e = h.ent, small = L.MK && L.MK[e.kind] && !(e.kind === 'rufer');
+        H.pull = { e, t: 0, small, sx: e.x, sz: e.z, px: P.x, pz: P.z };
+        L.nz && L.nz({ dur: 0.25, f: 3000, type: 'highpass', vol: 0.2 });
+        break;
+      }
       case 'lokizepter': {
         play('shoot', 0.3);
         const o = L.camera.position, dir = aim(), h = L.rayHit(o, dir, 150 + P.camDist, P.camDist + 0.3), end = o.clone().addScaledVector(dir, h.t);
@@ -379,6 +419,14 @@
     if (!s) { H.invisT = 0; return; }
     if (P.alive && s.regen) P.hp = Math.min(100, P.hp + s.regen * dt);
     if (H.invisT > 0) { H.invisT -= dt; if (P.rig) P.rig.root.visible = Math.random() < 0.04; if (H.invisT <= 0) L.msg('🐍 Die Tarnung ist vorbei.', 2000); }
+    if (H.pull) {
+      const Q = H.pull; Q.t += dt; const u = Math.min(1, Q.t / 0.35), e = Q.e, f = fwd();
+      if (e.dead) H.pull = null;
+      else if (Q.small) { e.x = L.lerp(Q.sx, P.x + f.x * 1.6, u); e.z = L.lerp(Q.sz, P.z + f.z * 1.6, u); e.stunT = Math.max(e.stunT || 0, 0.5); }
+      else { P.x = L.lerp(Q.px, e.x - f.x * 3, u); P.z = L.lerp(Q.pz, e.z - f.z * 3, u); P.air = true; P.vy = 3; }
+      if (H.anchor === undefined || !H.anchor) { /* Netzlinie */ }
+      if (u >= 1 && H.pull) { H.pull = null; play('flipkick', 0.45); setTimeout(() => { const n = L.damageEnt(e, Q.small ? 140 : 200, P.x, P.z, P); if (Q.small && L.MK && L.MK[e.kind] && !e.dead) { e.x += f.x * 10; e.z += f.z * 10; e.stunT = Math.max(e.stunT || 0, 2); } L.shake = Math.max(L.shake, 0.5); L.nz && L.nz({ dur: 0.15, f: 400, vol: 0.6 }); }, 120); }
+    }
     if (H.dashT > 0) {
       H.dashT -= dt; const f = fwd(); P.vx = f.x * 26; P.vz = f.z * 26;
       if (hitArea(P.x + f.x * 1.5, (P.y || 0) + 1, P.z + f.z * 1.5, 2.8, 230, 7, 1, H.dashHit)) { L.shake = Math.max(L.shake, 0.5); boom(0.5); }
@@ -447,7 +495,11 @@
         r.torso.rotation.x += 0.18; for (const a of r.arms) a.arm.rotation.z += (a === aR ? -0.25 : 0.25);
       }
     }
-    if (id === 'thor' && P.flying) { aR.arm.rotation.x = -3.0; aR.elbow.rotation.x = 0; r.body.rotation.x = 0.9; }
+    if (id === 'thor' && P.flying) {
+
+      aR.arm.rotation.x = -3.0; aR.elbow.rotation.x = 0; r.body.rotation.x = 0.9;
+      if (Math.random() < dt * 12) { const p = new T.Vector3(); (r.hand || r.root).getWorldPosition(p); L.fx('#a0e0ff', p.x, p.y, p.z, 1, 1, { basic: true, size: 0.1, life: 0.3 }); }
+    }
     if (r.cape) r.cape.rotation.x = 0.15 + Math.min(1.1, Math.hypot(P.vx, P.vz) * 0.06) + (P.flying ? 0.5 : 0) + Math.sin(performance.now() / 300) * 0.05;
     if (!H.anim) return;
     H.animT += dt; const u = Math.min(1, H.animT / H.animDur), s = Math.sin(u * Math.PI);
@@ -461,6 +513,10 @@
       case 'raise': aR.arm.rotation.x = -3.1; aR.elbow.rotation.x = 0; aL.arm.rotation.x = -1.4 * s; break;
       case 'cast': for (const a of r.arms) { a.arm.rotation.x = -1.4; a.arm.rotation.z = (a === aR ? -0.4 : 0.4) * s; } break;
       case 'dash': r.body.rotation.x = 0.6; for (const a of r.arms) a.arm.rotation.x = 0.6; break;
+      case 'throw': aR.arm.rotation.x = u < 0.4 ? -2.8 : -2.8 + (u - 0.4) * 4; aR.elbow.rotation.x = u < 0.4 ? -1.2 : 0; r.torso.rotation.y = u < 0.4 ? 0.4 : -0.3; break;
+      case 'jab': aR.arm.rotation.x = -1.55 * s; aR.elbow.rotation.x = -0.2; r.torso.rotation.y = -0.3 * s; break;
+      case 'jab2': aL.arm.rotation.x = -1.55 * s; aL.elbow.rotation.x = -0.2; r.torso.rotation.y = 0.3 * s; break;
+      case 'flipkick': r.body.rotation.x = -u * 6.283; r.legs[0].leg.rotation.x = -1.4 * s; r.legs[0].knee.rotation.x = 0.2; for (const a of r.arms) a.arm.rotation.x = -2.5 * s; break;
       case 'roar': r.head.rotation.x = -0.5 * s; for (const a of r.arms) { a.arm.rotation.z = (a === aR ? -1.2 : 1.2) * s; a.arm.rotation.x = -0.4; } break;
     }
     if (u >= 1 && H.anim !== 'slamUp') H.anim = null;

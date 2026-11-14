@@ -777,7 +777,7 @@
     const r = P.rig;
     r.root.position.set(P.x, P.y, P.z); r.root.rotation.set(0, P.yaw, 0);
     const st = selType();
-    L.setHeld(r, P.eatT >= 0 ? P.eatType : st);
+    L.setHeld(r, P.eatT >= 0 ? P.eatType : (L.heldOverride ? L.heldOverride(st) : st));
     P.animSt = {
       mode: P.tumble > 0 ? 'tumble' : P.air ? 'jump' : P.mode === 'idle' ? 'walk' : P.mode, tumble: P.tumble,
       phase: P.phase, speed: L.clamp(hsp / 4, 0, 1), aim: P.aiming || (P.fireCd > 0 && st && ITEMS[st] && ITEMS[st].slot === 'waffe'),
@@ -823,7 +823,7 @@
     // Superhelden-Pose: nach vorne geneigt, ein Arm voraus, Beine gestreckt
     const r = P.rig, tilt = L.clamp(hsp / 30, 0, 1);
     r.root.position.set(P.x, P.y, P.z); r.root.rotation.set(0, P.yaw, 0); r.root.rotateX(tilt * 1.1);
-    L.setHeld(r, selType());
+    L.setHeld(r, L.heldOverride ? L.heldOverride(selType()) : selType());
     P.phase += dt * 3;
     P.animSt = { mode: 'run', phase: P.phase, speed: 1 };
     L.animHuman(r, { mode: 'walk', phase: P.phase, speed: 0.05, aim: P.fireCd > 0 && selType() && ITEMS[selType()].slot === 'waffe', pitch: -P.camPitch * 0.6 });
