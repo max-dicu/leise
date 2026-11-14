@@ -297,8 +297,9 @@
   L.gauntletStart = function () {
     if (!L.hasGauntlet()) return;
     if ([P.hot, P.bag].some((a) => a.some((x) => x && x.type === 'ewigkeitshandschuh'))) return;
-    const i = P.hot.findIndex((x) => !x), it = { type: 'ewigkeitshandschuh', count: 1, mag: 1 };
-    if (i >= 0) P.hot[i] = it; else { const b = P.bag.findIndex((x) => !x); if (b >= 0) P.bag[b] = it; else P.hot[0] = it; }
+    // in den Rucksack (Inventar), nicht in die Schnellleiste – von dort kannst du ihn selbst hineinziehen
+    const it = { type: 'ewigkeitshandschuh', count: 1, mag: 1 }, b = P.bag.findIndex((x) => !x);
+    if (b >= 0) P.bag[b] = it; else { const i = P.hot.findIndex((x) => !x); if (i >= 0) P.hot[i] = it; }
   };
 
   // ---------- Handschuh benutzen ----------
@@ -512,7 +513,7 @@
         L.scene.remove(deadInfo.g); deadInfo = null;
         const first = !L.hasGauntlet(); L.save.gauntlet = true; L.persist && L.persist();
         L.gauntletStart();
-        L.banner('🧤 DER EWIGKEITSHANDSCHUH', (first ? 'Für immer freigeschaltet – mit jedem Skin! ' : '') + 'Nimm ihn in die Hand: Klick = Stein benutzen, N = Stein wechseln.');
+        L.banner('🧤 DER EWIGKEITSHANDSCHUH', (first ? 'Für immer freigeschaltet – mit jedem Skin! ' : '') + 'Er liegt in deinem Inventar (Tab). Zieh ihn in die Schnellleiste: Klick = Stein benutzen, N = Stein wechseln, J = einstellen.');
         L.snd.codeOk && L.snd.codeOk();
       }
     }
