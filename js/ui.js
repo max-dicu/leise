@@ -619,6 +619,7 @@
           L.animHuman(prev.rig, { mode: 'walk', phase: t * 1.5, speed: 0.02 });
           prev.r.render(prev.s, prev.cam);
         }
+        { const n = $('charTooBig'); if (n) { const on = !$('charScreen').hidden && !!prev.big, r = $('charPreview').getBoundingClientRect(); n.style.display = on && r.height > 0 ? 'block' : 'none'; if (on) { n.style.left = (r.left + r.width / 2) + 'px'; n.style.top = (r.bottom - 38) + 'px'; } } }
         requestAnimationFrame(loop);
       };
       loop();
@@ -633,6 +634,25 @@
     if (charApp.special === 'baer' && L.baerToken()) charApp.bk = L.baerToken();
     if (charApp.special && charApp.special.startsWith('h_') && L.heroToken && L.heroToken(charApp.special.slice(2))) charApp.hk = L.heroToken(charApp.special.slice(2));
     prev.rig = L.buildHuman(charApp); prev.s.add(prev.rig.root);
+    // ragt der Skin über den Rand der Vorschau? Dann Hinweis anzeigen (die Vorschau selbst bleibt gleich)
+    let big = false; const v = new T.Vector3();
+    prev.cam.updateMatrixWorld(); L.animHuman(prev.rig, { mode: 'walk', phase: 0, speed: 0.02 });
+    const vis = (o) => { while (o) { if (!o.visible) return false; o = o.parent; } return true; };
+    for (const ry of [-0.8, 0, 0.8]) {
+      if (big) break;
+      prev.rig.root.rotation.y = ry; prev.rig.root.updateMatrixWorld(true);
+      prev.rig.root.traverse((o) => {
+        if (big || !o.isMesh || !vis(o) || !o.geometry || !o.geometry.attributes.position) return;
+        const pa = o.geometry.attributes.position;
+        for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld).project(prev.cam); if (Math.abs(v.x) > 1.01 || Math.abs(v.y) > 1.01) { big = true; return; } }
+      });
+    }
+    prev.big = big;
+    if (!$('charTooBig')) {
+      const note = document.createElement('div'); note.id = 'charTooBig'; note.textContent = '⚠️ Zu breit für das Menü';
+      note.style.cssText = 'position:fixed;z-index:60;display:none;transform:translateX(-50%);white-space:nowrap;font-weight:700;color:#ffb040;background:rgba(0,0,0,.7);padding:4px 10px;border-radius:8px;pointer-events:none';
+      document.body.appendChild(note);
+    }
   }
   function renderCharOpts() {
     const box = $('charOpts'); box.innerHTML = '';
