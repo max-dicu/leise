@@ -508,12 +508,22 @@
   let flashT = null;
   function flash(t) { const f = panel && panel.querySelector('#wsFlash'); if (f) { f.textContent = t; clearTimeout(flashT); flashT = setTimeout(() => { f.textContent = ''; }, 2600); } }
   let garageMode = false;
+  // ausgeparktes Fahrzeug noch fahrbereit?
+  const alive = (v) => !!(v && v !== true && v.hp > 0 && L.ents.vehicles.includes(v));
+  // kaputtes Wrack entfernen
+  function despawn(v) {
+    if (!v || v === true) return;
+    if (P.vehicle === v && L._leaveVehicle) L._leaveVehicle(true);
+    L.scene.remove(v.rig.root); const k = L.ents.vehicles.indexOf(v); if (k >= 0) L.ents.vehicles.splice(k, 1);
+    if (v.key) L.byId.delete(v.key);
+    L.fx('#6a6a6a', v.x, 1, v.z, 20, 4, { size: 0.6, life: 1.2 });
+  }
   function garageHtml(v) {
     let h = '<h3 style="margin:12px 0 4px">🅿️ Deine Garage <small>(' + L.save.garage.length + '/' + GARAGE_MAX + ')</small></h3>';
     if (v) h += '<button class="btn" id="wsSave" style="margin-bottom:6px">💾 Diesen ' + v.t.name + ' in der Garage speichern</button>';
     if (!L.save.garage.length) h += '<p class="small">Noch keine Fahrzeuge gespeichert. Pass ein Fahrzeug an und speichere es – dann kannst du es in jeder Runde hier ausparken.</p>';
     const outNow = (L.round && L.round.garageOut) || {};
-    L.save.garage.forEach((g, i) => { const t = L.VTYPES[g.type]; if (!t) return; h += '<div class="row" style="justify-content:space-between;border-top:1px solid #333;padding-top:4px"><span>' + (t.kind === 'bike' ? '🏍️' : '🚗') + ' <b>' + t.name + '</b> <small>' + (g.cust && g.cust.body && g.cust.body !== 'orig' ? '🎨' : '') + (g.cust && g.cust.led && g.cust.led !== 'none' ? '💡' : '') + (g.cust && g.cust.decal && g.cust.decal !== 'none' ? '🖌️' : '') + (g.cust && g.cust.plate ? ' ' + g.cust.plate : '') + '</small></span><span>' + (outNow[i] ? '<small>schon ausgeparkt</small>' : '<button class="btn" data-out="' + i + '">Ausparken</button>') + ' <button class="btn" data-del="' + i + '">🗑️</button></span></div>'; });
+    L.save.garage.forEach((g, i) => { const t = L.VTYPES[g.type]; if (!t) return; h += '<div class="row" style="justify-content:space-between;border-top:1px solid #333;padding-top:4px"><span>' + (t.kind === 'bike' ? '🏍️' : '🚗') + ' <b>' + t.name + '</b> <small>' + (g.cust && g.cust.body && g.cust.body !== 'orig' ? '🎨' : '') + (g.cust && g.cust.led && g.cust.led !== 'none' ? '💡' : '') + (g.cust && g.cust.decal && g.cust.decal !== 'none' ? '🖌️' : '') + (g.cust && g.cust.plate ? ' ' + g.cust.plate : '') + '</small></span><span>' + (alive(outNow[i]) ? '<small>schon ausgeparkt</small>' : '<button class="btn" data-out="' + i + '">' + (outNow[i] ? '🔧 Kaputt – neu ausparken' : 'Ausparken') + '</button>') + ' <button class="btn" data-del="' + i + '">🗑️</button></span></div>'; });
     return h;
   }
   function bindGarage() {
@@ -529,13 +539,16 @@
   // Fahrzeug aus der Garage holen: steht auf dem Custom-Platz
   function takeOut(i) {
     const g = L.save.garage[i]; if (!g || !L.VTYPES[g.type]) return;
-    const R = L.round; R.garageOut = R.garageOut || {}; if (R.garageOut[i]) return;
+    const R = L.round; R.garageOut = R.garageOut || {};
+    if (alive(R.garageOut[i])) return; // steht noch heil herum
+    if (R.garageOut[i]) despawn(R.garageOut[i]); // das kaputte Wrack verschwindet
     for (const o of L.ents.vehicles) if (!o.occupied && Math.hypot(o.x - WS.x, o.z - (WS.z + 1)) < 4) { o.x += 6; o.rig.root.position.x = o.x; }
     L._g.spawnVehicle({ type: g.type, x: WS.x, z: WS.z + 1, yaw: Math.PI, cust: g.cust });
     const v = L.ents.vehicles[L.ents.vehicles.length - 1];
     L.applyCustom(v, g.cust, true);
-    R.garageOut[i] = true; flash('🚗 ' + v.t.name + ' steht auf dem Custom-Platz!'); render();
+    R.garageOut[i] = v; flash('🚗 ' + v.t.name + ' steht auf dem Custom-Platz!'); render();
   }
+  L._garageOut = (i) => takeOut(i); L._garageHtml = () => garageHtml(null);
   function render() {
     if (!panel) return;
     const v = target;
