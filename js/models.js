@@ -292,22 +292,30 @@
   L.titanToken = () => { const k = L.save && L.save.titanKey; return k && L.hash53(L.hash53(k)) === TK ? L.hash53(k) : null; };
   L.titanCheck = (code) => L.hash53(L.hash53(code)) === TK;
   function buildTitan(app) {
-    const r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, { name: app.name, build: 'muskuloes', height: 'gross', hair: 'glatze', top: 'jacke', topColor: '#2a2e36', pants: 'cargo', pantsColor: '#2a2e36', shoeType: 'stiefel', shoes: '#2a2e36', skin: '#2a2e36' }));
-    const metal = '#7a8494', dark = '#3a404c', glow = '#ff8a20', blue = '#40e0ff', ns = { noShadow: true };
+    const r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, { name: app.name, build: 'muskuloes', height: 'gross', hair: 'glatze', top: 'jacke', topColor: '#a0121a', pants: 'cargo', pantsColor: '#a0121a', shoeType: 'stiefel', shoes: '#a0121a', skin: '#a0121a' }));
+    // rot-gold: rote glänzende Platten, goldenes Gesicht, goldene Oberarme/Oberschenkel, leuchtender Brust-Kern
+    const RED = { metal: 0.35, rough: 0.35 }, GOLD = { metal: 0.3, rough: 0.35 };
+    const metal = '#c0161e', dark = '#f0c040', glow = '#cfefff', blue = '#e8f8ff', ns = { noShadow: true };
+    const pm = (geo, c, sx, sy, sz, x, y, z, par, o) => part(geo, c, sx, sy, sz, x, y, z, par, o || (c === metal ? RED : c === dark ? GOLD : undefined));
     const T0 = r.torso;
-    part(G().box, metal, 0.66, 0.66, 0.42, 0, 0.32, 0, T0); part(G().box, dark, 0.5, 0.12, 0.44, 0, 0.12, 0, T0);
-    for (const s of [-1, 1]) { part(G().box, metal, 0.28, 0.16, 0.36, s * 0.33, 0.62, 0, T0); part(G().box, glow, 0.08, 0.04, 0.02, s * 0.14, 0.42, 0.22, T0, { basic: true, noShadow: true }); }
-    part(G().box, '#1a1c22', 0.36, 0.5, 0.18, 0, 0.32, -0.28, T0);
+    pm(G().box, metal, 0.66, 0.66, 0.42, 0, 0.32, 0, T0); pm(G().box, dark, 0.5, 0.12, 0.44, 0, 0.12, 0, T0);
+    pm(G().box, dark, 0.34, 0.2, 0.02, 0, 0.22, 0.212, T0);
+    for (const s of [-1, 1]) pm(G().box, metal, 0.28, 0.16, 0.36, s * 0.33, 0.62, 0, T0);
+    const core = part(G().cyl, '#bfefff', 0.075, 0.03, 0.075, 0, 0.46, 0.215, T0, { basic: true, noShadow: true }); core.rotation.x = Math.PI / 2;
+    const coreR = part(G().cyl, '#8a8e98', 0.1, 0.02, 0.1, 0, 0.46, 0.208, T0, { metal: 0.8, rough: 0.3 }); coreR.rotation.x = Math.PI / 2;
+    part(G().box, '#7a0c12', 0.36, 0.5, 0.18, 0, 0.32, -0.28, T0, RED);
     for (const s of [-1, 1]) part(G().cyl, '#222', 0.06, 0.2, 0.06, s * 0.1, 0.1, -0.36, T0);
     // Schulter-Minigun rechts
     const sc = new T.Group(); sc.position.set(-0.32, 0.78, -0.05); T0.add(sc);
-    part(G().box, dark, 0.14, 0.12, 0.2, 0, 0, 0, sc); for (let k = 0; k < 4; k++) { const a = k / 4 * 6.283, b = part(G().cyl, '#111', 0.02, 0.4, 0.02, Math.cos(a) * 0.04, Math.sin(a) * 0.04 + 0.03, 0.22, sc); b.rotation.x = Math.PI / 2; }
+    part(G().box, '#8a8e98', 0.14, 0.12, 0.2, 0, 0, 0, sc, { metal: 0.8, rough: 0.3 }); for (let k = 0; k < 4; k++) { const a = k / 4 * 6.283, b = part(G().cyl, '#111', 0.02, 0.4, 0.02, Math.cos(a) * 0.04, Math.sin(a) * 0.04 + 0.03, 0.22, sc); b.rotation.x = Math.PI / 2; }
     r.scannon = sc;
     // Helm mit Visier
-    part(G().box, metal, 0.29, 0.33, 0.3, 0, 0.16, 0, r.head); part(G().box, blue, 0.2, 0.035, 0.02, 0, 0.19, 0.152, r.head, { basic: true, noShadow: true });
-    part(G().box, dark, 0.22, 0.06, 0.02, 0, 0.08, 0.152, r.head, ns);
-    for (const a of r.arms) { part(G().box, metal, 0.16, 0.34, 0.17, 0, -0.16, 0, a.arm); part(G().box, metal, 0.15, 0.3, 0.16, 0, -0.15, 0, a.elbow); part(G().box, blue, 0.05, 0.05, 0.02, 0, -0.34, 0.08, a.elbow, { basic: true, noShadow: true }); }
-    for (const l of r.legs) { part(G().box, metal, 0.2, 0.44, 0.21, 0, -0.22, 0, l.leg); part(G().box, metal, 0.18, 0.42, 0.19, 0, -0.22, 0, l.knee); part(G().box, glow, 0.1, 0.03, 0.1, 0, -0.52, 0, l.knee, { basic: true, noShadow: true }); }
+    pm(G().box, metal, 0.29, 0.33, 0.3, 0, 0.16, 0, r.head);
+    pm(G().box, dark, 0.24, 0.26, 0.06, 0, 0.12, 0.165, r.head); // goldene Gesichtsplatte (deckt die Nase ab)
+    for (const s of [-1, 1]) { const e = part(G().box, blue, 0.075, 0.026, 0.01, s * 0.055, 0.19, 0.198, r.head, { basic: true, noShadow: true }); e.rotation.z = s * 0.12; }
+    part(G().box, '#5a4a20', 0.1, 0.01, 0.01, 0, 0.06, 0.198, r.head, ns);
+    for (const a of r.arms) { pm(G().box, dark, 0.2, 0.36, 0.2, 0, -0.16, 0, a.arm); pm(G().box, metal, 0.19, 0.32, 0.19, 0, -0.15, 0, a.elbow); part(G().cyl, glow, 0.035, 0.02, 0.035, 0, -0.33, 0.085, a.elbow, { basic: true, noShadow: true }).rotation.x = Math.PI / 2; }
+    for (const l of r.legs) { pm(G().box, dark, 0.25, 0.46, 0.25, 0, -0.22, 0, l.leg); pm(G().box, metal, 0.23, 0.44, 0.23, 0, -0.22, 0, l.knee); part(G().box, glow, 0.1, 0.03, 0.1, 0, -0.52, 0, l.knee, { basic: true, noShadow: true }); }
     r.app = Object.assign({}, r.app, { special: 'titan', tk: app.tk });
     return r;
   }
