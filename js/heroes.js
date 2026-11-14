@@ -326,7 +326,35 @@
     if (!r || !r.heroId || r !== P.rig) return;
     const id = r.heroId, [aR, aL] = r.arms;
     // Grundhaltung
-    if (id === 'koloss') { r.torso.rotation.x += 0.18; for (const a of r.arms) a.arm.rotation.z += (a === aR ? -0.25 : 0.25); }
+    if (id === 'koloss') {
+      const hsp = Math.hypot(P.vx, P.vz), run = P.mode === 'run' && hsp > 3 && !P.air && !P.swim && !P.vehicle;
+      if (run) {
+        // schwerer Koloss-Sprint: weit nach vorn gebeugt, riesige Schritte, Arme schwingen wie Hämmer, jeder Schritt bebt
+        const ph = P.phase * 0.82, s1 = Math.sin(ph), c1 = Math.cos(ph);
+        r.body.rotation.x = 0.32; r.body.position.y = -0.06 + Math.abs(c1) * 0.12; r.body.rotation.z = s1 * 0.07;
+        r.torso.rotation.x = 0.22; r.torso.rotation.y = s1 * 0.28;
+        r.head.rotation.x = -0.35;
+        const [l0, l1] = r.legs;
+        l0.leg.rotation.x = s1 * 1.05; l1.leg.rotation.x = -s1 * 1.05;
+        l0.knee.rotation.x = Math.max(0, -c1) * 1.4 + 0.1; l1.knee.rotation.x = Math.max(0, c1) * 1.4 + 0.1;
+        aR.arm.rotation.x = -s1 * 1.25 - 0.2; aL.arm.rotation.x = s1 * 1.25 - 0.2;
+        aR.arm.rotation.z = -0.45 - Math.max(0, s1) * 0.2; aL.arm.rotation.z = 0.45 + Math.max(0, -s1) * 0.2;
+        aR.elbow.rotation.x = -0.9 - Math.max(0, s1) * 0.5; aL.elbow.rotation.x = -0.9 - Math.max(0, -s1) * 0.5;
+        // Fußaufsetzer: Staub, Beben, dumpfer Schlag
+        const step = Math.sign(s1);
+        if (H.lastStep !== undefined && step !== H.lastStep) {
+          const f = r.legs[step > 0 ? 1 : 0].leg, fp = new T.Vector3(); f.getWorldPosition(fp);
+          L.fx('#8a7a60', fp.x, (P.y || 0) + 0.1, fp.z, 6, 3, { size: 0.35, life: 0.6 });
+          L.shake = Math.max(L.shake, 0.18);
+          L.tn && L.tn({ f: 52, fTo: 28, dur: 0.22, vol: 0.28 });
+          if (Math.random() < 0.3) L.decal && L.decal(fp.x, fp.z, 0.6, '#3a3024');
+        }
+        H.lastStep = step;
+      } else {
+        H.lastStep = undefined;
+        r.torso.rotation.x += 0.18; for (const a of r.arms) a.arm.rotation.z += (a === aR ? -0.25 : 0.25);
+      }
+    }
     if (id === 'thor' && P.flying) { aR.arm.rotation.x = -3.0; aR.elbow.rotation.x = 0; r.body.rotation.x = 0.9; }
     if (r.cape) r.cape.rotation.x = 0.15 + Math.min(1.1, Math.hypot(P.vx, P.vz) * 0.06) + (P.flying ? 0.5 : 0) + Math.sin(performance.now() / 300) * 0.05;
     if (!H.anim) return;
