@@ -306,9 +306,20 @@
     underglow(root, c, 1.0, 1.8, 0.3 + lift);
     extras(B, c, { korbY: 0.85, korbZ: 0.85, flagX: -0.45, flagY: 0.7, flagZ: -0.95, rackW: 0.95, rackY: 0.88, rackZ: [0.68, -0.72], spY: 1.02, spZ: -0.85 });
     plate(B, c, 0, 0.58, -0.99, Math.PI);
-    const seat = { x: 0, y: 0.09 + lift, z: -0.22 };
+    // Gelände-ATV: großer schwarzer Koffer auf dem hinteren Gepäckträger (wie bei echten Arbeits-ATVs)
+    if (atv) {
+      const K = grp(B, 0, 0.94, -0.84);
+      part(G().box, '#1a1b1e', 0.98, 0.5, 0.56, 0, 0.25, 0, K);
+      part(G().box, '#232428', 1.02, 0.08, 0.6, 0, 0.53, 0, K);
+      part(G().box, '#141518', 0.9, 0.03, 0.5, 0, 0.58, 0, K);
+      for (const s of [-1, 1]) { part(G().box, '#8a8d92', 0.08, 0.1, 0.03, s * 0.3, 0.42, 0.29, K); part(G().box, '#141518', 0.03, 0.4, 0.5, s * 0.5, 0.25, 0, K); }
+      part(G().box, '#c8c8c8', 0.22, 0.05, 0.02, 0, 0.3, -0.29, K, { basic: true });
+    }
+    // echte Größe: ATVs sind groß (Gelände-ATV ~3,2 m lang, Straßen-Quad etwas kleiner)
+    const S = atv ? 1.35 : 1.2; root.scale.setScalar(S);
+    const seat = { x: 0, y: (0.09 + lift) * S + (0.88 - 0.12) * (S - 1), z: -0.22 * S };
     root.traverse((o) => { if (o.isMesh && o.castShadow !== false) o.castShadow = true; });
-    return { root, wheels, steer, seat, seats: [seat, { x: 0, y: 0.14 + lift, z: -0.62 }], glassZ: 0, color: c.body };
+    return { root, wheels, steer, seat, seats: atv ? [seat] : [seat, { x: 0, y: (0.14 + lift) * S + 0.8 * (S - 1), z: -0.62 * S }], glassZ: 0, color: c.body };
   }
   L.buildCustomVehicle = function (type, cust) {
     const c = sanitize(type, cust);
