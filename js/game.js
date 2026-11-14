@@ -1140,6 +1140,7 @@
     L.snd.key();
   }
   L._leaveVehicle = (s) => leaveVehicle(s);
+  L._enterVehicle = (v) => enterVehicle(v);
   function leaveVehicle(silent) {
     const v = P.vehicle; if (!v) return;
     if ((v.alt || 0) > 1.5 && v.hp > 0 && !silent) { L.msg('✈️ Erst landen! (C oder Shift = runter, nur auf dem Boden aussteigen)', 2500); return; }
