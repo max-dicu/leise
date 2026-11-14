@@ -69,7 +69,7 @@
 
   // ---------- Aussehen ----------
   const part = (geo, c, sx, sy, sz, x, y, z, par, o) => { const m = new T.Mesh(geo, typeof c === 'string' ? L.mat(c, o) : c); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; par.add(m); return m; };
-  const webTex = (() => { let t = null; return () => t || (t = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#123a52'; g.fillRect(0, 0, 128, 128); g.strokeStyle = 'rgba(220,240,255,0.85)'; g.lineWidth = 1.5; for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * 90, 64 + Math.sin(a) * 90); g.stroke(); } for (let r = 10; r < 90; r += 12) { g.beginPath(); for (let k = 0; k <= 12; k++) { const a = k / 12 * 6.283; g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r); } g.stroke(); } return new T.CanvasTexture(c); })()); })();
+  const webTex = (() => { let t = null; return () => t || (t = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#0c0c12'; g.fillRect(0, 0, 128, 128); g.strokeStyle = 'rgba(70,72,88,0.9)'; g.lineWidth = 1.5; for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * 90, 64 + Math.sin(a) * 90); g.stroke(); } for (let r = 10; r < 90; r += 12) { g.beginPath(); for (let k = 0; k <= 12; k++) { const a = k / 12 * 6.283; g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r); } g.stroke(); } return new T.CanvasTexture(c); })()); })();
   function cape(r, col) { const c = new T.Group(); c.position.set(0, 0.6, -0.2); r.torso.add(c); part(L.GEO.box, col, 0.62, 1.35, 0.03, 0, -0.68, 0, c); r.cape = c; return c; }
   function build(app, id) {
     const base = { name: app.name };
@@ -81,18 +81,22 @@
       r.root.scale.setScalar(1.55);
     } else if (id === 'netz') {
       r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, base, { hair: 'glatze', top: 'trikot', topColor: '#123a52', pants: 'skinny', pantsColor: '#123a52', shoeType: 'sneaker', shoes: '#0a1a2a', build: 'schmal', height: 'mittel', beard: 'kein', glasses: 'keine', hat: 'keine' }));
-      const wm = new T.MeshLambertMaterial({ map: webTex() });
-      part(L.GEO.sph, wm, 0.17, 0.2, 0.18, 0, 0.13, 0.01, r.head);
-      for (const s of [-1, 1]) { const e = part(L.GEO.sph, '#f4f8ff', 0.055, 0.04, 0.02, s * 0.07, 0.15, 0.17, r.head, { basic: true }); e.rotation.z = s * 0.4; }
-      part(L.GEO.box, wm, 0.48, 0.62, 0.3, 0, 0.3, 0, r.torso);
-      part(L.GEO.box, '#e8f0ff', 0.12, 0.1, 0.02, 0, 0.38, 0.16, r.torso, { basic: true });
+      const wm = new T.MeshPhongMaterial({ map: webTex(), shininess: 60, specular: 0x404050 });
+      r.head.children.forEach((c) => { c.visible = false; });
+      r.root.traverse((o) => { if (o.isMesh) o.material = wm; });
+      // runder Kopf mit Maske und großen weißen Augenlinsen
+      part(L.GEO.sph, wm, 0.165, 0.2, 0.175, 0, 0.13, 0.01, r.head);
+      part(L.GEO.sph, wm, 0.11, 0.07, 0.12, 0, 0.02, 0.03, r.head);
+      for (const s of [-1, 1]) { const rim = part(L.GEO.sph, '#050507', 0.066, 0.05, 0.02, s * 0.068, 0.15, 0.158, r.head); rim.rotation.z = s * 0.45; const e = part(L.GEO.sph, '#f4f8ff', 0.056, 0.04, 0.021, s * 0.068, 0.15, 0.162, r.head, { basic: true }); e.rotation.z = s * 0.45; }
+      // glatte, runde Arme, Beine und Oberkörper über den eckigen Grundformen
+      for (const a of r.arms) { part(L.GEO.sph, wm, 0.085, 0.18, 0.085, 0, -0.14, 0, a.arm); part(L.GEO.sph, wm, 0.075, 0.17, 0.075, 0, -0.14, 0, a.elbow); part(L.GEO.sph, wm, 0.06, 0.07, 0.05, 0, -0.32, 0.01, a.elbow); }
+      for (const l of r.legs) { part(L.GEO.sph, wm, 0.1, 0.24, 0.1, 0, -0.2, 0, l.leg); part(L.GEO.sph, wm, 0.085, 0.24, 0.085, 0, -0.2, 0, l.knee); }
+      part(L.GEO.sph, wm, 0.27, 0.36, 0.17, 0, 0.3, 0.01, r.torso);
+      part(L.GEO.sph, wm, 0.22, 0.13, 0.15, 0, 0.0, 0, r.hips);
     } else if (id === 'thor') {
       r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, base, { skin: '#e8c0a0', hair: 'lang', hairColor: '#e0b850', beard: 'vollbart', eyes: '#3a7ad0', brows: 'dick', top: 'weste', topColor: '#30323a', pants: 'anzughose', pantsColor: '#24262c', shoeType: 'stiefel', shoes: '#3a3030', build: 'muskuloes', height: 'gross' }));
       cape(r, '#a01818');
       for (let k = 0; k < 6; k++) part(L.GEO.cyl, '#c8ccd4', 0.07, 0.02, 0.07, (k % 2 ? 0.1 : -0.1), 0.48 - Math.floor(k / 2) * 0.13, 0.17, r.torso, { metal: 0.8, rough: 0.3 }).rotation.x = Math.PI / 2;
-      // Flügelhelm
-      part(L.GEO.sph, '#b8bcc4', 0.17, 0.11, 0.18, 0, 0.27, 0, r.head, { metal: 0.8, rough: 0.3 });
-      for (const s of [-1, 1]) { const w = part(L.GEO.box, '#e8e8ec', 0.02, 0.16, 0.1, s * 0.17, 0.32, -0.02, r.head); w.rotation.z = -s * 0.35; }
     } else if (id === 'loki') {
       r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, base, { skin: '#e8d0c0', hair: 'lang', hairColor: '#141414', brows: 'gebogen', mouth: 'grinsen', eyes: '#3a8a4a', top: 'mantel', topColor: '#1a4a2a', pants: 'anzughose', pantsColor: '#141414', shoeType: 'stiefel', shoes: '#141414', build: 'schmal', height: 'gross' }));
       cape(r, '#1a5a2a');
@@ -102,9 +106,19 @@
       r = L.buildHuman(Object.assign({}, L.DEFAULT_CHAR, base, { skin: '#8a5a3a', hair: 'glatze', top: 'tshirt', topColor: '#8a5a3a', pants: 'kurz', pantsColor: '#8a5a3a', shoeType: 'barfuss', shoes: '#6a4428', build: 'extrem', height: 'gross' }));
       r.head.children.forEach((c) => { c.visible = false; });
       const br = '#7a4a2e', dk = '#5a3420';
-      part(L.GEO.sph, br, 0.62, 0.68, 0.55, 0, 0.18, 0.04, r.torso);
-      part(L.GEO.sph, br, 0.24, 0.22, 0.25, 0, 0.12, 0.02, r.head);
-      for (const s of [-1, 1]) { part(L.GEO.sph, '#9a6a48', 0.1, 0.09, 0.08, s * 0.07, 0.03, 0.2, r.head); part(L.GEO.cone, '#f4ecd8', 0.03, 0.3, 0.03, s * 0.06, -0.14, 0.2, r.head).rotation.x = Math.PI; part(L.GEO.sph, '#141414', 0.025, 0.025, 0.02, s * 0.09, 0.18, 0.2, r.head, { basic: true }); for (let k = 0; k < 3; k++) { const w = part(L.GEO.box, '#e8dcc0', 0.15, 0.006, 0.006, s * 0.15, 0.03 + k * 0.025, 0.23, r.head); w.rotation.z = s * (k - 1) * 0.15; } }
+      part(L.GEO.sph, br, 0.6, 0.56, 0.52, 0, -0.04, 0.04, r.torso); r.head.position.z += 0.07; r.head.position.y += 0.04;
+      part(L.GEO.sph, br, 0.3, 0.14, 0.28, 0, -0.06, 0, r.head); // Nackenfalte
+      part(L.GEO.sph, br, 0.26, 0.24, 0.27, 0, 0.1, 0.02, r.head); // Kopf
+      part(L.GEO.sph, '#8a5838', 0.2, 0.13, 0.14, 0, 0.04, 0.16, r.head); // Schnauze
+      part(L.GEO.sph, dk, 0.05, 0.02, 0.02, 0, 0.12, 0.27, r.head);
+      for (const s of [-1, 1]) {
+        part(L.GEO.sph, '#9a6a48', 0.1, 0.09, 0.08, s * 0.07, 0.02, 0.24, r.head); // Barthaar-Polster
+        part(L.GEO.sph, '#141414', 0.022, 0.024, 0.015, s * 0.12, 0.2, 0.2, r.head, { basic: true }); // Auge
+        part(L.GEO.sph, '#141414', 0.012, 0.02, 0.01, s * 0.025, 0.1, 0.29, r.head, { basic: true }); // Nasenloch
+        const tusk = part(L.GEO.cone, '#f4ecd8', 0.028, 0.48, 0.028, s * 0.06, -0.24, 0.24, r.head, { metal: 0.1, rough: 0.6 }); tusk.rotation.set(Math.PI - 0.12, 0, -s * 0.06);
+        for (let k = 0; k < 18; k++) { const hr = part(L.GEO.cyl, '#e8d8b0', 0.004, 0.08, 0.004, s * (0.03 + (k % 6) * 0.017), -0.02 + Math.floor(k / 6) * 0.03, 0.3, r.head); hr.rotation.set(1.3 + Math.floor(k / 6) * 0.15, 0, s * (0.2 + (k % 6) * 0.08)); }
+        for (let k = 0; k < 4; k++) { const hr = part(L.GEO.cyl, '#c8b890', 0.004, 0.07, 0.004, s * (0.08 + k * 0.03), 0.3, 0.06 - k * 0.04, r.head); hr.rotation.z = -s * 0.4; }
+      }
       for (const a of r.arms) { part(L.GEO.sph, dk, 0.1, 0.05, 0.22, 0, -0.32, 0.08, a.elbow); }
     }
     r.app = Object.assign({}, r.app, { special: 'h_' + id, hk: app.hk, name: app.name });
