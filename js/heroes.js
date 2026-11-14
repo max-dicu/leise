@@ -149,13 +149,27 @@
   const fwd = () => { const d = V(); L.camera.getWorldDirection(d); d.y = 0; d.normalize(); return d; };
   const aim = () => { const d = V(); L.camera.getWorldDirection(d); return d; };
   const handPos = () => { const h = V(); if (P.rig && P.rig.hand) P.rig.hand.getWorldPosition(h); else h.set(P.x, (P.y || 0) + 1.4, P.z); return h; };
+  // Abstand zum echten Körper (auch bei riesigen Monstern: Beine, Kuppel, Körper zählen)
+  const HB = new T.Box3(), BB = new T.Box3(), PT = new T.Vector3();
+  function distTo(e, x, y, z) {
+    if (e.sph && e.sph.length) { let best = 1e9; for (const q of e.sph) best = Math.min(best, Math.hypot(q[0] - x, q[1] - y, q[2] - z) - q[3]); return Math.max(0, best); }
+    const root = e.rig && e.rig.root;
+    if (root && root.visible !== false) {
+      root.updateMatrixWorld(true); HB.makeEmpty();
+      root.traverse((o) => { if (!o.isMesh || !o.geometry) return; for (let p = o; p && p !== root; p = p.parent) if (!p.visible) return; const m = o.material; if (m && m.transparent && m.opacity < 0.3) return; if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); BB.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld); HB.union(BB); });
+      if (!HB.isEmpty()) return HB.distanceToPoint(PT.set(x, y, z));
+    }
+    const ey = e.y !== undefined ? e.y : 1;
+    return Math.max(0, Math.hypot(e.x - x, e.z - z, (ey - y) * 0.5) - (e.bigR || 0.6));
+  }
+  L.heroDistTo = distTo;
   function hitArea(x, y, z, r, dmg, knock, stun, skip) {
     let n = 0;
     for (const e of targets()) {
       if (skip && skip.has(e)) continue;
-      const ey = e.y !== undefined ? e.y : (e.hy !== undefined ? e.hy * 0.5 : 0);
-      const d = Math.hypot(e.x - x, e.z - z);
-      if (d > r + (e.bigR || 0) || Math.abs(ey - y) > r + 25) continue;
+      if (!e.sph && Math.hypot(e.x - x, e.z - z) > r + 200) continue;
+      const d = distTo(e, x, y, z);
+      if (d > r) continue;
       L.damageEnt(e, dmg * (1 - Math.min(d, r) / (r * 1.6)), P.x, P.z, P); n++;
       if (skip) skip.add(e);
       if (e.kind && L.MK && L.MK[e.kind] && !e.dead) {
@@ -192,7 +206,7 @@
       case 'kolossfaust': {
         play('punch', 0.4);
         rageUp(); const kp = kPow(), kr = kRad();
-        setTimeout(() => { const n = hitArea(P.x + f.x * 2.6 * kr, y + 1, P.z + f.z * 2.6 * kr, 3.2 * kr, 380 * kp, 6 * kr); if (n) { L.shake = Math.max(L.shake, 0.6); boom(0.6); L.fx('#c8b090', P.x + f.x * 2.6, y + 1.2, P.z + f.z * 2.6, 14, 6, { size: 0.3, life: 0.6 }); } else L.snd.swing && L.snd.swing(); }, 140);
+        setTimeout(() => { const n = hitArea(P.x + f.x * 2.6 * kr, y + 1.6 * RG.show, P.z + f.z * 2.6 * kr, 3.2 * kr, 380 * kp, 6 * kr); if (n) { L.shake = Math.max(L.shake, 0.6); boom(0.6); L.fx('#c8b090', P.x + f.x * 2.6, y + 1.2, P.z + f.z * 2.6, 14, 6, { size: 0.3, life: 0.6 }); } else L.snd.swing && L.snd.swing(); }, 140);
         break;
       }
       case 'donnerklatscher': {
@@ -200,7 +214,7 @@
         setTimeout(() => {
           boom(1); L.shake = Math.max(L.shake, 1); L.env.bolt = 0.3;
           const m = ring(P.x + f.x * 2, y + 1.5, P.z + f.z * 2, 0xffffff, 30, 0.7, false); m.lookAt(P.x + f.x * 10, y + 1.5, P.z + f.z * 10);
-          for (const e of targets()) { const dx = e.x - P.x, dz = e.z - P.z, dd = Math.hypot(dx, dz); if (dd > 32 * kr + (e.bigR || 0) || (dx * f.x + dz * f.z) / (dd || 1) < 0.75) continue; L.damageEnt(e, 170 * kp * (1 - dd / (40 * kr)), P.x, P.z, P); if (L.MK && L.MK[e.kind] && !e.dead) { e.x += dx / (dd || 1) * 10; e.z += dz / (dd || 1) * 10; e.stunT = Math.max(e.stunT || 0, 2); } }
+          for (const e of targets()) { const dx = e.x - P.x, dz = e.z - P.z, dd0 = Math.hypot(dx, dz); if (dd0 > 32 * kr + 200) continue; const dd = Math.min(dd0, distTo(e, P.x + f.x * 2, y + 1.5 * RG.show, P.z + f.z * 2) + 2); if (dd > 32 * kr || ((dx * f.x + dz * f.z) / (dd0 || 1) < 0.75 && dd > 6 * kr)) continue; L.damageEnt(e, 170 * kp * (1 - dd / (40 * kr)), P.x, P.z, P); if (L.MK && L.MK[e.kind] && !e.dead) { e.x += dx / (dd || 1) * 10; e.z += dz / (dd || 1) * 10; e.stunT = Math.max(e.stunT || 0, 2); } }
           for (let k = 0; k < 20; k++) L.fx('#d8c8a8', P.x + f.x * (3 + k * 1.4), y + 0.5, P.z + f.z * (3 + k * 1.4), 2, 5, { size: 0.5, life: 0.8 });
         }, 320);
         break;
@@ -335,7 +349,7 @@
     // Landung nach Sprung-Angriffen
     if (H.wasAir && !P.air && H.slam) {
       const S = H.slam; H.slam = null; const y = P.y || 0;
-      hitArea(P.x, y + 1, P.z, S.r, S.dmg, 8, 1.5);
+      hitArea(P.x, y + 1, P.z, S.r + (isK() ? 3 * RG.show : 0), S.dmg, 8, 1.5);
       ring(P.x, y + 0.3, P.z, S.col, S.r * 1.3, 0.7); boom(1); L.shake = Math.max(L.shake, 1.2);
       L.decal && L.decal(P.x, P.z, S.r * 0.5, '#2a2018');
       for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283; L.fx(S.splash ? '#e8f4ff' : '#8a7a60', P.x + Math.sin(a) * 2, y + 0.3, P.z + Math.cos(a) * 2, 2, 8, { size: 0.5, life: 1 }); }
