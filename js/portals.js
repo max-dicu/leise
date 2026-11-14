@@ -45,6 +45,17 @@
     g.userData = { ring, inner, swirl, deco, th };
     L.scene.add(g); return g;
   }
+  // Spieler – samt Fahrzeug, wenn er drin sitzt – an einen Ort versetzen (Schwung bleibt erhalten)
+  L.carryTo = function (x, z, y, keepSpeed) {
+    const v = P.vehicle;
+    if (v) {
+      v.x = x; v.z = z; if (!keepSpeed) v.speed = 0; v.vy = 0; v.sink = 0;
+      if (!(v.t.fly || v.t.plane) || !(v.alt > 0.5)) v.alt = v.t.boat || v.t.sub ? v.alt : 0;
+      v.rig.root.position.set(x, v.alt || 0, z);
+      P.x = x; P.z = z;
+    } else { P.x = x; P.z = z; P.y = (y || 0) + 0.1; P.vx = P.vz = P.vy = 0; P.air = true; }
+    P.spawnProt = Math.max(P.spawnProt || 0, 2);
+  };
   let entry = null, exits = [];
   // offene Portale (vom Anzug-Träger): alle Spieler sehen sie und können hindurchgehen
   const open = [], LIFE = 30;
@@ -75,7 +86,8 @@
     if (!fl) { fl = document.createElement('div'); fl.id = 'portalFlash'; fl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:40;opacity:0;transition:opacity .45s'; document.body.appendChild(fl); }
     fl.style.background = '#' + new T.Color(THEMES[e.th].inner).getHexString(); fl.style.opacity = '0.9'; setTimeout(() => { fl.style.opacity = '0'; }, 120);
     const yaw = P.camYaw;
-    P.x = x; P.z = z; P.y = y + 0.1; P.vx = P.vz = P.vy = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 2);
+    L.carryTo(x, z, y, true);
+    if (P.vehicle) { P.vehicle.yaw = yaw; P.vehicle.x += Math.sin(yaw) * 3; P.vehicle.z += Math.cos(yaw) * 3; }
     if (L.underwaterDive) L.underwaterDive = false;
     // Ausgangsportal hinter dir, schließt sich
     const g = build(e.th); g.position.set(x - Math.sin(yaw) * 2.2, y + 1.9, z - Math.cos(yaw) * 2.2); g.rotation.y = yaw;
@@ -98,7 +110,8 @@
       if (e.g.visible) anim(e.g, e.t, dt);
       e.cd = (e.cd || 0) - dt;
       const dh = Math.hypot(P.x - e.x, P.z - e.z);
-      if (e.t > 0.5 && e.cd <= 0 && dh < 1.7 && Math.abs((P.y || 0) + 1 - e.y) < 3.5 && P.alive && !P.vehicle && !L.cine) { e.cd = 3; arrive(e); }
+      const v = P.vehicle, py = v ? (v.alt || 0) : (P.y || 0), reach = v ? 2.2 + v.t.len * 0.4 : 1.7;
+      if (e.t > 0.5 && e.cd <= 0 && Math.hypot((v || P).x - e.x, (v || P).z - e.z) < reach && Math.abs(py + 1 - e.y) < (v ? 5 : 3.5) && P.alive && !L.cine) { e.cd = 3; arrive(e); }
       if (e.t > LIFE) { L.scene.remove(e.g); open.splice(i, 1); }
     }
     for (let i = exits.length - 1; i >= 0; i--) {

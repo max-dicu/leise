@@ -32,9 +32,10 @@
     if (!pBack && L.inTitan(P.x, P.z)) { pBack = portal(0x9a9aff, 0xd0d0ff); pBack.g.position.set(BACKP.x, 10.5, BACKP.z); pBack.g.rotation.y = Math.PI / 2; }
     for (const p of [pMoon, pBack]) if (p) { p.sw.forEach((s, k) => { s.rotation.z = t * (k % 2 ? 1.6 : -1.2); }); p.disc.material.opacity = 0.5 + Math.sin(t * 3) * 0.15; }
     if (travel) { travel.t += dt; L.backFade && (L.backFade.style.background = travel.toT ? '#ffb060' : '#c0c0ff', L.backFade.style.opacity = String(travel.t < 1.6 ? Math.max(0, (travel.t - 1.2) / 0.4) : Math.max(0, 1 - (travel.t - 1.6) / 0.6))); if (travel.t > 1.6 && !travel.done) doTravel(); if (travel.t > 2.3) { travel = null; if (L.backFade) L.backFade.style.opacity = '0'; } return; }
-    if (!P.alive || L.cine || P.vehicle) return;
-    if (pMoon && L.inMoon(P.x) && Math.hypot(P.x - mp.x, P.z - mp.z) < 6) startTravel(true);
-    if (pBack && L.inTitan(P.x, P.z) && Math.hypot(P.x - BACKP.x, P.z - BACKP.z) < 6) startTravel(false);
+    if (!P.alive || L.cine) return;
+    const ref = P.vehicle || P, reach = P.vehicle ? 7 + P.vehicle.t.len * 0.4 : 6;
+    if (pMoon && L.inMoon(ref.x) && Math.hypot(ref.x - mp.x, ref.z - mp.z) < reach) startTravel(true);
+    if (pBack && L.inTitan(ref.x, ref.z) && Math.hypot(ref.x - BACKP.x, ref.z - BACKP.z) < reach) startTravel(false);
   }
   function startTravel(toT) {
     travel = { toT, t: 0 };
@@ -45,8 +46,11 @@
   function doTravel() {
     travel.done = true;
     const toT = travel.toT, mp = MOONP();
-    if (toT) { if (!world) build(); P.x = BACKP.x + 14; P.z = BACKP.z; } else { P.x = mp.x - 14; P.z = mp.z; }
-    P.y = 1; P.vx = P.vz = P.vy = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 6); P.yaw = toT ? Math.PI / 2 : -Math.PI / 2;
+    if (toT && !world) build();
+    const tx = toT ? BACKP.x + 16 : mp.x - 16, tz = toT ? BACKP.z : mp.z;
+    if (L.carryTo) L.carryTo(tx, tz, 1, false); else { P.x = tx; P.z = tz; P.y = 1; P.air = true; }
+    if (P.vehicle) P.vehicle.yaw = toT ? Math.PI / 2 : -Math.PI / 2;
+    P.spawnProt = Math.max(P.spawnProt || 0, 6); P.yaw = toT ? Math.PI / 2 : -Math.PI / 2;
     if (L.endCine && L.cine) L.endCine();
     if (toT) L.banner('🪐 DER TITANENMOND', B && !B.dead ? 'Ganz hinten in den Ruinen wartet THANATOS. Besiege ihn für den Ewigkeitshandschuh!' : 'Thanatos ist besiegt – er kehrt bald zurück …');
     else L.banner('🌕 ZURÜCK AUF DEM MOND', 'Das Portal zum Titanenmond bleibt offen.');

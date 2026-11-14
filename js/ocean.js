@@ -159,8 +159,7 @@
   }
   function travel(toDim) {
     // Kurzfilm: durch das Portal
-    const v = P.vehicle;
-    if (v && L._leaveVehicle) L._leaveVehicle(true);
+    // Fahrzeug fährt mit durchs Portal
     const from = toDim ? L.PORTAL : L.DIM_PORTAL;
     L.banner(toDim ? '🌀 DAS PORTAL' : '🌀 ZURÜCK', toDim ? 'Du wirst in eine andere Dimension gezogen …' : 'Zurück in die Heimat …');
     for (let k = 0; k < 6; k++) setTimeout(() => L.tn({ f: 200 + k * 120, fTo: 2000, dur: 0.8, type: 'sine', vol: 0.12 }), k * 400);
@@ -176,7 +175,8 @@
   function doTravel() {
     const toDim = pending.toDim; pending = null;
     const c = toDim ? L.dimCheckpoint() : { x: 1490, z: 200 };
-    P.x = c.x; P.z = c.z; P.y = toDim ? 0.5 : 0; P.vx = P.vz = P.vy = 0; P.air = true; P.spawnProt = Math.max(P.spawnProt || 0, 15);
+    if (L.carryTo) L.carryTo(c.x, c.z, toDim ? 0.5 : 0, false); else { P.x = c.x; P.z = c.z; P.y = toDim ? 0.5 : 0; P.vx = P.vz = P.vy = 0; P.air = true; }
+    P.spawnProt = Math.max(P.spawnProt || 0, 15);
     L.msg(toDim ? '🌌 Willkommen in der Dimension. Fall nicht in die Leere!' : '🏠 Du bist wieder in der Heimat.', 6000);
   }
   function updatePortal(dt) {
